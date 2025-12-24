@@ -1,8 +1,9 @@
-from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QHBoxLayout, QVBoxLayout, QLabel, QStylePainter, QStyleOptionButton, QStackedWidget
+from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QHBoxLayout, QVBoxLayout, QLabel, QStylePainter, \
+    QStyleOptionButton, QStackedWidget, QFileDialog, QLineEdit
 from PyQt6.QtCore import Qt, QRect, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QIcon, QPainter
+from PyQt6.QtGui import QIcon, QPainter, QPixmap
 from BlurWindow.blurWindow import blur
-import ctypes, sys, os
+import ctypes, sys, os, json
 
 STYLE_BTN = "QPushButton{background:transparent;border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.2);}"
 STYLE_BTN_ACTIVE = "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.1);}"
@@ -70,6 +71,9 @@ class Window(QWidget):
 
     def __init__(self):
         super().__init__()
+        self.config_file = "config.json"
+        self.load_config()
+
         self.setWindowTitle("Spectra")
         if os.path.exists("icon.png"):
             self.setWindowIcon(QIcon("icon.png"))
@@ -142,7 +146,7 @@ class Window(QWidget):
         # 内容区
         self.stack = QStackedWidget()
         self.stack.setStyleSheet("background:transparent;")
-        self.stack.addWidget(QWidget())  # 主页
+        self.stack.addWidget(QWidget())
         self.stack.addWidget(self.create_config_page())
         rl.addWidget(self.stack, 1)
 
@@ -151,6 +155,26 @@ class Window(QWidget):
         self.drag_pos = None
         self.resize_edge = None
         self.switch_page(0)
+
+        # 应用保存的配置
+        if self.config["background_mode"] == "image" and self.config["background_image_path"]:
+            if os.path.exists(self.config["background_image_path"]):
+                self.set_background_image(self.config["background_image_path"])
+
+    def load_config(self):
+        try:
+            with open(self.config_file, 'r', encoding='utf-8') as f:
+                self.config = json.load(f)
+        except:
+            self.config = {
+                "background_mode": "blur",
+                "background_image_path": ""
+            }
+            self.save_config()
+
+    def save_config(self):
+        with open(self.config_file, 'w', encoding='utf-8') as f:
+            json.dump(self.config, f, ensure_ascii=False, indent=2)
 
     def create_nav_btn(self, icon, text, handler, page_index=None):
         container = QWidget()
@@ -209,7 +233,8 @@ class Window(QWidget):
     def create_title_btn(self, text, handler):
         b = JellyButton(text)
         b.setFixedSize(32, 32)
-        b.setStyleSheet("QPushButton{background:transparent;color:white;border:none;border-radius:16px;font-size:16px;font-family:'微软雅黑';}QPushButton:hover{background:rgba(255,255,255,0.2);}")
+        b.setStyleSheet(
+            "QPushButton{background:transparent;color:white;border:none;border-radius:16px;font-size:16px;font-family:'微软雅黑';}QPushButton:hover{background:rgba(255,255,255,0.2);}")
         b.clicked.connect(handler)
         return b
 
@@ -218,11 +243,197 @@ class Window(QWidget):
         page.setStyleSheet("background:transparent;")
         pl = QVBoxLayout(page)
         pl.setContentsMargins(20, 10, 20, 20)
-        lbl = QLabel("设置")
-        lbl.setStyleSheet("color:white;font-size:20px;font-family:'微软雅黑';font-weight:bold;")
-        pl.addWidget(lbl)
+        pl.setSpacing(15)
+
+        title = QLabel("设置")
+        title.setStyleSheet("color:white;font-size:20px;font-family:'微软雅黑';font-weight:bold;")
+        pl.addWidget(title)
+
+        bg_title = QLabel("背景")
+        bg_title.setStyleSheet("color:white;font-size:16px;font-family:'微软雅黑';")
+        pl.addWidget(bg_title)
+
+        self.blur_card = self.create_bg_card("模糊背景", "使用系统窗口模糊效果",
+                                             self.config["background_mode"] == "blur",
+                                             lambda: self.set_background("blur"))
+        pl.addWidget(self.blur_card)
+
+        # 图片背景卡片容器
+        self.image_card_container = QWidget()
+        self.image_card_container.setStyleSheet("background:transparent;")
+        image_container_layout = QVBoxLayout(self.image_card_container)
+        image_container_layout.setContentsMargins(0, 0, 0, 0)
+        image_container_layout.setSpacing(10)
+
+        self.image_card = self.create_bg_card("图像背景", "使用图像作为背景", self.config["background_mode"] == "image",
+                                              lambda: self.set_background("image"))
+        image_container_layout.addWidget(self.image_card)
+
+        # 路径输入区域
+        self.path_widget = QWidget()
+        self.path_widget.setStyleSheet("background:transparent;")
+        path_layout = QHBoxLayout(self.path_widget)
+        path_layout.setContentsMargins(35, 0, 0, 0)
+        path_layout.setSpacing(10)
+
+        path_label = QLabel("背景图片路径")
+        path_label.setStyleSheet("color:rgba(255,255,255,0.8);font-size:13px;font-family:'微软雅黑';")
+        path_layout.addWidget(path_label)
+
+        self.path_input = QLineEdit()
+        self.path_input.setText(self.config["background_image_path"])
+        self.path_input.setStyleSheet(
+            "QLineEdit{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:6px;color:white;font-size:13px;font-family:'微软雅黑';}")
+        self.path_input.editingFinished.connect(self.on_path_changed)
+        path_layout.addWidget(self.path_input, 1)
+
+        browse_btn = JellyButton("📁")
+        browse_btn.setFixedSize(32, 32)
+        browse_btn.setStyleSheet(
+            "QPushButton{background:rgba(255,255,255,0.1);border:none;border-radius:4px;font-size:16px;}QPushButton:hover{background:rgba(255,255,255,0.15);}")
+        browse_btn.clicked.connect(self.choose_background_image)
+        path_layout.addWidget(browse_btn)
+
+        image_container_layout.addWidget(self.path_widget)
+        self.path_widget.setVisible(self.config["background_mode"] == "image")
+
+        pl.addWidget(self.image_card_container)
         pl.addStretch()
+
         return page
+
+    def create_bg_card(self, title, desc, selected, handler):
+        card = QPushButton()
+        card.setFixedHeight(70)
+        card.setCursor(Qt.CursorShape.PointingHandCursor)
+        card.clicked.connect(handler)
+
+        style = "background:rgba(255,255,255,0.15);" if selected else "background:rgba(255,255,255,0.05);"
+        card.setStyleSheet(
+            f"QPushButton{{{style}border:none;border-radius:8px;}}QPushButton:hover{{background:rgba(255,255,255,0.1);}}")
+
+        layout = QHBoxLayout(card)
+        layout.setContentsMargins(15, 12, 15, 12)
+        layout.setSpacing(12)
+
+        radio = QLabel()
+        radio.setFixedSize(20, 20)
+        if selected:
+            radio.setStyleSheet("background:rgba(255,255,255,0.9);border:5px solid #4080ff;border-radius:10px;")
+        else:
+            radio.setStyleSheet("background:rgba(255,255,255,0.8);border:1px solid rgba(0,0,0,0.3);border-radius:10px;")
+        radio.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        layout.addWidget(radio, 0, Qt.AlignmentFlag.AlignTop)
+
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(4)
+        text_layout.setContentsMargins(0, 0, 0, 0)
+
+        title_lbl = QLabel(title)
+        title_lbl.setStyleSheet("color:white;font-size:14px;font-family:'微软雅黑';background:transparent;")
+        title_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        text_layout.addWidget(title_lbl)
+
+        desc_lbl = QLabel(desc)
+        desc_lbl.setStyleSheet(
+            "color:rgba(255,255,255,0.6);font-size:12px;font-family:'微软雅黑';background:transparent;")
+        desc_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        text_layout.addWidget(desc_lbl)
+
+        layout.addLayout(text_layout)
+        layout.addStretch()
+
+        card.radio = radio
+        return card
+
+    def toggle_image_card(self):
+        if self.path_widget.isVisible():
+            return
+        self.path_widget.setVisible(True)
+        self.set_background("image")
+        if self.config["background_image_path"] and os.path.exists(self.config["background_image_path"]):
+            self.set_background_image(self.config["background_image_path"])
+        else:
+            self.choose_background_image()
+
+    def set_background(self, mode):
+        self.config["background_mode"] = mode
+        self.save_config()
+
+        if mode == "blur":
+            self.blur_card.setStyleSheet(
+                "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.1);}")
+            self.blur_card.radio.setStyleSheet(
+                "background:rgba(255,255,255,0.9);border:5px solid #4080ff;border-radius:10px;")
+
+            self.image_card.setStyleSheet(
+                "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.1);}")
+            self.image_card.radio.setStyleSheet(
+                "background:rgba(255,255,255,0.8);border:1px solid rgba(0,0,0,0.3);border-radius:10px;")
+
+            self.path_widget.setVisible(False)
+
+            blur(self.winId())
+            if hasattr(self, 'bg_label_widget'):
+                self.bg_label_widget.hide()
+        elif mode == "image":
+            self.blur_card.setStyleSheet(
+                "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.1);}")
+            self.blur_card.radio.setStyleSheet(
+                "background:rgba(255,255,255,0.8);border:1px solid rgba(0,0,0,0.3);border-radius:10px;")
+
+            self.image_card.setStyleSheet(
+                "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.1);}")
+            self.image_card.radio.setStyleSheet(
+                "background:rgba(255,255,255,0.9);border:5px solid #4080ff;border-radius:10px;")
+
+            self.path_widget.setVisible(True)
+
+    def on_path_changed(self):
+        path = self.path_input.text().strip()
+        if path and os.path.exists(path):
+            self.config["background_image_path"] = path
+            self.save_config()
+            self.set_background_image(path)
+        elif not path:
+            self.config["background_image_path"] = ""
+            self.save_config()
+
+    def choose_background_image(self):
+        file, _ = QFileDialog.getOpenFileName(self, "选择背景图片", "", "图片文件 (*.png *.jpg *.jpeg *.bmp)")
+        if file:
+            self.config["background_image_path"] = file
+            self.save_config()
+            self.path_input.setText(file)
+            self.set_background_image(file)
+
+    def set_background_image(self, path):
+        if not os.path.exists(path):
+            return
+
+        if not hasattr(self, 'bg_label_widget'):
+            self.bg_label_widget = QLabel(self)
+            self.bg_label_widget.lower()
+
+        pixmap = QPixmap(path)
+        w, h = self.width(), self.height()
+
+        img_w, img_h = pixmap.width(), pixmap.height()
+        scale = max(w / img_w, h / img_h)
+        scaled_w, scaled_h = int(img_w * scale), int(img_h * scale)
+
+        scaled_pixmap = pixmap.scaled(scaled_w, scaled_h, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                                      Qt.TransformationMode.SmoothTransformation)
+
+        x = (scaled_w - w) // 2
+        y = (scaled_h - h) // 2
+        cropped = scaled_pixmap.copy(x, y, w, h)
+
+        self.bg_label_widget.setPixmap(cropped)
+        self.bg_label_widget.setGeometry(0, 0, w, h)
+        self.bg_label_widget.show()
+        self.current_bg_path = path
+        self.set_background("image")
 
     def switch_page(self, index):
         self.stack.setCurrentIndex(index)
@@ -253,10 +464,14 @@ class Window(QWidget):
     def get_edge(self, pos):
         x, y, w, h, e = pos.x(), pos.y(), self.width(), self.height(), self.EDGE
         edge = ""
-        if y < e: edge += "t"
-        elif y > h - e: edge += "b"
-        if x < e: edge += "l"
-        elif x > w - e: edge += "r"
+        if y < e:
+            edge += "t"
+        elif y > h - e:
+            edge += "b"
+        if x < e:
+            edge += "l"
+        elif x > w - e:
+            edge += "r"
         return edge
 
     def update_cursor(self, global_pos):
@@ -296,6 +511,11 @@ class Window(QWidget):
     def mouseReleaseEvent(self, ev):
         self.drag_pos = None
         self.resize_edge = None
+
+    def resizeEvent(self, ev):
+        super().resizeEvent(ev)
+        if hasattr(self, 'bg_label_widget') and self.bg_label_widget.isVisible() and hasattr(self, 'current_bg_path'):
+            self.set_background_image(self.current_bg_path)
 
 
 app = QApplication(sys.argv)
