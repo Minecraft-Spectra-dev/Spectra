@@ -12,7 +12,7 @@ os.environ["QT_LOGGING_RULES"] = "qt.multimedia*=false"
 from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QHBoxLayout, QVBoxLayout, QLabel, QStylePainter, \
     QStyleOptionButton, QStackedWidget, QFileDialog, QLineEdit
 from PyQt6.QtCore import Qt, QRect, QPropertyAnimation, QEasingCurve, QUrl, QSizeF
-from PyQt6.QtGui import QIcon, QPainter, QPixmap
+from PyQt6.QtGui import QIcon, QPainter, QPixmap, QCursor
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from BlurWindow.blurWindow import blur
 import ctypes, sys, json
@@ -161,8 +161,6 @@ class Window(QWidget):
         # 内容区
         self.stack = QStackedWidget()
         self.stack.setStyleSheet("background:transparent;")
-        self.stack.setMouseTracking(True)
-        self.stack.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.stack.addWidget(QWidget())
         self.stack.addWidget(self.create_config_page())
         rl.addWidget(self.stack, 1)
@@ -194,6 +192,12 @@ class Window(QWidget):
         self.audio_output.setVolume(0)
         self.player.setAudioOutput(self.audio_output)
         self.player.setLoops(QMediaPlayer.Loops.Infinite)
+
+        # 定时器轮询光标位置
+        from PyQt6.QtCore import QTimer
+        self.cursor_timer = QTimer()
+        self.cursor_timer.timeout.connect(lambda: self.update_cursor(QCursor.pos()))
+        self.cursor_timer.start(50)  # 每 50ms 更新一次
 
         self.show()
 
