@@ -1,8 +1,52 @@
-from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QHBoxLayout, QVBoxLayout, QLabel
-from PyQt6.QtCore import Qt, QRect, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QHBoxLayout, QVBoxLayout, QLabel, QStylePainter, QStyleOptionButton
+from PyQt6.QtCore import Qt, QRect, QPropertyAnimation, QEasingCurve, pyqtProperty
+from PyQt6.QtGui import QIcon, QPainter
 from BlurWindow.blurWindow import blur
 import ctypes, sys, os
+
+
+class JellyButton(QPushButton):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._scale = 1.0
+
+    @pyqtProperty(float)
+    def scale(self):
+        return self._scale
+
+    @scale.setter
+    def scale(self, s):
+        self._scale = s
+        self.update()
+
+    def paintEvent(self, ev):
+        painter = QStylePainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        cx, cy = self.width() / 2, self.height() / 2
+        painter.translate(cx, cy)
+        painter.scale(self._scale, self._scale)
+        painter.translate(-cx, -cy)
+        opt = QStyleOptionButton()
+        self.initStyleOption(opt)
+        painter.drawControl(self.style().ControlElement.CE_PushButton, opt)
+
+    def mousePressEvent(self, ev):
+        self.anim = QPropertyAnimation(self, b"scale")
+        self.anim.setDuration(100)
+        self.anim.setStartValue(1.0)
+        self.anim.setEndValue(0.92)
+        self.anim.setEasingCurve(QEasingCurve.Type.OutQuad)
+        self.anim.start()
+        super().mousePressEvent(ev)
+
+    def mouseReleaseEvent(self, ev):
+        self.anim = QPropertyAnimation(self, b"scale")
+        self.anim.setDuration(150)
+        self.anim.setStartValue(self._scale)
+        self.anim.setEndValue(1.0)
+        self.anim.setEasingCurve(QEasingCurve.Type.OutBack)
+        self.anim.start()
+        super().mouseReleaseEvent(ev)
 
 
 class Window(QWidget):
@@ -58,7 +102,7 @@ class Window(QWidget):
         sb.setSpacing(5)
 
         # 菜单按钮
-        self.menu_btn = QPushButton()
+        self.menu_btn = JellyButton()
         self.menu_btn.setFixedHeight(40)
         self.menu_btn.setMouseTracking(True)
         self.menu_btn.setStyleSheet(
@@ -97,7 +141,7 @@ class Window(QWidget):
         sb.addStretch()
 
         # 配置按钮
-        self.config_btn = QPushButton()
+        self.config_btn = JellyButton()
         self.config_btn.setFixedHeight(40)
         self.config_btn.setMouseTracking(True)
         self.config_btn.setStyleSheet(
@@ -153,7 +197,7 @@ class Window(QWidget):
         tb.addStretch()
 
         for t, s in [("−", self.showMinimized), ("×", self.close)]:
-            b = QPushButton(t)
+            b = JellyButton(t)
             b.setFixedSize(32, 32)
             b.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
             b.setMouseTracking(True)
