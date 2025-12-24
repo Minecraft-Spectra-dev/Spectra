@@ -87,12 +87,12 @@ class Window(QWidget):
     def __init__(self):
         super().__init__()
         self.config_file = "config.json"
-        self.load_config()
+        self.config = self.load_config()
 
         self.setWindowTitle("Spectra")
         if os.path.exists("icon.png"):
             self.setWindowIcon(QIcon("icon.png"))
-        self.resize(600, 400)
+        self.resize(self.config["window_width"], self.config["window_height"])
         self.setMinimumSize(400, 300)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
@@ -161,6 +161,8 @@ class Window(QWidget):
         # 内容区
         self.stack = QStackedWidget()
         self.stack.setStyleSheet("background:transparent;")
+        self.stack.setMouseTracking(True)
+        self.stack.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.stack.addWidget(QWidget())
         self.stack.addWidget(self.create_config_page())
         rl.addWidget(self.stack, 1)
@@ -192,9 +194,6 @@ class Window(QWidget):
         self.audio_output.setVolume(0)
         self.player.setAudioOutput(self.audio_output)
         self.player.setLoops(QMediaPlayer.Loops.Infinite)
-        self.player.setVideoOutput(self.video_item)
-        self.player.mediaStatusChanged.connect(
-            lambda s: self.player.play() if s == QMediaPlayer.MediaStatus.EndOfMedia else None)
 
         self.show()
 
@@ -205,14 +204,21 @@ class Window(QWidget):
 
     def load_config(self):
         try:
-            with open(self.config_file, 'r', encoding='utf-8') as f:
-                self.config = json.load(f)
+            with open("config.json", "r", encoding="utf-8") as f:
+                config = json.load(f)
+                return {
+                    "background_mode": config.get("background_mode", "blur"),
+                    "background_image_path": config.get("background_image_path", ""),
+                    "window_width": config.get("window_width", 900),
+                    "window_height": config.get("window_height", 600)
+                }
         except:
-            self.config = {
+            return {
                 "background_mode": "blur",
-                "background_image_path": ""
+                "background_image_path": "",
+                "window_width": 900,
+                "window_height": 600
             }
-            self.save_config()
 
     def save_config(self):
         with open(self.config_file, 'w', encoding='utf-8') as f:
@@ -604,6 +610,12 @@ class Window(QWidget):
         super().resizeEvent(ev)
         if hasattr(self, 'current_bg_path') and self.current_bg_path:
             self.set_background_image(self.current_bg_path)
+
+        # 保存窗口尺寸
+        if hasattr(self, 'config'):
+            self.config["window_width"] = self.width()
+            self.config["window_height"] = self.height()
+            self.save_config()
 
 
 app = QApplication(sys.argv)
