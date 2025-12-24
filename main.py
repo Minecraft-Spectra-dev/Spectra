@@ -1,9 +1,24 @@
+import os
+import sys
+
+# 禁用 FFmpeg 日志输出
+if sys.platform == 'win32':
+    import ctypes
+    kernel32 = ctypes.windll.kernel32
+    kernel32.SetStdHandle(-12, None)  # STD_ERROR_HANDLE
+
+os.environ["QT_LOGGING_RULES"] = "qt.multimedia*=false"
+
 from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QHBoxLayout, QVBoxLayout, QLabel, QStylePainter, \
     QStyleOptionButton, QStackedWidget, QFileDialog, QLineEdit
-from PyQt6.QtCore import Qt, QRect, QPropertyAnimation, QEasingCurve
+from PyQt6.QtCore import Qt, QRect, QPropertyAnimation, QEasingCurve, QUrl, QSizeF
 from PyQt6.QtGui import QIcon, QPainter, QPixmap
+from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from BlurWindow.blurWindow import blur
-import ctypes, sys, os, json
+import ctypes, sys, json
+
+os.environ["QT_MEDIA_BACKEND"] = "ffmpeg"
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "hwaccel;none"
 
 STYLE_BTN = "QPushButton{background:transparent;border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.2);}"
 STYLE_BTN_ACTIVE = "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.1);}"
@@ -124,10 +139,10 @@ class Window(QWidget):
         layout.addWidget(self.sidebar)
 
         # 右侧区域
-        right = QWidget()
-        right.setStyleSheet("background:rgba(0,0,0,100);")
-        right.setMouseTracking(True)
-        rl = QVBoxLayout(right)
+        self.right_panel = QWidget()
+        self.right_panel.setStyleSheet("background:rgba(0,0,0,100);")
+        self.right_panel.setMouseTracking(True)
+        rl = QVBoxLayout(self.right_panel)
         rl.setContentsMargins(0, 0, 0, 0)
         rl.setSpacing(0)
 
@@ -150,11 +165,38 @@ class Window(QWidget):
         self.stack.addWidget(self.create_config_page())
         rl.addWidget(self.stack, 1)
 
-        layout.addWidget(right, 1)
+        layout.addWidget(self.right_panel, 1)
 
         self.drag_pos = None
         self.resize_edge = None
         self.switch_page(0)
+
+        # 初始化视频组件
+        from PyQt6.QtWidgets import QGraphicsView, QGraphicsScene
+        from PyQt6.QtMultimediaWidgets import QGraphicsVideoItem
+
+        self.video_scene = QGraphicsScene()
+        self.video_view = QGraphicsView(self.video_scene, self)
+        self.video_view.setStyleSheet("border:none;background:black;")
+        self.video_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.video_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.video_view.setFrameShape(QGraphicsView.Shape.NoFrame)
+        self.video_view.hide()
+
+        self.video_item = QGraphicsVideoItem()
+        self.video_scene.addItem(self.video_item)
+
+        self.player = QMediaPlayer(self)
+        self.player.setVideoOutput(self.video_item)
+        self.audio_output = QAudioOutput()
+        self.audio_output.setVolume(0)
+        self.player.setAudioOutput(self.audio_output)
+        self.player.setLoops(QMediaPlayer.Loops.Infinite)
+        self.player.setVideoOutput(self.video_item)
+        self.player.mediaStatusChanged.connect(
+            lambda s: self.player.play() if s == QMediaPlayer.MediaStatus.EndOfMedia else None)
+
+        self.show()
 
         # 应用保存的配置
         if self.config["background_mode"] == "image" and self.config["background_image_path"]:
@@ -376,6 +418,11 @@ class Window(QWidget):
             blur(self.winId())
             if hasattr(self, 'bg_label_widget'):
                 self.bg_label_widget.hide()
+            if hasattr(self, 'video_view'):
+                self.player.stop()
+                self.video_view.hide()
+                if hasattr(self, 'current_video_path'):
+                    delattr(self, 'current_video_path')
         elif mode == "image":
             self.blur_card.setStyleSheet(
                 "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.1);}")
@@ -389,6 +436,10 @@ class Window(QWidget):
 
             self.path_widget.setVisible(True)
 
+            # 应用已保存的背景
+            if self.config.get("background_image_path") and os.path.exists(self.config["background_image_path"]):
+                self.set_background_image(self.config["background_image_path"])
+
     def on_path_changed(self):
         path = self.path_input.text().strip()
         if path and os.path.exists(path):
@@ -400,7 +451,8 @@ class Window(QWidget):
             self.save_config()
 
     def choose_background_image(self):
-        file, _ = QFileDialog.getOpenFileName(self, "选择背景图片", "", "图片文件 (*.png *.jpg *.jpeg *.bmp)")
+        file, _ = QFileDialog.getOpenFileName(self, "选择背景", "",
+                                              "媒体文件 (*.png *.jpg *.jpeg *.bmp *.mp4 *.avi *.mov *.mkv *.webm);;所有文件 (*.*)")
         if file:
             self.config["background_image_path"] = file
             self.save_config()
@@ -411,29 +463,65 @@ class Window(QWidget):
         if not os.path.exists(path):
             return
 
-        if not hasattr(self, 'bg_label_widget'):
-            self.bg_label_widget = QLabel(self)
-            self.bg_label_widget.lower()
+        ext = os.path.splitext(path)[1].lower()
 
-        pixmap = QPixmap(path)
-        w, h = self.width(), self.height()
+        # 视频格式
+        if ext in ['.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm']:
+            if hasattr(self, 'bg_label_widget'):
+                self.bg_label_widget.hide()
 
-        img_w, img_h = pixmap.width(), pixmap.height()
-        scale = max(w / img_w, h / img_h)
-        scaled_w, scaled_h = int(img_w * scale), int(img_h * scale)
+            w, h = self.width(), self.height()
 
-        scaled_pixmap = pixmap.scaled(scaled_w, scaled_h, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-                                      Qt.TransformationMode.SmoothTransformation)
+            # 只在首次加载或路径改变时重新加载视频
+            if not hasattr(self, 'current_video_path') or self.current_video_path != path:
+                self.player.setSource(QUrl.fromLocalFile(path))
+                self.player.play()
+                self.current_video_path = path
 
-        x = (scaled_w - w) // 2
-        y = (scaled_h - h) // 2
-        cropped = scaled_pixmap.copy(x, y, w, h)
+            # 使用固定 16:9 比例计算
+            video_w, video_h = 1920, 1080
+            scale = max(w / video_w, h / video_h)
+            scaled_w, scaled_h = video_w * scale, video_h * scale
 
-        self.bg_label_widget.setPixmap(cropped)
-        self.bg_label_widget.setGeometry(0, 0, w, h)
-        self.bg_label_widget.show()
-        self.current_bg_path = path
-        self.set_background("image")
+            self.video_view.setGeometry(0, 0, w, h)
+            self.video_scene.setSceneRect(0, 0, w, h)
+            self.video_item.setSize(QSizeF(scaled_w, scaled_h))
+            self.video_item.setPos((w - scaled_w) / 2, (h - scaled_h) / 2)
+            self.video_view.lower()
+            self.video_view.show()
+
+            self.current_bg_path = path
+
+        # 图片格式
+        else:
+            if hasattr(self, 'video_view'):
+                self.player.stop()
+                self.video_view.hide()
+                if hasattr(self, 'current_video_path'):
+                    delattr(self, 'current_video_path')
+
+            if not hasattr(self, 'bg_label_widget'):
+                self.bg_label_widget = QLabel(self)
+                self.bg_label_widget.lower()
+
+            pixmap = QPixmap(path)
+            w, h = self.width(), self.height()
+
+            img_w, img_h = pixmap.width(), pixmap.height()
+            scale = max(w / img_w, h / img_h)
+            scaled_w, scaled_h = int(img_w * scale), int(img_h * scale)
+
+            scaled_pixmap = pixmap.scaled(scaled_w, scaled_h, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                                          Qt.TransformationMode.SmoothTransformation)
+
+            x = (scaled_w - w) // 2
+            y = (scaled_h - h) // 2
+            cropped = scaled_pixmap.copy(x, y, w, h)
+
+            self.bg_label_widget.setPixmap(cropped)
+            self.bg_label_widget.setGeometry(0, 0, w, h)
+            self.bg_label_widget.show()
+            self.current_bg_path = path
 
     def switch_page(self, index):
         self.stack.setCurrentIndex(index)
@@ -514,7 +602,7 @@ class Window(QWidget):
 
     def resizeEvent(self, ev):
         super().resizeEvent(ev)
-        if hasattr(self, 'bg_label_widget') and self.bg_label_widget.isVisible() and hasattr(self, 'current_bg_path'):
+        if hasattr(self, 'current_bg_path') and self.current_bg_path:
             self.set_background_image(self.current_bg_path)
 
 
