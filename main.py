@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QHBoxLayout, QVBoxLayout, QLabel
 from PyQt6.QtCore import Qt, QRect, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QIcon
+from PyQt6.QtGui import QIcon, QPixmap
 from BlurWindow.blurWindow import blur
 import ctypes, sys, os
 
@@ -27,7 +27,7 @@ class Window(QWidget):
 
         # 侧边栏
         self.sidebar = QWidget()
-        self.sidebar.setFixedWidth(50)
+        self.sidebar.setFixedWidth(40)
         self.sidebar.setStyleSheet("background:rgba(0,0,0,80);")
         self.sidebar.setMouseTracking(True)
         self.sidebar_expanded = False
@@ -36,37 +36,97 @@ class Window(QWidget):
         sb.setContentsMargins(5, 10, 5, 10)
         sb.setSpacing(5)
 
-        # 标题
-        self.title_label = QLabel("Spectra")
-        self.title_label.setStyleSheet("color:white;background:transparent;font-size:14px;font-family:'微软雅黑';padding-left:5px;")
-        self.title_label.setMouseTracking(True)
-        self.title_label.setFixedHeight(30)
-        self.title_label.hide()
-        sb.addWidget(self.title_label)
+        # 标题（图标+文字）
+        title_widget = QWidget()
+        title_widget.setFixedSize(130, 30)
+        title_widget.setStyleSheet("background:transparent;")
+        title_layout = QHBoxLayout(title_widget)
+        title_layout.setContentsMargins(3, 0, 0, 0)
+        title_layout.setSpacing(8)
 
-        # 占位
-        self.spacer = QWidget()
-        self.spacer.setFixedHeight(30)
-        self.spacer.setStyleSheet("background:transparent;")
-        sb.addWidget(self.spacer)
+        logo = QLabel()
+        logo.setFixedSize(20, 20)
+        logo.setStyleSheet("background:transparent;")
+        logo.setScaledContents(True)
+        if os.path.exists("icon.png"):
+            logo.setPixmap(QPixmap("icon.png"))
+        title_layout.addWidget(logo)
+
+        self.title_label = QLabel("Spectra")
+        self.title_label.setStyleSheet("color:white;background:transparent;font-size:14px;font-family:'微软雅黑';")
+        self.title_label.hide()
+        title_layout.addWidget(self.title_label)
+        title_layout.addStretch()
+
+        sb.addWidget(title_widget)
 
         # 菜单按钮
-        menu_btn = QPushButton("\uE700")
-        menu_btn.setFixedHeight(40)
-        menu_btn.setMouseTracking(True)
-        menu_btn.setStyleSheet(
-            "QPushButton{background:transparent;color:white;border:none;border-radius:8px;font-size:16px;font-family:'微软雅黑','Segoe Fluent Icons';text-align:left;padding-left:12px;}QPushButton:hover{background:rgba(255,255,255,0.2);}")
-        menu_btn.clicked.connect(self.toggle_sidebar)
-        sb.addWidget(menu_btn)
+        self.menu_btn = QPushButton()
+        self.menu_btn.setFixedHeight(40)
+        self.menu_btn.setMouseTracking(True)
+        self.menu_btn.setStyleSheet(
+            "QPushButton{background:transparent;border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.2);}")
+        self.menu_btn.clicked.connect(self.toggle_sidebar)
+
+        menu_outer = QHBoxLayout(self.menu_btn)
+        menu_outer.setContentsMargins(0, 0, 0, 0)
+        menu_inner = QWidget()
+        menu_inner.setFixedWidth(130)
+        menu_inner.setStyleSheet("background:transparent;")
+        menu_layout = QHBoxLayout(menu_inner)
+        menu_layout.setContentsMargins(8, 0, 8, 0)
+        menu_layout.setSpacing(12)
+
+        menu_icon = QLabel("\uE700")
+        menu_icon.setFixedSize(20, 20)
+        menu_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        menu_icon.setStyleSheet("color:white;background:transparent;font-size:16px;font-family:'Segoe Fluent Icons';")
+        menu_layout.addWidget(menu_icon)
+
+        self.menu_text = QLabel("菜单")
+        self.menu_text.setStyleSheet("color:white;background:transparent;font-size:14px;font-family:'微软雅黑';")
+        self.menu_text.hide()
+        menu_layout.addWidget(self.menu_text)
+        menu_layout.addStretch()
+
+        menu_outer.addWidget(menu_inner)
+        menu_outer.addStretch()
+
+        sb.addWidget(self.menu_btn)
 
         sb.addStretch()
 
         # 配置按钮
-        self.config_btn = QPushButton("\uE713")
+        self.config_btn = QPushButton()
         self.config_btn.setFixedHeight(40)
         self.config_btn.setMouseTracking(True)
         self.config_btn.setStyleSheet(
-            "QPushButton{background:transparent;color:white;border:none;border-radius:8px;font-size:16px;font-family:'微软雅黑','Segoe Fluent Icons';text-align:left;padding-left:12px;padding-top:-3px;}QPushButton:hover{background:rgba(255,255,255,0.2);}")
+            "QPushButton{background:transparent;border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.2);}")
+
+        config_outer = QHBoxLayout(self.config_btn)
+        config_outer.setContentsMargins(0, 0, 0, 0)
+        config_inner = QWidget()
+        config_inner.setFixedWidth(130)
+        config_inner.setStyleSheet("background:transparent;")
+        config_layout = QHBoxLayout(config_inner)
+        config_layout.setContentsMargins(8, 0, 8, 0)
+        config_layout.setSpacing(12)
+
+        config_icon = QLabel("\uE713")
+        config_icon.setFixedSize(20, 20)
+        config_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        config_icon.setStyleSheet("color:white;background:transparent;font-size:16px;font-family:'Segoe Fluent Icons';")
+        config_layout.addWidget(config_icon)
+
+        self.config_text = QLabel("配置")
+        self.config_text.setStyleSheet("color:white;background:transparent;font-size:14px;font-family:'微软雅黑';")
+        self.config_text.hide()
+        config_layout.addWidget(self.config_text)
+        config_layout.addStretch()
+
+        config_outer.addWidget(config_inner)
+        config_outer.addStretch()
+
         sb.addWidget(self.config_btn)
 
         layout.addWidget(self.sidebar)
@@ -120,21 +180,19 @@ class Window(QWidget):
         self.anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
         self.anim2.setEasingCurve(QEasingCurve.Type.InOutQuad)
         if self.sidebar_expanded:
-            self.anim.setStartValue(150)
-            self.anim.setEndValue(50)
-            self.anim2.setStartValue(150)
-            self.anim2.setEndValue(50)
-            self.config_btn.setText("\uE713")
-            self.title_label.hide()
-            self.spacer.show()
+            self.anim.setStartValue(140)
+            self.anim.setEndValue(40)
+            self.anim2.setStartValue(140)
+            self.anim2.setEndValue(40)
+            self.anim.finished.connect(lambda: (self.title_label.hide(), self.menu_text.hide(), self.config_text.hide()))
         else:
-            self.anim.setStartValue(50)
-            self.anim.setEndValue(150)
-            self.anim2.setStartValue(50)
-            self.anim2.setEndValue(150)
-            self.config_btn.setText("\uE713  配置")
+            self.anim.setStartValue(40)
+            self.anim.setEndValue(140)
+            self.anim2.setStartValue(40)
+            self.anim2.setEndValue(140)
             self.title_label.show()
-            self.spacer.hide()
+            self.menu_text.show()
+            self.config_text.show()
         self.anim.start()
         self.anim2.start()
         self.sidebar_expanded = not self.sidebar_expanded
