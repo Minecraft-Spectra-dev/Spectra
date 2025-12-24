@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QHBoxLayout, QVBoxLayout, QLabel, QStylePainter, QStyleOptionButton
+from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QHBoxLayout, QVBoxLayout, QLabel, QStylePainter, QStyleOptionButton, QStackedWidget
 from PyQt6.QtCore import Qt, QRect, QPropertyAnimation, QEasingCurve, pyqtProperty
 from PyQt6.QtGui import QIcon, QPainter
 from BlurWindow.blurWindow import blur
@@ -77,6 +77,8 @@ class Window(QWidget):
         self.sidebar_expanded = False
 
         sb = QVBoxLayout(self.sidebar)
+        sb.setContentsMargins(5, 10, 5, 10)
+        sb.setSpacing(5)
 
         # 标题
         title_widget = QWidget()
@@ -98,8 +100,6 @@ class Window(QWidget):
         title_layout.addStretch()
 
         sb.addWidget(title_widget)
-        sb.setContentsMargins(5, 10, 5, 10)
-        sb.setSpacing(5)
 
         # 菜单按钮
         self.menu_btn = JellyButton()
@@ -138,6 +138,43 @@ class Window(QWidget):
 
         sb.addWidget(self.menu_btn)
 
+        # 主页按钮
+        self.home_btn = JellyButton()
+        self.home_btn.setFixedHeight(40)
+        self.home_btn.setMouseTracking(True)
+        self.home_btn.setStyleSheet(
+            "QPushButton{background:transparent;border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.2);}")
+        self.home_btn.clicked.connect(lambda: self.stack.setCurrentIndex(0))
+
+        home_outer = QHBoxLayout(self.home_btn)
+        home_outer.setContentsMargins(0, 0, 0, 0)
+        home_inner = QWidget()
+        home_inner.setFixedWidth(130)
+        home_inner.setStyleSheet("background:transparent;")
+        home_inner.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        home_layout = QHBoxLayout(home_inner)
+        home_layout.setContentsMargins(5, 0, 5, 0)
+        home_layout.setSpacing(12)
+
+        home_icon = QLabel("\uE80F")
+        home_icon.setFixedSize(20, 20)
+        home_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        home_icon.setStyleSheet("color:white;background:transparent;font-size:16px;font-family:'Segoe Fluent Icons';")
+        home_icon.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        home_layout.addWidget(home_icon)
+
+        self.home_text = QLabel("主页")
+        self.home_text.setStyleSheet("color:white;background:transparent;font-size:14px;font-family:'微软雅黑';")
+        self.home_text.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.home_text.hide()
+        home_layout.addWidget(self.home_text)
+        home_layout.addStretch()
+
+        home_outer.addWidget(home_inner)
+        home_outer.addStretch()
+
+        sb.addWidget(self.home_btn)
+
         sb.addStretch()
 
         # 配置按钮
@@ -146,6 +183,7 @@ class Window(QWidget):
         self.config_btn.setMouseTracking(True)
         self.config_btn.setStyleSheet(
             "QPushButton{background:transparent;border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.2);}")
+        self.config_btn.clicked.connect(lambda: self.stack.setCurrentIndex(1))
 
         config_outer = QHBoxLayout(self.config_btn)
         config_outer.setContentsMargins(0, 0, 0, 0)
@@ -208,11 +246,31 @@ class Window(QWidget):
 
         right_layout.addWidget(titlebar)
 
-        # 内容区
-        content = QWidget()
-        content.setStyleSheet("background:transparent;")
-        content.setMouseTracking(True)
-        right_layout.addWidget(content, 1)
+        # 内容区（使用 QStackedWidget）
+        self.stack = QStackedWidget()
+        self.stack.setStyleSheet("background:transparent;")
+
+        # 主页
+        home_page = QWidget()
+        home_page.setStyleSheet("background:transparent;")
+        self.stack.addWidget(home_page)
+
+        # 配置页
+        config_page = QWidget()
+        config_page.setStyleSheet("background:transparent;")
+        config_page_layout = QVBoxLayout(config_page)
+        config_page_layout.setContentsMargins(20, 10, 20, 20)
+        config_page_layout.setSpacing(15)
+
+        config_title = QLabel("应用设置")
+        config_title.setStyleSheet("color:white;font-size:20px;font-family:'微软雅黑';font-weight:bold;")
+        config_page_layout.addWidget(config_title)
+
+        config_page_layout.addStretch()
+
+        self.stack.addWidget(config_page)
+
+        right_layout.addWidget(self.stack, 1)
 
         layout.addWidget(right, 1)
 
@@ -231,13 +289,14 @@ class Window(QWidget):
             self.anim.setEndValue(40)
             self.anim2.setStartValue(140)
             self.anim2.setEndValue(40)
-            self.anim.finished.connect(lambda: (self.menu_text.hide(), self.config_text.hide()))
+            self.anim.finished.connect(lambda: (self.menu_text.hide(), self.home_text.hide(), self.config_text.hide()))
         else:
             self.anim.setStartValue(40)
             self.anim.setEndValue(140)
             self.anim2.setStartValue(40)
             self.anim2.setEndValue(140)
             self.menu_text.show()
+            self.home_text.show()
             self.config_text.show()
         self.anim.start()
         self.anim2.start()
