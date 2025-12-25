@@ -343,31 +343,29 @@ class Window(QWidget):
         title.setStyleSheet("color:white;font-size:20px;font-family:'微软雅黑';font-weight:bold;")
         pl.addWidget(title)
 
-        bg_title = QLabel("背景")
-        bg_title.setStyleSheet("color:white;font-size:16px;font-family:'微软雅黑';")
-        pl.addWidget(bg_title)
+        # 外观设置容器（主卡片）
+        self.appearance_container, self.appearance_arrow = self.create_expandable_menu("外观设置", "背景、主题等外观选项")
+        pl.addWidget(self.appearance_container)
 
+        # 获取内容区域
+        self.appearance_content = self.appearance_container.layout().itemAt(1).widget()
+
+        # 背景选项卡片
         self.blur_card = self.create_bg_card("模糊背景", "使用系统窗口模糊效果",
                                              self.config["background_mode"] == "blur",
                                              lambda: self.set_background("blur"))
-        pl.addWidget(self.blur_card)
+        self.appearance_content_layout.addWidget(self.blur_card)
 
-        # 图片背景卡片容器
-        self.image_card_container = QWidget()
-        self.image_card_container.setStyleSheet("background:transparent;")
-        image_container_layout = QVBoxLayout(self.image_card_container)
-        image_container_layout.setContentsMargins(0, 0, 0, 0)
-        image_container_layout.setSpacing(10)
-
+        # 图片背景卡片
         self.image_card = self.create_bg_card("图像背景", "使用图像作为背景", self.config["background_mode"] == "image",
                                               lambda: self.set_background("image"))
-        image_container_layout.addWidget(self.image_card)
+        self.appearance_content_layout.addWidget(self.image_card)
 
         # 路径输入区域
         self.path_widget = QWidget()
-        self.path_widget.setStyleSheet("background:transparent;")
+        self.path_widget.setStyleSheet("background:rgba(255,255,255,0);border-bottom-left-radius:8px;border-bottom-right-radius:8px;")
         path_layout = QHBoxLayout(self.path_widget)
-        path_layout.setContentsMargins(35, 0, 0, 0)
+        path_layout.setContentsMargins(35, 12, 15, 12)
         path_layout.setSpacing(10)
 
         path_label = QLabel("背景图片路径")
@@ -388,10 +386,13 @@ class Window(QWidget):
         browse_btn.clicked.connect(self.choose_background_image)
         path_layout.addWidget(browse_btn)
 
-        image_container_layout.addWidget(self.path_widget)
+        self.appearance_content_layout.addWidget(self.path_widget)
         self.path_widget.setVisible(self.config["background_mode"] == "image")
 
-        pl.addWidget(self.image_card_container)
+        # 初始状态：默认不展开
+        self.appearance_content.setVisible(False)
+        self.appearance_arrow.setText("▶")
+
         pl.addStretch()
 
         return page
@@ -404,7 +405,7 @@ class Window(QWidget):
 
         style = "background:rgba(255,255,255,0.15);" if selected else "background:rgba(255,255,255,0.05);"
         card.setStyleSheet(
-            f"QPushButton{{{style}border:none;border-radius:8px;}}QPushButton:hover{{background:rgba(255,255,255,0.1);}}QPushButton:pressed{{background:rgba(255,255,255,0.05);}}")
+            f"QPushButton{{{style}border:none;border-radius:0px;}}QPushButton:hover{{background:rgba(255,255,255,0.1);}}QPushButton:pressed{{background:rgba(255,255,255,0.05);}}")
 
         layout = QHBoxLayout(card)
         layout.setContentsMargins(15, 12, 15, 12)
@@ -440,6 +441,80 @@ class Window(QWidget):
         card.radio = radio
         return card
 
+    def create_expandable_menu(self, title, desc):
+        # 主容器
+        container = QWidget()
+        container.setStyleSheet("background:rgba(255,255,255,0.08);border-radius:8px;")
+        main_layout = QVBoxLayout(container)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # 标题栏
+        header = CardButton()
+        header.setFixedHeight(70)
+        header.setCursor(Qt.CursorShape.PointingHandCursor)
+        header.clicked.connect(self.toggle_appearance_menu)
+
+        header.setStyleSheet(
+            "QPushButton{background:transparent;border:none;border-top-left-radius:8px;border-top-right-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.05);}QPushButton:pressed{background:rgba(255,255,255,0.02);}")
+
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(15, 12, 15, 12)
+        header_layout.setSpacing(12)
+
+        # 箭头图标
+        arrow = QLabel("▶")
+        arrow.setFixedSize(16, 16)
+        arrow.setStyleSheet("color:white;background:transparent;font-size:12px;")
+        arrow.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        arrow.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header_layout.addWidget(arrow, 0, Qt.AlignmentFlag.AlignTop)
+
+        # 标题和描述
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(4)
+        text_layout.setContentsMargins(0, 0, 0, 0)
+
+        title_lbl = QLabel(title)
+        title_lbl.setStyleSheet("color:white;font-size:14px;font-family:'微软雅黑';background:transparent;")
+        title_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        text_layout.addWidget(title_lbl)
+
+        desc_lbl = QLabel(desc)
+        desc_lbl.setStyleSheet(
+            "color:rgba(255,255,255,0.6);font-size:12px;font-family:'微软雅黑';background:transparent;")
+        desc_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        text_layout.addWidget(desc_lbl)
+
+        header_layout.addLayout(text_layout)
+        header_layout.addStretch()
+
+        main_layout.addWidget(header)
+
+        # 内容区域
+        self.appearance_content_layout = QVBoxLayout()
+        self.appearance_content_layout.setContentsMargins(0, 0, 0, 0)
+        self.appearance_content_layout.setSpacing(0)
+
+        content_widget = QWidget()
+        content_widget.setLayout(self.appearance_content_layout)
+        content_widget.setStyleSheet("background:transparent;")
+
+        main_layout.addWidget(content_widget)
+
+        return container, arrow
+
+    def toggle_appearance_menu(self):
+        content = self.appearance_container.layout().itemAt(1).widget()
+        is_visible = content.isVisible()
+
+        if is_visible:
+            content.setVisible(False)
+            self.appearance_arrow.setText("▶")
+        else:
+            content.setVisible(True)
+            self.appearance_arrow.setText("▼")
+
     def toggle_image_card(self):
         if self.path_widget.isVisible():
             return
@@ -456,12 +531,12 @@ class Window(QWidget):
 
         if mode == "blur":
             self.blur_card.setStyleSheet(
-                "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.05);}")
+                "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.05);}")
             self.blur_card.radio.setStyleSheet(
                 "background:rgba(255,255,255,0.9);border:5px solid #4080ff;border-radius:10px;")
 
             self.image_card.setStyleSheet(
-                "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
+                "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
             self.image_card.radio.setStyleSheet(
                 "background:rgba(255,255,255,0.8);border:1px solid rgba(0,0,0,0.3);border-radius:10px;")
 
@@ -477,12 +552,12 @@ class Window(QWidget):
                     delattr(self, 'current_video_path')
         elif mode == "image":
             self.blur_card.setStyleSheet(
-                "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
+                "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
             self.blur_card.radio.setStyleSheet(
                 "background:rgba(255,255,255,0.8);border:1px solid rgba(0,0,0,0.3);border-radius:10px;")
 
             self.image_card.setStyleSheet(
-                "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.05);}")
+                "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.05);}")
             self.image_card.radio.setStyleSheet(
                 "background:rgba(255,255,255,0.9);border:5px solid #4080ff;border-radius:10px;")
 
