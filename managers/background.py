@@ -14,6 +14,7 @@ class BackgroundManager:
         self.current_bg_path = None
         self.current_video_path = None
         self.bg_label_widget = None
+        self.solid_bg_widget = None
 
         # 初始化视频组件
         self.video_scene = QGraphicsScene()
@@ -99,8 +100,28 @@ class BackgroundManager:
             self.bg_label_widget.show()
             self.current_bg_path = path
 
+    def set_solid_color(self, color):
+        """设置纯色背景 (ARGB格式)"""
+        # 隐藏其他背景
+        if self.bg_label_widget:
+            self.bg_label_widget.hide()
+        self.player.stop()
+        self.video_view.hide()
+
+        # 创建或更新纯色背景
+        if not self.solid_bg_widget:
+            self.solid_bg_widget = QLabel(self.parent)
+            self.solid_bg_widget.lower()
+
+        w, h = self.parent.width(), self.parent.height()
+        self.solid_bg_widget.setStyleSheet(f"background:{color};")
+        self.solid_bg_widget.setGeometry(0, 0, w, h)
+        self.solid_bg_widget.show()
+
     def hide(self):
         if self.bg_label_widget:
             self.bg_label_widget.hide()
+        if self.solid_bg_widget:
+            self.solid_bg_widget.hide()
         self.player.stop()
         self.video_view.hide()

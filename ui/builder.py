@@ -1,7 +1,7 @@
 """UI构建器"""
 
 from PyQt6.QtWidgets import (QWidget, QPushButton, QHBoxLayout, QVBoxLayout, QLabel,
-                             QStackedWidget, QLineEdit, QSlider)
+                             QStackedWidget, QLineEdit, QSlider, QColorDialog)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
 
@@ -249,6 +249,18 @@ class UIBuilder:
         self._create_opacity_slider()
         self.window.appearance_content_layout.addWidget(self.window.opacity_widget)
 
+        # 纯色背景卡片
+        self.window.solid_card = self.create_bg_card(
+            "纯色背景", "使用纯色作为背景",
+            self.window.config.get("background_mode") == "solid",
+            lambda: self.window.set_background("solid")
+        )
+        self.window.appearance_content_layout.addWidget(self.window.solid_card)
+
+        # 颜色选择区域
+        self._create_color_picker()
+        self.window.appearance_content_layout.addWidget(self.window.color_widget)
+
         # 图片背景卡片
         self.window.image_card = self.create_bg_card(
             "图像背景", "使用图像作为背景",
@@ -369,3 +381,57 @@ class UIBuilder:
         path_layout.addWidget(browse_btn)
 
         self.window.path_widget.setVisible(self.window.config.get("background_mode") == "image")
+
+    def _create_color_picker(self):
+        """创建颜色选择器"""
+        self.window.color_widget = QWidget()
+        border_radius = self._scale_size(8)
+        self.window.color_widget.setStyleSheet(f"background:rgba(255,255,255,0);border-bottom-left-radius:{border_radius}px;border-bottom-right-radius:{border_radius}px;")
+        color_layout = QHBoxLayout(self.window.color_widget)
+        color_layout.setContentsMargins(self._scale_size(35), self._scale_size(12), self._scale_size(15), self._scale_size(12))
+        color_layout.setSpacing(self._scale_size(10))
+
+        color_label = QLabel("背景颜色 (ARGB)")
+        color_label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'微软雅黑';")
+        color_layout.addWidget(color_label)
+
+        # 颜色预览和输入
+        self.window.color_input = QLineEdit()
+        self.window.color_input.setText(self.window.config.get("background_color", "#00000000"))
+        padding = self._scale_size(6)
+        border_radius_input = self._scale_size(4)
+        self.window.color_input.setStyleSheet(
+            f"QLineEdit{{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:{border_radius_input}px;padding:{padding}px;color:white;font-size:{self._scale_size(13)}px;font-family:'微软雅黑';}}")
+        self.window.color_input.editingFinished.connect(self.window.on_color_changed)
+        color_layout.addWidget(self.window.color_input, 1)
+
+        # 颜色选择按钮
+        color_btn = QPushButton()
+        color_btn.setFixedSize(self._scale_size(32), self._scale_size(32))
+        border_radius_btn = self._scale_size(4)
+        
+        # 解析当前颜色用于显示
+        color_str = self.window.config.get("background_color", "#00000000")
+        try:
+            color = self._parse_color(color_str)
+            bg_color = color.name(QColor.NameFormat.HexArgb) if color else "#00000000"
+        except:
+            bg_color = "#00000000"
+        
+        color_btn.setStyleSheet(f"QPushButton{{background:{bg_color};border:1px solid rgba(255,255,255,0.3);border-radius:{border_radius_btn}px;}}QPushButton:hover{{background:{bg_color};border:1px solid rgba(255,255,255,0.5);}}")
+        color_btn.clicked.connect(self.window.choose_background_color)
+        color_layout.addWidget(color_btn)
+        self.window.color_btn = color_btn
+
+        self.window.color_widget.setVisible(self.window.config.get("background_mode") == "solid")
+
+    def _parse_color(self, color_str):
+        """解析ARGB颜色字符串"""
+        from PyQt6.QtGui import QColor
+        color = QColor(color_str)
+        if color.isValid():
+            return color
+        # 尝试解析 #RRGGBB 格式，添加透明度
+        if len(color_str) == 7 and color_str.startswith('#'):
+            return QColor(f"#FF{color_str[1:]}")
+        return QColor("#00000000")

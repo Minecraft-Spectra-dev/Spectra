@@ -16,6 +16,7 @@ class ConfigManager:
                 return {
                     "background_mode": config.get("background_mode", "blur"),
                     "background_image_path": config.get("background_image_path", ""),
+                    "background_color": config.get("background_color", "#00000000"),
                     "window_width": config.get("window_width", 900),
                     "window_height": config.get("window_height", 600),
                     "blur_opacity": config.get("blur_opacity", 80)
@@ -24,6 +25,7 @@ class ConfigManager:
             return {
                 "background_mode": "blur",
                 "background_image_path": "",
+                "background_color": "#00000000",
                 "window_width": 900,
                 "window_height": 600,
                 "blur_opacity": 80

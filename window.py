@@ -4,9 +4,10 @@ import os
 import sys
 import ctypes
 from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QLabel,
-                             QFileDialog, QStackedWidget, QApplication)
+                             QFileDialog, QStackedWidget, QApplication,
+                             QColorDialog)
 from PyQt6.QtCore import Qt, QRect, QPropertyAnimation, QEasingCurve, QTimer
-from PyQt6.QtGui import QCursor, QPixmap, QIcon
+from PyQt6.QtGui import QCursor, QPixmap, QIcon, QColor
 from BlurWindow.blurWindow import blur
 
 from widgets import JellyButton
@@ -363,10 +364,16 @@ class Window(QWidget):
             if check_pixmap:
                 self.blur_card.check_label.setPixmap(scale_icon_for_display(check_pixmap, 20, self.dpi_scale))
 
+            # 清除其他卡片选中状态
+            if hasattr(self, 'solid_card'):
+                self.solid_card.setStyleSheet(
+                    "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
+                self.solid_card.check_label.clear()
+                self.color_widget.setVisible(False)
+
             self.image_card.setStyleSheet(
                 "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
             self.image_card.check_label.clear()
-
             self.path_widget.setVisible(False)
             self.opacity_widget.setVisible(True)
             self.apply_opacity()
@@ -374,10 +381,39 @@ class Window(QWidget):
             blur(self.winId())
             self.bg_manager.hide()
 
+        elif mode == "solid":
+            self.blur_card.setStyleSheet(
+                "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
+            self.blur_card.check_label.clear()
+
+            self.solid_card.setStyleSheet(
+                "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.05);}")
+            check_pixmap = load_svg_icon("svg/check-lg.svg", self.dpi_scale)
+            if check_pixmap:
+                self.solid_card.check_label.setPixmap(scale_icon_for_display(check_pixmap, 20, self.dpi_scale))
+
+            self.image_card.setStyleSheet(
+                "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
+            self.image_card.check_label.clear()
+
+            self.path_widget.setVisible(False)
+            self.opacity_widget.setVisible(False)
+            self.color_widget.setVisible(True)
+
+            # 应用纯色背景
+            color = self.config.get("background_color", "#00000000")
+            self.bg_manager.set_solid_color(color)
+
         elif mode == "image":
             self.blur_card.setStyleSheet(
                 "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
             self.blur_card.check_label.clear()
+
+            if hasattr(self, 'solid_card'):
+                self.solid_card.setStyleSheet(
+                    "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
+                self.solid_card.check_label.clear()
+                self.color_widget.setVisible(False)
 
             self.image_card.setStyleSheet(
                 "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.05);}")
@@ -387,6 +423,7 @@ class Window(QWidget):
 
             self.path_widget.setVisible(True)
             self.opacity_widget.setVisible(False)
+            self.color_widget.setVisible(False)
 
             if self.config.get("background_image_path") and os.path.exists(self.config.get("background_image_path")):
                 self.set_background_image(self.config.get("background_image_path"))
@@ -433,6 +470,52 @@ class Window(QWidget):
             self.config_manager.save_config()
             self.path_input.setText(file)
             self.set_background_image(file)
+
+    def choose_background_color(self):
+        """选择背景颜色"""
+        # 从当前配置获取初始颜色
+        color_str = self.config.get("background_color", "#00000000")
+        try:
+            current_color = QColor(color_str)
+            if not current_color.isValid():
+                current_color = QColor(0, 0, 0, 0)
+        except:
+            current_color = QColor(0, 0, 0, 0)
+
+        # 打开颜色选择对话框，支持ARGB
+        color = QColorDialog.getColor(
+            current_color,
+            self,
+            "选择背景颜色",
+            QColorDialog.ColorDialogOption.ShowAlphaChannel
+        )
+
+        if color.isValid():
+            # 转换为ARGB格式字符串 (#AARRGGBB)
+            color_str = color.name(QColor.NameFormat.HexArgb)
+            self.color_input.setText(color_str)
+            self.on_color_changed()
+
+    def on_color_changed(self):
+        """颜色改变"""
+        color_str = self.color_input.text().strip()
+        try:
+            color = QColor(color_str)
+            if color.isValid():
+                self.config["background_color"] = color_str
+                self.config_manager.save_config()
+                
+                # 更新颜色按钮显示
+                if hasattr(self, 'color_btn'):
+                    self.color_btn.setStyleSheet(
+                        f"QPushButton{{background:{color_str};border:1px solid rgba(255,255,255,0.3);border-radius:4px;}}QPushButton:hover{{background:{color_str};border:1px solid rgba(255,255,255,0.5);}}"
+                    )
+                
+                # 如果当前是纯色背景模式，立即应用
+                if self.config.get("background_mode") == "solid":
+                    self.bg_manager.set_solid_color(color_str)
+        except:
+            pass
 
     def get_edge(self, pos):
         """获取边缘"""
