@@ -14,12 +14,17 @@ from utils import load_svg_icon, scale_icon_for_display
 class UIBuilder:
     def __init__(self, window):
         self.window = window
+        self.dpi_scale = getattr(window, 'dpi_scale', 1.0)
+
+    def _scale_size(self, size):
+        """根据DPI缩放尺寸"""
+        return int(size * self.dpi_scale)
 
     def create_nav_btn(self, icon, text, handler, page_index=None,
                        icon_path=None, icon_path_active=None):
         """创建导航按钮"""
         container = QWidget()
-        container.setFixedHeight(40)
+        container.setFixedHeight(self._scale_size(40))
         container.setStyleSheet("background:transparent;")
         container.setMouseTracking(True)
         cl = QHBoxLayout(container)
@@ -27,7 +32,7 @@ class UIBuilder:
         cl.setSpacing(0)
 
         btn = JellyButton()
-        btn.setFixedHeight(40)
+        btn.setFixedHeight(self._scale_size(40))
         btn.setStyleSheet(STYLE_BTN)
         btn.clicked.connect(handler)
 
@@ -36,7 +41,7 @@ class UIBuilder:
         outer.setSpacing(0)
 
         indicator = QWidget()
-        indicator.setFixedSize(3, 18)
+        indicator.setFixedSize(self._scale_size(3), self._scale_size(18))
         indicator.setStyleSheet("background:transparent;border-radius:1px;")
         indicator.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         outer.addWidget(indicator, 0, Qt.AlignmentFlag.AlignVCenter)
@@ -44,13 +49,13 @@ class UIBuilder:
             self.window.nav_indicators.append((page_index, indicator, btn, icon_path, icon_path_active, container))
 
         inner = make_transparent(QWidget())
-        inner.setFixedWidth(125)
+        inner.setFixedWidth(self._scale_size(125))
         il = QHBoxLayout(inner)
-        il.setContentsMargins(7, 0, 5, 0)
-        il.setSpacing(12)
+        il.setContentsMargins(self._scale_size(7), 0, self._scale_size(5), 0)
+        il.setSpacing(self._scale_size(12))
 
         icon_lbl = QLabel()
-        icon_lbl.setFixedSize(20, 20)
+        icon_lbl.setFixedSize(self._scale_size(20), self._scale_size(20))
         icon_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_lbl.setStyleSheet("background:transparent;")
         icon_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
@@ -58,7 +63,7 @@ class UIBuilder:
         icon_lbl.setObjectName("nav_icon")
 
         if isinstance(icon, QPixmap):
-            icon_lbl.setPixmap(scale_icon_for_display(icon, 20))
+            icon_lbl.setPixmap(scale_icon_for_display(icon, 20, self.dpi_scale))
         else:
             icon_lbl.setText(icon)
             icon_lbl.setStyleSheet(STYLE_ICON)
@@ -66,7 +71,9 @@ class UIBuilder:
         il.addWidget(icon_lbl)
 
         text_lbl = QLabel(text)
-        text_lbl.setStyleSheet(STYLE_TEXT)
+        # 根据DPI缩放字体大小
+        font_size = int(14 * self.dpi_scale)
+        text_lbl.setStyleSheet(f"color:white;background:transparent;font-size:{font_size}px;font-family:'微软雅黑';")
         text_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         text_lbl.setMouseTracking(True)
         text_lbl.hide()
@@ -82,16 +89,17 @@ class UIBuilder:
     def create_title_btn(self, text, handler):
         """创建标题栏按钮"""
         b = JellyButton(text)
-        b.setFixedSize(32, 32)
+        b.setFixedSize(self._scale_size(32), self._scale_size(32))
+        font_size = self._scale_size(16)
         b.setStyleSheet(
-            "QPushButton{background:transparent;color:white;border:none;border-radius:16px;font-size:16px;font-family:'微软雅黑';}QPushButton:hover{background:rgba(255,255,255,0.2);}")
+            f"QPushButton{{background:transparent;color:white;border:none;border-radius:{self._scale_size(16)}px;font-size:{font_size}px;font-family:'微软雅黑';}}QPushButton:hover{{background:rgba(255,255,255,0.2);}}")
         b.clicked.connect(handler)
         return b
 
     def create_bg_card(self, title, desc, selected, handler):
         """创建背景选项卡片"""
         card = CardButton()
-        card.setFixedHeight(70)
+        card.setFixedHeight(self._scale_size(70))
         card.setCursor(Qt.CursorShape.PointingHandCursor)
         card.clicked.connect(handler)
 
@@ -100,34 +108,34 @@ class UIBuilder:
             f"QPushButton{{{style}border:none;border-radius:0px;}}QPushButton:hover{{background:rgba(255,255,255,0.1);}}QPushButton:pressed{{background:rgba(255,255,255,0.05);}}")
 
         layout = QHBoxLayout(card)
-        layout.setContentsMargins(15, 12, 15, 12)
-        layout.setSpacing(12)
+        layout.setContentsMargins(self._scale_size(15), self._scale_size(12), self._scale_size(15), self._scale_size(12))
+        layout.setSpacing(self._scale_size(12))
 
         check_label = QLabel()
-        check_label.setFixedSize(20, 20)
+        check_label.setFixedSize(self._scale_size(20), self._scale_size(20))
         check_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         check_label.setStyleSheet("background:transparent;")
         check_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
         if selected:
-            check_pixmap = load_svg_icon("svg/check-lg.svg")
+            check_pixmap = load_svg_icon("svg/check-lg.svg", self.dpi_scale)
             if check_pixmap:
-                check_label.setPixmap(scale_icon_for_display(check_pixmap, 20))
+                check_label.setPixmap(scale_icon_for_display(check_pixmap, 20, self.dpi_scale))
 
         layout.addWidget(check_label, 0, Qt.AlignmentFlag.AlignTop)
 
         text_layout = QVBoxLayout()
-        text_layout.setSpacing(4)
+        text_layout.setSpacing(self._scale_size(4))
         text_layout.setContentsMargins(0, 0, 0, 0)
 
         title_lbl = QLabel(title)
-        title_lbl.setStyleSheet("color:white;font-size:14px;font-family:'微软雅黑';background:transparent;")
+        title_lbl.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:'微软雅黑';background:transparent;")
         title_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         text_layout.addWidget(title_lbl)
 
         desc_lbl = QLabel(desc)
         desc_lbl.setStyleSheet(
-            "color:rgba(255,255,255,0.6);font-size:12px;font-family:'微软雅黑';background:transparent;")
+            f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:'微软雅黑';background:transparent;")
         desc_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         text_layout.addWidget(desc_lbl)
 
@@ -146,44 +154,45 @@ class UIBuilder:
         main_layout.setSpacing(0)
 
         header = CardButton()
-        header.setFixedHeight(70)
+        header.setFixedHeight(self._scale_size(70))
         header.setCursor(Qt.CursorShape.PointingHandCursor)
         header.clicked.connect(self.window.toggle_appearance_menu)
 
+        border_radius = self._scale_size(8)
         header.setStyleSheet(
-            "QPushButton{background:transparent;border:none;border-top-left-radius:8px;border-top-right-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.05);}QPushButton:pressed{background:rgba(255,255,255,0.02);}")
+            f"QPushButton{{background:transparent;border:none;border-top-left-radius:{border_radius}px;border-top-right-radius:{border_radius}px;}}QPushButton:hover{{background:rgba(255,255,255,0.05);}}QPushButton:pressed{{background:rgba(255,255,255,0.02);}}")
 
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(15, 12, 15, 12)
-        header_layout.setSpacing(12)
+        header_layout.setContentsMargins(self._scale_size(15), self._scale_size(12), self._scale_size(15), self._scale_size(12))
+        header_layout.setSpacing(self._scale_size(12))
 
         icon_label = None
         if icon_path:
             icon_label = QLabel()
-            icon_label.setFixedSize(20, 20)
+            icon_label.setFixedSize(self._scale_size(20), self._scale_size(20))
             icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             icon_label.setStyleSheet("background:transparent;")
             icon_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
             icon_label.setObjectName("menu_icon")
 
-            icon_pixmap = load_svg_icon(icon_path)
+            icon_pixmap = load_svg_icon(icon_path, self.dpi_scale)
             if icon_pixmap:
-                icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20))
+                icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20, self.dpi_scale))
 
             header_layout.addWidget(icon_label, 0, Qt.AlignmentFlag.AlignTop)
 
         text_layout = QVBoxLayout()
-        text_layout.setSpacing(4)
+        text_layout.setSpacing(self._scale_size(4))
         text_layout.setContentsMargins(0, 0, 0, 0)
 
         title_lbl = QLabel(title)
-        title_lbl.setStyleSheet("color:white;font-size:14px;font-family:'微软雅黑';background:transparent;")
+        title_lbl.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:'微软雅黑';background:transparent;")
         title_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         text_layout.addWidget(title_lbl)
 
         desc_lbl = QLabel(desc)
         desc_lbl.setStyleSheet(
-            "color:rgba(255,255,255,0.6);font-size:12px;font-family:'微软雅黑';background:transparent;")
+            f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:'微软雅黑';background:transparent;")
         desc_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         text_layout.addWidget(desc_lbl)
 
@@ -213,11 +222,11 @@ class UIBuilder:
         page = QWidget()
         page.setStyleSheet("background:transparent;")
         pl = QVBoxLayout(page)
-        pl.setContentsMargins(20, 10, 20, 20)
-        pl.setSpacing(15)
+        pl.setContentsMargins(self._scale_size(20), self._scale_size(10), self._scale_size(20), self._scale_size(20))
+        pl.setSpacing(self._scale_size(15))
 
         title = QLabel("设置")
-        title.setStyleSheet("color:white;font-size:20px;font-family:'微软雅黑';font-weight:bold;")
+        title.setStyleSheet(f"color:white;font-size:{self._scale_size(20)}px;font-family:'微软雅黑';font-weight:bold;")
         pl.addWidget(title)
 
         # 外观设置容器
@@ -291,18 +300,19 @@ class UIBuilder:
     def _create_opacity_slider(self):
         """创建透明度滑块"""
         self.window.opacity_widget = QWidget()
-        self.window.opacity_widget.setStyleSheet("background:rgba(255,255,255,0);border-bottom-left-radius:8px;border-bottom-right-radius:8px;")
+        border_radius = self._scale_size(8)
+        self.window.opacity_widget.setStyleSheet(f"background:rgba(255,255,255,0);border-bottom-left-radius:{border_radius}px;border-bottom-right-radius:{border_radius}px;")
         opacity_layout = QVBoxLayout(self.window.opacity_widget)
-        opacity_layout.setContentsMargins(35, 8, 15, 8)
-        opacity_layout.setSpacing(4)
+        opacity_layout.setContentsMargins(self._scale_size(35), self._scale_size(8), self._scale_size(15), self._scale_size(8))
+        opacity_layout.setSpacing(self._scale_size(4))
 
         opacity_header_layout = QHBoxLayout()
         opacity_label = QLabel("模糊透明度")
-        opacity_label.setStyleSheet("color:rgba(255,255,255,0.8);font-size:13px;font-family:'微软雅黑';")
+        opacity_label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'微软雅黑';")
         # 将10-255转换为0-100%显示
         opacity_value = QLabel()
         opacity_value.setText(str(int((self.window.config.get("blur_opacity", 150) - 10) / (255 - 10) * 100)) + "%")
-        opacity_value.setStyleSheet("color:rgba(255,255,255,0.8);font-size:13px;font-family:'微软雅黑';")
+        opacity_value.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'微软雅黑';")
         self.window.opacity_value_label = opacity_value
         opacity_header_layout.addWidget(opacity_label)
         opacity_header_layout.addStretch()
@@ -321,36 +331,40 @@ class UIBuilder:
     def _create_path_input(self):
         """创建路径输入"""
         self.window.path_widget = QWidget()
-        self.window.path_widget.setStyleSheet("background:rgba(255,255,255,0);border-bottom-left-radius:8px;border-bottom-right-radius:8px;")
+        border_radius = self._scale_size(8)
+        self.window.path_widget.setStyleSheet(f"background:rgba(255,255,255,0);border-bottom-left-radius:{border_radius}px;border-bottom-right-radius:{border_radius}px;")
         path_layout = QHBoxLayout(self.window.path_widget)
-        path_layout.setContentsMargins(35, 12, 15, 12)
-        path_layout.setSpacing(10)
+        path_layout.setContentsMargins(self._scale_size(35), self._scale_size(12), self._scale_size(15), self._scale_size(12))
+        path_layout.setSpacing(self._scale_size(10))
 
         path_label = QLabel("背景图片路径")
-        path_label.setStyleSheet("color:rgba(255,255,255,0.8);font-size:13px;font-family:'微软雅黑';")
+        path_label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'微软雅黑';")
         path_layout.addWidget(path_label)
 
         self.window.path_input = QLineEdit()
         self.window.path_input.setText(self.window.config.get("background_image_path", ""))
+        padding = self._scale_size(6)
+        border_radius_input = self._scale_size(4)
         self.window.path_input.setStyleSheet(
-            "QLineEdit{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:6px;color:white;font-size:13px;font-family:'微软雅黑';}")
+            f"QLineEdit{{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:{border_radius_input}px;padding:{padding}px;color:white;font-size:{self._scale_size(13)}px;font-family:'微软雅黑';}}")
         self.window.path_input.editingFinished.connect(self.window.on_path_changed)
         path_layout.addWidget(self.window.path_input, 1)
 
         # 浏览按钮
         browse_btn = ClickableLabel()
-        browse_btn.setFixedSize(32, 32)
+        browse_btn.setFixedSize(self._scale_size(32), self._scale_size(32))
+        border_radius_btn = self._scale_size(4)
         browse_btn.setHoverStyle(
-            "background:rgba(255,255,255,0.1);border:none;border-radius:4px;",
-            "background:rgba(255,255,255,0.15);border:none;border-radius:4px;"
+            f"background:rgba(255,255,255,0.1);border:none;border-radius:{border_radius_btn}px;",
+            f"background:rgba(255,255,255,0.15);border:none;border-radius:{border_radius_btn}px;"
         )
         browse_btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
         browse_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         browse_btn.setCallback(self.window.choose_background_image)
 
-        folder_pixmap = load_svg_icon("svg/folder2.svg")
+        folder_pixmap = load_svg_icon("svg/folder2.svg", self.dpi_scale)
         if folder_pixmap:
-            browse_btn.setPixmap(scale_icon_for_display(folder_pixmap, 20))
+            browse_btn.setPixmap(scale_icon_for_display(folder_pixmap, 20, self.dpi_scale))
 
         path_layout.addWidget(browse_btn)
 

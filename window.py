@@ -1,6 +1,7 @@
 """主窗口"""
 
 import os
+import sys
 import ctypes
 from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QLabel,
                              QFileDialog, QStackedWidget, QApplication)
@@ -16,22 +17,32 @@ from ui import UIBuilder
 
 
 class Window(QWidget):
-    EDGE = 8
+    EDGE = 8  # 基础边缘宽度，会在 __init__ 中根据 DPI 缩放
 
     def __init__(self):
         super().__init__()
         self.config_manager = ConfigManager()
         self.config = self.config_manager.config
         self.bg_manager = BackgroundManager(self)
+
+        # 获取系统 DPI 缩放比例（真实比例，不受 Qt 高 DPI 设置影响）
+        # 在 Windows 上，可以通过 ctypes 获取系统 DPI 缩放比例
+        self.dpi_scale = self._get_system_dpi_scale()
+
+        # 初始化UI构建器（需要在edge_size之前）
         self.ui_builder = UIBuilder(self)
+
+        # 缩放边缘检测区域
+        self.edge_size = self.ui_builder._scale_size(8)
 
         self.setWindowTitle("Spectra")
         if os.path.exists("icon.png"):
             from PyQt6.QtGui import QIcon
             self.setWindowIcon(QIcon("icon.png"))
 
+        # 使用配置中的逻辑像素尺寸
         self.resize(self.config.get("window_width", 900), self.config.get("window_height", 600))
-        self.setMinimumSize(400, 300)
+        self.setMinimumSize(self.ui_builder._scale_size(400), self.ui_builder._scale_size(300))
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setMouseTracking(True)
@@ -39,6 +50,9 @@ class Window(QWidget):
         self._init_ui()
         self._init_nav()
         self._init_content()
+
+        # 应用 DPI 缩放
+        self._apply_dpi_scaling()
 
         self.drag_pos = None
         self.resize_edge = None
@@ -60,6 +74,81 @@ class Window(QWidget):
             if os.path.exists(self.config.get("background_image_path")):
                 self.set_background_image(self.config.get("background_image_path"))
 
+    def _get_system_dpi_scale(self):
+        """获取系统 DPI 缩放比例"""
+        if sys.platform == 'win32':
+            try:
+                import ctypes
+                user32 = ctypes.windll.user32
+                shcore = ctypes.windll.shcore
+
+                # 设置 DPI 感知（per-monitor aware v2）
+                try:
+                    shcore.SetProcessDpiAwarenessContext(-2)
+                except:
+                    try:
+                        shcore.SetProcessDpiAwareness(2)
+                    except:
+                        pass
+
+                # 方法1: 使用 GetDpiForSystem (Windows 10 1607+)
+                try:
+                    get_dpi_for_system = user32.GetDpiForSystem
+                    get_dpi_for_system.argtypes = []
+                    get_dpi_for_system.restype = ctypes.c_uint
+                    system_dpi = get_dpi_for_system()
+                    scale = system_dpi / 96.0
+                    print(f"GetDpiForSystem - DPI: {system_dpi}, Scale: {scale}")
+                    return scale
+                except Exception as e:
+                    print(f"GetDpiForSystem failed: {e}")
+
+                # 方法2: 使用 GetDeviceCaps 获取 DPI（旧版 Windows）
+                try:
+                    hdc = user32.GetDC(0)
+                    if hdc:
+                        try:
+                            dpi = user32.GetDeviceCaps(hdc, 88)
+                            scale = dpi / 96.0
+                            print(f"GetDeviceCaps - DPI: {dpi}, Scale: {scale}")
+                            return scale
+                        finally:
+                            user32.ReleaseDC(0, hdc)
+                except Exception as e:
+                    print(f"GetDeviceCaps failed: {e}")
+
+            except Exception as e:
+                print(f"Windows API failed: {e}")
+
+        # 回退：尝试使用 Qt 的 screen（可能受 Qt 自动缩放影响）
+        try:
+            screen = QApplication.primaryScreen()
+            if screen:
+                logical_dpi = screen.logicalDotsPerInch().x()
+                scale = logical_dpi / 96.0
+                print(f"Qt logical DPI: {logical_dpi}, Scale: {scale}")
+                return scale
+        except Exception as e:
+            print(f"Qt screen failed: {e}")
+
+        print("Using default scale 1.0")
+        return 1.0
+
+    def _apply_dpi_scaling(self):
+        """应用DPI缩放到控件"""
+        # 调整侧边栏宽度（确保在初始化后也应用缩放）
+        if hasattr(self, 'sidebar'):
+            self.sidebar.setFixedWidth(self.ui_builder._scale_size(50))
+
+        # 调整标题栏高度
+        if hasattr(self, 'right_panel') and self.right_panel.layout() and self.right_panel.layout().itemAt(0):
+            titlebar = self.right_panel.layout().itemAt(0).widget()
+            titlebar.setFixedHeight(self.ui_builder._scale_size(40))
+
+        # 调整所有图标标签的大小
+        for widget in self.findChildren(QLabel, "nav_icon"):
+            widget.setFixedSize(self.ui_builder._scale_size(20), self.ui_builder._scale_size(20))
+
     def _init_ui(self):
         """初始化UI"""
         layout = QHBoxLayout(self)
@@ -69,7 +158,7 @@ class Window(QWidget):
     def _init_nav(self):
         """初始化导航栏"""
         self.sidebar = QWidget()
-        self.sidebar.setFixedWidth(50)
+        self.sidebar.setFixedWidth(self.ui_builder._scale_size(50))
         opacity_value = self.config.get("blur_opacity", 150)
         self.sidebar.setStyleSheet(f"background:rgba(0,0,0,{opacity_value});")
         self.sidebar.setMouseTracking(True)
@@ -82,27 +171,31 @@ class Window(QWidget):
         self.menu_icon_label = None
 
         sb = QVBoxLayout(self.sidebar)
-        sb.setContentsMargins(2, 10, 5, 10)
-        sb.setSpacing(5)
+        sb.setContentsMargins(self.ui_builder._scale_size(2), self.ui_builder._scale_size(10), self.ui_builder._scale_size(5), self.ui_builder._scale_size(10))
+        sb.setSpacing(self.ui_builder._scale_size(5))
 
         # 标题
         from widgets import make_transparent
         title = make_transparent(QWidget())
-        title.setFixedSize(133, 30)
+        title.setFixedHeight(self.ui_builder._scale_size(30))
         tl = QHBoxLayout(title)
-        tl.setContentsMargins(48, 0, 0, 0)
-        lbl = QLabel("Spectra")
-        from styles import STYLE_TEXT
-        lbl.setStyleSheet(STYLE_TEXT)
-        lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        lbl.setMouseTracking(True)
-        tl.addWidget(lbl)
-        tl.addStretch()
+        # 左边距应该等于导航按钮中文字的位置：indicator(3) + padding(7) + icon(20) + spacing(12) = 42
+        # 不需要右边距，因为标题宽度会自适应侧边栏宽度
+        tl.setContentsMargins(self.ui_builder._scale_size(42), 0, self.ui_builder._scale_size(5), 0)
+        self.title_lbl = QLabel("Spectra")
+        # 根据DPI缩放字体大小
+        font_size = int(14 * self.dpi_scale)
+        self.title_lbl.setStyleSheet(f"color:white;background:transparent;font-size:{font_size}px;font-family:'微软雅黑';")
+        self.title_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.title_lbl.setMouseTracking(True)
+        # 初始隐藏标题，只在展开时显示
+        self.title_lbl.hide()
+        tl.addWidget(self.title_lbl)
         sb.addWidget(title)
 
         # 导航按钮
-        menu_icon = load_svg_icon("svg/chevron-bar-right.svg")
-        menu_icon_active = load_svg_icon("svg/chevron-bar-left.svg")
+        menu_icon = load_svg_icon("svg/chevron-bar-right.svg", self.dpi_scale)
+        menu_icon_active = load_svg_icon("svg/chevron-bar-left.svg", self.dpi_scale)
         menu_btn_container = self.ui_builder.create_nav_btn(
             menu_icon if menu_icon else "\uE700", "菜单", self.toggle_sidebar,
             None, "svg/chevron-bar-right.svg", "svg/chevron-bar-left.svg"
@@ -110,8 +203,8 @@ class Window(QWidget):
         self.menu_icon_label = menu_btn_container.findChild(QLabel, "nav_icon")
         sb.addWidget(menu_btn_container)
 
-        home_icon = load_svg_icon("svg/houses.svg")
-        home_icon_active = load_svg_icon("svg/houses-fill.svg")
+        home_icon = load_svg_icon("svg/houses.svg", self.dpi_scale)
+        home_icon_active = load_svg_icon("svg/houses-fill.svg", self.dpi_scale)
         sb.addWidget(self.ui_builder.create_nav_btn(
             home_icon if home_icon else "\uE80F", "主页",
             lambda: self.switch_page(0), 0, "svg/houses.svg", "svg/houses-fill.svg"
@@ -132,8 +225,8 @@ class Window(QWidget):
         ))
         sb.addStretch()
 
-        settings_icon = load_svg_icon("svg/gear.svg")
-        settings_icon_active = load_svg_icon("svg/gear-fill.svg")
+        settings_icon = load_svg_icon("svg/gear.svg", self.dpi_scale)
+        settings_icon_active = load_svg_icon("svg/gear-fill.svg", self.dpi_scale)
         sb.addWidget(self.ui_builder.create_nav_btn(
             settings_icon if settings_icon else "\uE713", "设置",
             lambda: self.switch_page(3), 3, "svg/gear.svg", "svg/gear-fill.svg"
@@ -153,11 +246,11 @@ class Window(QWidget):
 
         # 标题栏
         titlebar = QWidget()
-        titlebar.setFixedHeight(40)
+        titlebar.setFixedHeight(self.ui_builder._scale_size(40))
         titlebar.setStyleSheet("background:transparent;")
         titlebar.setMouseTracking(True)
         tb = QHBoxLayout(titlebar)
-        tb.setContentsMargins(0, 0, 8, 0)
+        tb.setContentsMargins(0, 0, self.ui_builder._scale_size(8), 0)
         tb.addStretch()
         for t, s in [("−", self.showMinimized), ("×", self.close)]:
             tb.addWidget(self.ui_builder.create_title_btn(t, s))
@@ -192,23 +285,24 @@ class Window(QWidget):
                 i, ind, btn, icon_path, icon_path_active, container = item
 
             if i == index:
-                ind.setStyleSheet("background:#a0a0ff;border-radius:1px;")
+                ind.setStyleSheet(f"background:#a0a0ff;border-radius:{self.ui_builder._scale_size(1)}px;")
                 btn.setStyleSheet(STYLE_BTN_ACTIVE)
                 if icon_path_active and container:
-                    icon_pixmap = load_svg_icon(icon_path_active)
+                    icon_pixmap = load_svg_icon(icon_path_active, self.dpi_scale)
                     if icon_pixmap:
                         icon_lbl = container.findChild(QLabel, "nav_icon")
                         if icon_lbl:
-                            icon_lbl.setPixmap(scale_icon_for_display(icon_pixmap, 20))
+                            # 图标标签的固定大小已经设置了，这里缩放图标后设置pixmap
+                            icon_lbl.setPixmap(scale_icon_for_display(icon_pixmap, 20, self.dpi_scale))
             else:
-                ind.setStyleSheet("background:transparent;border-radius:1px;")
+                ind.setStyleSheet(f"background:transparent;border-radius:{self.ui_builder._scale_size(1)}px;")
                 btn.setStyleSheet(STYLE_BTN)
                 if icon_path and container:
-                    icon_pixmap = load_svg_icon(icon_path)
+                    icon_pixmap = load_svg_icon(icon_path, self.dpi_scale)
                     if icon_pixmap:
                         icon_lbl = container.findChild(QLabel, "nav_icon")
                         if icon_lbl:
-                            icon_lbl.setPixmap(scale_icon_for_display(icon_pixmap, 20))
+                            icon_lbl.setPixmap(scale_icon_for_display(icon_pixmap, 20, self.dpi_scale))
 
     def toggle_sidebar(self):
         """切换侧边栏"""
@@ -217,20 +311,24 @@ class Window(QWidget):
         for a in (self.anim, self.anim2):
             a.setDuration(200)
             a.setEasingCurve(QEasingCurve.Type.InOutQuad)
-            a.setStartValue(140 if self.sidebar_expanded else 50)
-            a.setEndValue(50 if self.sidebar_expanded else 140)
+            a.setStartValue(self.ui_builder._scale_size(140) if self.sidebar_expanded else self.ui_builder._scale_size(50))
+            a.setEndValue(self.ui_builder._scale_size(50) if self.sidebar_expanded else self.ui_builder._scale_size(140))
         if self.sidebar_expanded:
+            # 收起侧边栏时：隐藏导航文字和标题
             self.anim.finished.connect(lambda: [t.hide() for t in self.nav_texts])
+            self.anim.finished.connect(lambda: self.title_lbl.hide())
             if self.menu_icon_label and self.menu_icon_path:
-                icon_pixmap = load_svg_icon(self.menu_icon_path)
+                icon_pixmap = load_svg_icon(self.menu_icon_path, self.dpi_scale)
                 if icon_pixmap:
-                    self.menu_icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20))
+                    self.menu_icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20, self.dpi_scale))
         else:
+            # 展开侧边栏时：显示导航文字和标题
             [t.show() for t in self.nav_texts]
+            self.title_lbl.show()
             if self.menu_icon_label and self.menu_icon_path_active:
-                icon_pixmap = load_svg_icon(self.menu_icon_path_active)
+                icon_pixmap = load_svg_icon(self.menu_icon_path_active, self.dpi_scale)
                 if icon_pixmap:
-                    self.menu_icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20))
+                    self.menu_icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20, self.dpi_scale))
         self.anim.start()
         self.anim2.start()
         self.sidebar_expanded = not self.sidebar_expanded
@@ -243,15 +341,15 @@ class Window(QWidget):
         if is_visible:
             content.setVisible(False)
             if self.appearance_icon_label and self.appearance_icon_path:
-                icon_pixmap = load_svg_icon(self.appearance_icon_path)
+                icon_pixmap = load_svg_icon(self.appearance_icon_path, self.dpi_scale)
                 if icon_pixmap:
-                    self.appearance_icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20))
+                    self.appearance_icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20, self.dpi_scale))
         else:
             content.setVisible(True)
             if self.appearance_icon_label and self.appearance_icon_path_active:
-                icon_pixmap = load_svg_icon(self.appearance_icon_path_active)
+                icon_pixmap = load_svg_icon(self.appearance_icon_path_active, self.dpi_scale)
                 if icon_pixmap:
-                    self.appearance_icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20))
+                    self.appearance_icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20, self.dpi_scale))
 
     def set_background(self, mode):
         """设置背景模式"""
@@ -261,9 +359,9 @@ class Window(QWidget):
         if mode == "blur":
             self.blur_card.setStyleSheet(
                 "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.05);}")
-            check_pixmap = load_svg_icon("svg/check-lg.svg")
+            check_pixmap = load_svg_icon("svg/check-lg.svg", self.dpi_scale)
             if check_pixmap:
-                self.blur_card.check_label.setPixmap(scale_icon_for_display(check_pixmap, 20))
+                self.blur_card.check_label.setPixmap(scale_icon_for_display(check_pixmap, 20, self.dpi_scale))
 
             self.image_card.setStyleSheet(
                 "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
@@ -283,9 +381,9 @@ class Window(QWidget):
 
             self.image_card.setStyleSheet(
                 "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.05);}")
-            check_pixmap = load_svg_icon("svg/check-lg.svg")
+            check_pixmap = load_svg_icon("svg/check-lg.svg", self.dpi_scale)
             if check_pixmap:
-                self.image_card.check_label.setPixmap(scale_icon_for_display(check_pixmap, 20))
+                self.image_card.check_label.setPixmap(scale_icon_for_display(check_pixmap, 20, self.dpi_scale))
 
             self.path_widget.setVisible(True)
             self.opacity_widget.setVisible(False)
@@ -338,7 +436,7 @@ class Window(QWidget):
 
     def get_edge(self, pos):
         """获取边缘"""
-        x, y, w, h, e = pos.x(), pos.y(), self.width(), self.height(), self.EDGE
+        x, y, w, h, e = pos.x(), pos.y(), self.width(), self.height(), self.edge_size
         edge = ""
         if y < e:
             edge += "t"
@@ -408,7 +506,17 @@ class Window(QWidget):
         if hasattr(self, 'current_bg_path') and self.current_bg_path:
             self.set_background_image(self.current_bg_path)
 
-        # 保存逻辑像素（width/height已经是逻辑像素值）
+        # 使用防抖定时器，避免频繁保存配置
+        if not hasattr(self, '_resize_timer'):
+            self._resize_timer = QTimer()
+            self._resize_timer.setSingleShot(True)
+            self._resize_timer.timeout.connect(self._save_window_size)
+
+        # 每次resize都重置定时器，300ms后才保存
+        self._resize_timer.start(300)
+
+    def _save_window_size(self):
+        """保存窗口大小"""
         self.config["window_width"] = self.width()
         self.config["window_height"] = self.height()
         self.config_manager.save_config()

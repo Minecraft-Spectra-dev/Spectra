@@ -20,11 +20,14 @@ from window import Window
 
 
 if __name__ == "__main__":
-    # 必须在创建 QApplication 之前设置高DPI属性
+    # 禁用 Qt 的高 DPI 自动缩放，使屏幕显示的物理像素与配置一致
+    # 但需要手动处理控件的 DPI 缩放
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
-    
+    os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "0"
+    os.environ["QT_SCALE_FACTOR"] = "1"
+
     app = QApplication(sys.argv)
 
     # 创建并显示启动画面
