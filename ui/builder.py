@@ -272,11 +272,11 @@ class UIBuilder:
         page = QWidget()
         page.setStyleSheet("background:transparent;")
         pl = QVBoxLayout(page)
-        pl.setContentsMargins(20, 10, 20, 20)
-        pl.setSpacing(15)
+        pl.setContentsMargins(self._scale_size(20), self._scale_size(10), self._scale_size(20), self._scale_size(20))
+        pl.setSpacing(self._scale_size(15))
 
         title = QLabel("实例")
-        title.setStyleSheet("color:white;font-size:20px;font-family:'微软雅黑';font-weight:bold;")
+        title.setStyleSheet(f"color:white;font-size:{self._scale_size(20)}px;font-family:'微软雅黑';font-weight:bold;")
         pl.addWidget(title)
 
         pl.addStretch()
@@ -287,11 +287,11 @@ class UIBuilder:
         page = QWidget()
         page.setStyleSheet("background:transparent;")
         pl = QVBoxLayout(page)
-        pl.setContentsMargins(20, 10, 20, 20)
-        pl.setSpacing(15)
+        pl.setContentsMargins(self._scale_size(20), self._scale_size(10), self._scale_size(20), self._scale_size(20))
+        pl.setSpacing(self._scale_size(15))
 
         title = QLabel("下载")
-        title.setStyleSheet("color:white;font-size:20px;font-family:'微软雅黑';font-weight:bold;")
+        title.setStyleSheet(f"color:white;font-size:{self._scale_size(20)}px;font-family:'微软雅黑';font-weight:bold;")
         pl.addWidget(title)
 
         pl.addStretch()
