@@ -74,6 +74,48 @@ class JellyButton(QPushButton):
         super().mouseMoveEvent(ev)
 
 
+class CardButton(QPushButton):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._scale = 1.0
+        self.setMouseTracking(True)
+
+    def getScale(self):
+        return self._scale
+
+    def setScale(self, s):
+        self._scale = s
+        self.update()
+
+    def paintEvent(self, ev):
+        painter = QStylePainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        cx, cy = self.width() / 2, self.height() / 2
+        painter.translate(cx, cy)
+        painter.scale(self._scale, self._scale)
+        painter.translate(-cx, -cy)
+        opt = QStyleOptionButton()
+        self.initStyleOption(opt)
+        painter.drawControl(self.style().ControlElement.CE_PushButton, opt)
+
+    def _animate(self, end, duration, curve):
+        self.anim = QPropertyAnimation()
+        self.anim.setDuration(duration)
+        self.anim.setStartValue(self._scale)
+        self.anim.setEndValue(end)
+        self.anim.setEasingCurve(curve)
+        self.anim.valueChanged.connect(self.setScale)
+        self.anim.start()
+
+    def mousePressEvent(self, ev):
+        self._animate(0.97, 80, QEasingCurve.Type.Linear)
+        super().mousePressEvent(ev)
+
+    def mouseReleaseEvent(self, ev):
+        self._animate(1.0, 120, QEasingCurve.Type.Linear)
+        super().mouseReleaseEvent(ev)
+
+
 def make_transparent(widget):
     widget.setStyleSheet("background:transparent;")
     widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
@@ -355,14 +397,14 @@ class Window(QWidget):
         return page
 
     def create_bg_card(self, title, desc, selected, handler):
-        card = QPushButton()
+        card = CardButton()
         card.setFixedHeight(70)
         card.setCursor(Qt.CursorShape.PointingHandCursor)
         card.clicked.connect(handler)
 
         style = "background:rgba(255,255,255,0.15);" if selected else "background:rgba(255,255,255,0.05);"
         card.setStyleSheet(
-            f"QPushButton{{{style}border:none;border-radius:8px;}}QPushButton:hover{{background:rgba(255,255,255,0.1);}}")
+            f"QPushButton{{{style}border:none;border-radius:8px;}}QPushButton:hover{{background:rgba(255,255,255,0.1);}}QPushButton:pressed{{background:rgba(255,255,255,0.05);}}")
 
         layout = QHBoxLayout(card)
         layout.setContentsMargins(15, 12, 15, 12)
@@ -414,12 +456,12 @@ class Window(QWidget):
 
         if mode == "blur":
             self.blur_card.setStyleSheet(
-                "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.1);}")
+                "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.05);}")
             self.blur_card.radio.setStyleSheet(
                 "background:rgba(255,255,255,0.9);border:5px solid #4080ff;border-radius:10px;")
 
             self.image_card.setStyleSheet(
-                "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.1);}")
+                "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
             self.image_card.radio.setStyleSheet(
                 "background:rgba(255,255,255,0.8);border:1px solid rgba(0,0,0,0.3);border-radius:10px;")
 
@@ -435,12 +477,12 @@ class Window(QWidget):
                     delattr(self, 'current_video_path')
         elif mode == "image":
             self.blur_card.setStyleSheet(
-                "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.1);}")
+                "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
             self.blur_card.radio.setStyleSheet(
                 "background:rgba(255,255,255,0.8);border:1px solid rgba(0,0,0,0.3);border-radius:10px;")
 
             self.image_card.setStyleSheet(
-                "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.1);}")
+                "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:8px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.05);}")
             self.image_card.radio.setStyleSheet(
                 "background:rgba(255,255,255,0.9);border:5px solid #4080ff;border-radius:10px;")
 
