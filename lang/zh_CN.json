@@ -28,6 +28,14 @@
     "background_image_desc": "使用图像作为背景",
     "blur_opacity": "模糊透明度",
     "bg_image_path": "背景图片路径",
-    "bg_color": "背景颜色 (ARGB)"
+    "bg_color": "背景颜色 (ARGB)",
+    "settings_font": "字体设置",
+    "settings_font_desc": "选择界面显示字体",
+    "font_select": "选择字体",
+    "font_select_desc": "从系统已安装字体中选择",
+    "font_custom": "自定义字体",
+    "font_custom_desc": "从字体文件中选择",
+    "font_select_label": "系统字体",
+    "font_custom_label": "字体文件路径"
   }
 }

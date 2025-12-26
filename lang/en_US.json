@@ -28,6 +28,14 @@
     "background_image_desc": "Use image as background",
     "blur_opacity": "Blur Opacity",
     "bg_image_path": "Background Image Path",
-    "bg_color": "Background Color (ARGB)"
+    "bg_color": "Background Color (ARGB)",
+    "settings_font": "Font Settings",
+    "settings_font_desc": "Select interface display font",
+    "font_select": "Select Font",
+    "font_select_desc": "Choose from installed system fonts",
+    "font_custom": "Custom Font",
+    "font_custom_desc": "Choose from font files",
+    "font_select_label": "System Font",
+    "font_custom_label": "Font File Path"
   }
 }

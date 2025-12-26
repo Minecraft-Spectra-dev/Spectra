@@ -295,6 +295,46 @@ class UIBuilder:
 
         self.window.language_content.setVisible(False)
 
+        # 字体设置容器
+        self.window.font_container = self.create_expandable_menu(
+            self.window.language_manager.translate("settings_font"),
+            self.window.language_manager.translate("settings_font_desc"),
+            "svg/type.svg", "svg/file-earmark-font.svg",
+            toggle_handler=self.window.toggle_font_menu,
+            content_attr="font"
+        )
+        pl.addWidget(self.window.font_container)
+
+        self.window.font_content = self.window.font_container.layout().itemAt(1).widget()
+
+        # 选择字体卡片
+        self.window.font_select_card = self.create_bg_card(
+            self.window.language_manager.translate("font_select"),
+            self.window.language_manager.translate("font_select_desc"),
+            self.window.config.get("font_mode") == 0,
+            lambda: self.window.set_font_mode(0)
+        )
+        self.window.font_content_layout.addWidget(self.window.font_select_card)
+
+        # 字体选择下拉框区域
+        self._create_font_select_widget()
+        self.window.font_content_layout.addWidget(self.window.font_select_widget)
+
+        # 自定义字体卡片
+        self.window.font_custom_card = self.create_bg_card(
+            self.window.language_manager.translate("font_custom"),
+            self.window.language_manager.translate("font_custom_desc"),
+            self.window.config.get("font_mode") == 1,
+            lambda: self.window.set_font_mode(1)
+        )
+        self.window.font_content_layout.addWidget(self.window.font_custom_card)
+
+        # 自定义字体路径输入区域
+        self._create_font_path_widget()
+        self.window.font_content_layout.addWidget(self.window.font_path_widget)
+
+        self.window.font_content.setVisible(False)
+
         pl.addStretch()
         return page
 
@@ -445,6 +485,181 @@ class UIBuilder:
         if len(color_str) == 7 and color_str.startswith('#'):
             return QColor(f"#FF{color_str[1:]}")
         return QColor("#00000000")
+
+    def _create_font_select_widget(self):
+        self.window.font_select_widget = QWidget()
+        border_radius = self._scale_size(8)
+        self.window.font_select_widget.setStyleSheet(f"background:rgba(255,255,255,0);border-bottom-left-radius:{border_radius}px;border-bottom-right-radius:{border_radius}px;")
+        font_select_layout = QHBoxLayout(self.window.font_select_widget)
+        font_select_layout.setContentsMargins(self._scale_size(35), self._scale_size(12), self._scale_size(15), self._scale_size(12))
+        font_select_layout.setSpacing(self._scale_size(10))
+
+        font_select_label = QLabel(self.window.language_manager.translate("font_select_label"))
+        font_select_label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'微软雅黑';")
+        font_select_layout.addWidget(font_select_label)
+
+        font_select_layout.addStretch()
+
+        from PyQt6.QtWidgets import QComboBox
+        from PyQt6.QtGui import QFontDatabase
+        self.window.font_combo = QComboBox()
+        self.window.font_combo.setFixedHeight(self._scale_size(32))
+        self.window.font_combo.setFixedWidth(self._scale_size(200))
+        self.window.font_combo.setMaxVisibleItems(8)
+        padding = self._scale_size(6)
+        border_radius = self._scale_size(4)
+        self.window.font_combo.setStyleSheet(
+            f"QComboBox{{"
+            f"background:rgba(0,0,0,0.3);"
+            f"border:1px solid rgba(255,255,255,0.15);"
+            f"border-radius:{border_radius}px;"
+            f"padding:{padding}px;"
+            f"color:rgba(255,255,255,0.95);"
+            f"font-size:{self._scale_size(13)}px;"
+            f"font-family:'微软雅黑';"
+            f"}}"
+            f"QComboBox:hover{{"
+            f"background:rgba(0,0,0,0.4);"
+            f"border:1px solid rgba(255,255,255,0.25);"
+            f"}}"
+            f"QComboBox:focus{{"
+            f"background:rgba(0,0,0,0.5);"
+            f"border:1px solid rgba(100,150,255,0.6);"
+            f"}}"
+            f"QComboBox:on{{"
+            f"padding-top:{padding - 1}px;"
+            f"padding-bottom:{padding - 1}px;"
+            f"}}"
+            f"QComboBox::drop-down{{"
+            f"border:none;"
+            f"width:28px;"
+            f"background:transparent;"
+            f"}}"
+            f"QComboBox::down-arrow{{"
+            f"image:url(svg/x-diamond.svg);"
+            f"width:12px;"
+            f"height:12px;"
+            f"}}"
+            f"QComboBox QAbstractItemView{{"
+            f"background:rgba(0,0,0,0.9);"
+            f"border:1px solid rgba(255,255,255,0.1);"
+            f"border-radius:{border_radius}px;"
+            f"selection-background-color:rgba(64,128,255,0.8);"
+            f"selection-color:white;"
+            f"outline:none;"
+            f"padding:{self._scale_size(2)}px;"
+            f"}}"
+            f"QComboBox QAbstractItemView::item{{"
+            f"height:{self._scale_size(28)}px;"
+            f"padding:{self._scale_size(6)}px {self._scale_size(8)}px;"
+            f"color:rgba(255,255,255,0.85);"
+            f"border-radius:{border_radius - 1}px;"
+            f"}}"
+            f"QComboBox QAbstractItemView::item:hover{{"
+            f"background:rgba(255,255,255,0.08);"
+            f"}}"
+            f"QComboBox QAbstractItemView::item:selected{{"
+            f"background:rgba(64,128,255,0.9);"
+            f"color:white;"
+            f"}}"
+            f"QComboBox QScrollBar:vertical{{"
+            f"background:rgba(255,255,255,0.05);"
+            f"width:8px;"
+            f"margin:0px;"
+            f"border-radius:4px;"
+            f"}}"
+            f"QComboBox QScrollBar::handle:vertical{{"
+            f"background:rgba(255,255,255,0.3);"
+            f"min-height:20px;"
+            f"border-radius:4px;"
+            f"}}"
+            f"QComboBox QScrollBar::handle:vertical:hover{{"
+            f"background:rgba(255,255,255,0.5);"
+            f"}}"
+            f"QComboBox QScrollBar::add-line:vertical,"
+            f"QComboBox QScrollBar::sub-line:vertical{{"
+            f"border:none;"
+            f"background:none;"
+            f"}}"
+            f"QComboBox QScrollBar::add-page:vertical,"
+            f"QComboBox QScrollBar::sub-page:vertical{{"
+            f"background:none;"
+            f"}}"
+        )
+        # 获取系统字体
+        families = QFontDatabase.families()
+        # 过滤一些常见的系统字体
+        common_fonts = ["Microsoft YaHei UI", "Microsoft YaHei", "SimSun", "SimHei", "Arial", "Tahoma", "Verdana", "Segoe UI"]
+        for font in common_fonts:
+            if font in families:
+                self.window.font_combo.addItem(font)
+        # 添加剩余字体
+        for font in families:
+            if font not in common_fonts:
+                self.window.font_combo.addItem(font)
+
+        # 设置当前字体
+        current_font = self.window.config.get("custom_font_family", "Microsoft YaHei UI")
+        for i in range(self.window.font_combo.count()):
+            if self.window.font_combo.itemText(i) == current_font:
+                self.window.font_combo.setCurrentIndex(i)
+                break
+
+        # 连接字体选择事件
+        self.window.font_combo.currentTextChanged.connect(self.window.on_font_family_changed)
+
+        font_select_layout.addWidget(self.window.font_combo)
+
+        self.window.font_select_widget.setVisible(self.window.config.get("font_mode") == 0)
+
+        return self.window.font_select_widget
+
+        self.window.font_select_widget.setVisible(self.window.config.get("font_mode") == 1)
+
+        return self.window.font_select_widget
+
+    def _create_font_path_widget(self):
+        self.window.font_path_widget = QWidget()
+        border_radius = self._scale_size(8)
+        self.window.font_path_widget.setStyleSheet(f"background:rgba(255,255,255,0);border-bottom-left-radius:{border_radius}px;border-bottom-right-radius:{border_radius}px;")
+        font_path_layout = QHBoxLayout(self.window.font_path_widget)
+        font_path_layout.setContentsMargins(self._scale_size(35), self._scale_size(12), self._scale_size(15), self._scale_size(12))
+        font_path_layout.setSpacing(self._scale_size(10))
+
+        font_path_label = QLabel(self.window.language_manager.translate("font_custom_label"))
+        font_path_label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'微软雅黑';")
+        font_path_layout.addWidget(font_path_label)
+
+        self.window.font_path_input = QLineEdit()
+        self.window.font_path_input.setText(self.window.config.get("custom_font_path", ""))
+        padding = self._scale_size(6)
+        border_radius_input = self._scale_size(4)
+        self.window.font_path_input.setStyleSheet(
+            f"QLineEdit{{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:{border_radius_input}px;padding:{padding}px;color:white;font-size:{self._scale_size(13)}px;font-family:'微软雅黑';}}")
+        self.window.font_path_input.editingFinished.connect(self.window.on_font_path_changed)
+        font_path_layout.addWidget(self.window.font_path_input, 1)
+
+        # 浏览按钮
+        browse_btn = ClickableLabel()
+        browse_btn.setFixedSize(self._scale_size(32), self._scale_size(32))
+        border_radius_btn = self._scale_size(4)
+        browse_btn.setHoverStyle(
+            f"background:rgba(255,255,255,0.1);border:none;border-radius:{border_radius_btn}px;",
+            f"background:rgba(255,255,255,0.15);border:none;border-radius:{border_radius_btn}px;"
+        )
+        browse_btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        browse_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        browse_btn.setCallback(self.window.choose_font_file)
+
+        folder_pixmap = load_svg_icon("svg/folder2.svg", self.dpi_scale)
+        if folder_pixmap:
+            browse_btn.setPixmap(scale_icon_for_display(folder_pixmap, 20, self.dpi_scale))
+
+        font_path_layout.addWidget(browse_btn)
+
+        self.window.font_path_widget.setVisible(self.window.config.get("font_mode") == 1)
+
+        return self.window.font_path_widget
 
     def _create_language_card(self):
         language_widget = QWidget()
@@ -672,7 +887,40 @@ class UIBuilder:
                 if language_widget and language_widget.layout():
                     label = language_widget.layout().itemAt(0).widget()
                     label.setText(self.window.language_manager.translate("settings_language_label"))
-    
+
+        # 更新字体设置容器
+        font_header = self.window.font_container.layout().itemAt(0).widget()
+        if font_header and font_header.layout():
+            header_layout = font_header.layout()
+            for i in range(header_layout.count()):
+                item = header_layout.itemAt(i)
+                if item and isinstance(item.layout(), QVBoxLayout):
+                    text_layout = item.layout()
+                    if text_layout.count() >= 2:
+                        title = text_layout.itemAt(0).widget()
+                        desc = text_layout.itemAt(1).widget()
+                        title.setText(self.window.language_manager.translate("settings_font"))
+                        desc.setText(self.window.language_manager.translate("settings_font_desc"))
+                        break
+
+        # 更新字体卡片
+        self._update_bg_card(self.window.font_select_card, "font_select", "font_select_desc")
+        self._update_bg_card(self.window.font_custom_card, "font_custom", "font_custom_desc")
+
+        # 更新字体选择标签
+        if hasattr(self.window, 'font_select_widget'):
+            font_select_layout = self.window.font_select_widget.layout()
+            if font_select_layout and font_select_layout.count() > 0:
+                label = font_select_layout.itemAt(0).widget()
+                label.setText(self.window.language_manager.translate("font_select_label"))
+
+        # 更新字体路径标签
+        if hasattr(self.window, 'font_path_widget'):
+            font_path_layout = self.window.font_path_widget.layout()
+            if font_path_layout and font_path_layout.count() > 0:
+                label = font_path_layout.itemAt(0).widget()
+                label.setText(self.window.language_manager.translate("font_custom_label"))
+
     def _update_bg_card(self, card, title_key, desc_key):
         """更新背景卡片的文本"""
         if not card or not card.layout():

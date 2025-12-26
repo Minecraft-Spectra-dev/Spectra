@@ -24,7 +24,7 @@ class Window(QWidget):
         self.config_manager = ConfigManager()
         self.config = self.config_manager.config
         self.bg_manager = BackgroundManager(self)
-        self.language_manager = LanguageManager()
+        self.language_manager = LanguageManager(self.config_manager)
 
         self.dpi_scale = self._get_system_dpi_scale()
 
@@ -582,3 +582,105 @@ class Window(QWidget):
         self.config["window_width"] = self.width()
         self.config["window_height"] = self.height()
         self.config_manager.save_config()
+
+    def toggle_font_menu(self):
+        """切换字体设置菜单"""
+        content = self.font_container.layout().itemAt(1).widget()
+        is_visible = content.isVisible()
+
+        if is_visible:
+            content.setVisible(False)
+        else:
+            content.setVisible(True)
+
+    def set_font_mode(self, mode):
+        """设置字体模式: 0=选择字体, 1=自定义字体"""
+        self.config["font_mode"] = mode
+        self.config_manager.save_config()
+
+        # 更新卡片选中状态
+        self._update_font_card_selection(mode)
+
+        # 显示/隐藏对应的控件
+        self.font_select_widget.setVisible(mode == 0)
+        self.font_path_widget.setVisible(mode == 1)
+
+        # 应用字体
+        self.apply_font()
+
+    def _update_font_card_selection(self, mode):
+        """更新字体卡片选中状态"""
+        cards = [
+            (self.font_select_card, 0),
+            (self.font_custom_card, 1)
+        ]
+
+        for card, card_mode in cards:
+            if card_mode == mode:
+                card.setStyleSheet(
+                    "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.05);}")
+                check_pixmap = load_svg_icon("svg/check-lg.svg", self.dpi_scale)
+                if check_pixmap:
+                    card.check_label.setPixmap(scale_icon_for_display(check_pixmap, 20, self.dpi_scale))
+            else:
+                card.setStyleSheet(
+                    "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
+                card.check_label.clear()
+
+    def on_font_family_changed(self, font_family):
+        """字体选择变化"""
+        self.config["custom_font_family"] = font_family
+        self.config_manager.save_config()
+        self.apply_font()
+
+    def on_font_path_changed(self):
+        """字体路径变化"""
+        path = self.font_path_input.text().strip()
+        if path and os.path.exists(path):
+            self.config["custom_font_path"] = path
+            self.config_manager.save_config()
+            self.apply_font()
+        elif not path:
+            self.config["custom_font_path"] = ""
+            self.config_manager.save_config()
+
+    def choose_font_file(self):
+        """选择字体文件"""
+        file, _ = QFileDialog.getOpenFileName(
+            self, self.language_manager.translate("font_custom_label"), "",
+            "字体文件 (*.ttf *.otf *.ttc *.woff *.woff2);;所有文件 (*.*)"
+        )
+        if file:
+            self.config["custom_font_path"] = file
+            self.config_manager.save_config()
+            self.font_path_input.setText(file)
+            self.apply_font()
+
+    def apply_font(self):
+        """应用字体设置"""
+        from PyQt6.QtGui import QFontDatabase, QFont
+        font_mode = self.config.get("font_mode", 0)
+        font_family = "Microsoft YaHei UI"
+        font_path = self.config.get("custom_font_path", "")
+
+        if font_mode == 0:
+            # 选择字体
+            font_family = self.config.get("custom_font_family", "Microsoft YaHei UI")
+        elif font_mode == 1 and font_path and os.path.exists(font_path):
+            # 自定义字体：从字体文件加载
+            font_id = QFontDatabase.addApplicationFont(font_path)
+            if font_id != -1:
+                font_family = QFontDatabase.applicationFontFamilies(font_id)[0]
+
+        # 应用到整个应用
+        self._apply_font_to_app(font_family)
+
+    def _apply_font_to_app(self, font_family):
+        """应用字体到应用的所有控件"""
+        from PyQt6.QtGui import QFont
+        app = QApplication.instance()
+        if app:
+            font = QFont(font_family)
+            app.setFont(font)
+
+
