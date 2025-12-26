@@ -134,16 +134,33 @@ class NewsCard(QWidget):
 
     def update_font(self, font_family):
         """更新卡片字体"""
-        title_font = QFont()
-        title_font.setFamily(font_family)
-        title_font.setWeight(QFont.Weight.Bold)
-        title_font.setPointSize(int(13 * self.dpi_scale))
-        self.title_label.setFont(title_font)
+        # 转义字体名称中的特殊字符
+        escaped_font = font_family.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"')
+        # 使用双引号包裹字体名称，避免单引号问题
+        font_family_quoted = f'"{escaped_font}"'
 
-        content_font = QFont()
-        content_font.setFamily(font_family)
-        content_font.setPointSize(int(11 * self.dpi_scale))
-        self.content_label.setFont(content_font)
+        # 使用样式表设置字体（优先级高于 setFont）
+        title_font_size = int(13 * self.dpi_scale)
+        content_font_size = int(11 * self.dpi_scale)
+
+        self.title_label.setStyleSheet(f"""
+            QLabel {{
+                color: white;
+                background: transparent;
+                font-family: {font_family_quoted};
+                font-size: {title_font_size}px;
+                font-weight: bold;
+            }}
+        """)
+
+        self.content_label.setStyleSheet(f"""
+            QLabel {{
+                color: rgba(255, 255, 255, 0.85);
+                background: transparent;
+                font-family: {font_family_quoted};
+                font-size: {content_font_size}px;
+            }}
+        """)
 
     def fade_in(self, duration=300):
         """淡入动画"""

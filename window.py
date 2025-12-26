@@ -91,6 +91,9 @@ class Window(QWidget):
         self.current_bg_path = None
         self.switch_page(0)
 
+        # 应用初始字体设置（在所有 UI 初始化完成后立即应用）
+        self.apply_font()
+
         self.cursor_timer = QTimer()
         def update_cursor_safe():
             try:
@@ -871,27 +874,44 @@ class Window(QWidget):
             app.setFont(font)
 
             # 强制更新所有控件以应用新字体
+            # 注意：样式表中的字体设置优先级高于 setFont，所以需要手动更新
             self._update_all_fonts(font_family)
 
     def _update_all_fonts(self, font_family):
         """更新所有控件的字体样式"""
+        # 转义字体名称中的特殊字符
+        escaped_font = font_family.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"')
+        # 使用双引号包裹字体名称，避免单引号问题
+        font_family_quoted = f'"{escaped_font}"'
+
         # 更新窗口中的导航文本和标题
         for text_widget in self.nav_texts:
             font_size = int(14 * self.dpi_scale)
-            text_widget.setStyleSheet(f"color:white;background:transparent;font-size:{font_size}px;font-family:'{font_family}';")
+            text_widget.setStyleSheet(f"color:white;background:transparent;font-size:{font_size}px;font-family:{font_family_quoted};")
 
         # 更新标题标签
         if hasattr(self, 'title_lbl'):
             font_size = int(14 * self.dpi_scale)
-            self.title_lbl.setStyleSheet(f"color:white;background:transparent;font-size:{font_size}px;font-family:'{font_family}';")
+            self.title_lbl.setStyleSheet(f"color:white;background:transparent;font-size:{font_size}px;font-family:{font_family_quoted};")
 
         # 更新所有新闻卡片的字体
         home_page = self.stack.widget(0)
-        if home_page and hasattr(home_page, 'news_cards'):
-            for card in home_page.news_cards:
-                card.update_font(font_family)
+        if home_page:
+            # 获取主页的滚动区域（通过遍历布局查找）
+            from PyQt6.QtWidgets import QScrollArea
+            scroll_area = home_page.findChild(QScrollArea)
+            if scroll_area:
+                # 获取 scroll_content
+                scroll_content = scroll_area.widget()
+                if scroll_content and hasattr(scroll_content, 'news_cards'):
+                    for card in scroll_content.news_cards:
+                        card.update_font(font_family)
 
         # 触发 UI 更新以刷新设置页面的字体
-        self.ui_builder._update_settings_font(font_family)
+        try:
+            self.ui_builder._update_settings_font(font_family)
+        except Exception as e:
+            # 静默处理字体更新错误，避免崩溃
+            pass
 
 

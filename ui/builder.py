@@ -1063,20 +1063,24 @@ class UIBuilder:
 
     def _update_settings_font(self, font_family):
         """更新设置页面的字体"""
+        # 转义字体名称中的特殊字符
+        escaped_font = font_family.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"')
+        font_family_quoted = f'"{escaped_font}"'
+
         # 更新设置页面标题
         settings_page = self.window.stack.widget(3)
         if settings_page and settings_page.layout():
             title = settings_page.layout().itemAt(0).widget()
             if title:
-                title.setStyleSheet(f"color:white;font-size:{self._scale_size(20)}px;font-family:'{font_family}';font-weight:bold;")
+                title.setStyleSheet(f"color:white;font-size:{self._scale_size(20)}px;font-family:{font_family_quoted};font-weight:bold;")
 
-        # 更新其他页面标题
-        for i in [0, 1, 2]:
+        # 更新其他页面标题（主页没有标题，实例和下载页面的标题在 itemAt(0)）
+        for i in [1, 2]:  # 实例页面和下载页面
             page = self.window.stack.widget(i)
             if page and page.layout():
-                title = page.layout().itemAt(1).widget() if i == 0 else page.layout().itemAt(0).widget()
+                title = page.layout().itemAt(0).widget()
                 if title and hasattr(title, 'setText'):
-                    title.setStyleSheet(f"color:white;font-size:{self._scale_size(20)}px;font-family:'{font_family}';font-weight:bold;")
+                    title.setStyleSheet(f"color:white;font-size:{self._scale_size(20)}px;font-family:{font_family_quoted};font-weight:bold;")
 
         # 更新外观设置容器的标题和描述
         if hasattr(self.window, 'appearance_container'):
@@ -1110,10 +1114,10 @@ class UIBuilder:
                 if header_layout and isinstance(header_layout, QHBoxLayout):
                     label = header_layout.itemAt(0).widget()
                     if label:
-                        label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'{font_family}';")
+                        label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:{font_family_quoted};")
                     value_label = header_layout.itemAt(1).widget()
                     if value_label:
-                        value_label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'{font_family}';")
+                        value_label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:{font_family_quoted};")
 
         # 更新路径标签
         if hasattr(self.window, 'path_widget'):
@@ -1121,14 +1125,13 @@ class UIBuilder:
             if path_layout and path_layout.count() > 0:
                 label = path_layout.itemAt(0).widget()
                 if label:
-                    label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'{font_family}';")
-                # 更新输入框
-                input_widget = path_layout.itemAt(1).widget()
-                if input_widget:
+                    label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:{font_family_quoted};")
+                # 更新输入框（直接从 window 属性获取）
+                if hasattr(self.window, 'path_input'):
                     padding = self._scale_size(6)
                     border_radius_input = self._scale_size(4)
-                    input_widget.setStyleSheet(
-                        f"QLineEdit{{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:{border_radius_input}px;padding:{padding}px;color:white;font-size:{self._scale_size(13)}px;font-family:'{font_family}';}}")
+                    self.window.path_input.setStyleSheet(
+                        f"QLineEdit{{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:{border_radius_input}px;padding:{padding}px;color:white;font-size:{self._scale_size(13)}px;font-family:{font_family_quoted};}}")
 
         # 更新颜色标签
         if hasattr(self.window, 'color_widget'):
@@ -1136,14 +1139,13 @@ class UIBuilder:
             if color_layout and color_layout.count() > 0:
                 label = color_layout.itemAt(0).widget()
                 if label:
-                    label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'{font_family}';")
-                # 更新输入框
-                input_widget = color_layout.itemAt(1).widget()
-                if input_widget:
+                    label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:{font_family_quoted};")
+                # 更新输入框（直接从 window 属性获取）
+                if hasattr(self.window, 'color_input'):
                     padding = self._scale_size(6)
                     border_radius_input = self._scale_size(4)
-                    input_widget.setStyleSheet(
-                        f"QLineEdit{{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:{border_radius_input}px;padding:{padding}px;color:white;font-size:{self._scale_size(13)}px;font-family:'{font_family}';}}")
+                    self.window.color_input.setStyleSheet(
+                        f"QLineEdit{{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:{border_radius_input}px;padding:{padding}px;color:white;font-size:{self._scale_size(13)}px;font-family:{font_family_quoted};}}")
 
         # 更新字体选择标签
         if hasattr(self.window, 'font_select_widget'):
@@ -1151,7 +1153,10 @@ class UIBuilder:
             if font_select_layout and font_select_layout.count() > 0:
                 label = font_select_layout.itemAt(0).widget()
                 if label:
-                    label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'{font_family}';")
+                    label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:{font_family_quoted};")
+                # 更新 QComboBox 字体（直接从 window 属性获取）
+                if hasattr(self.window, 'font_combo'):
+                    self._update_combobox_font(self.window.font_combo, font_family_quoted)
 
         # 更新字体路径标签
         if hasattr(self.window, 'font_path_widget'):
@@ -1159,14 +1164,13 @@ class UIBuilder:
             if font_path_layout and font_path_layout.count() > 0:
                 label = font_path_layout.itemAt(0).widget()
                 if label:
-                    label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'{font_family}';")
-                # 更新输入框
-                input_widget = font_path_layout.itemAt(1).widget()
-                if input_widget:
+                    label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:{font_family_quoted};")
+                # 更新输入框（直接从 window 属性获取）
+                if hasattr(self.window, 'font_path_input'):
                     padding = self._scale_size(6)
                     border_radius_input = self._scale_size(4)
-                    input_widget.setStyleSheet(
-                        f"QLineEdit{{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:{border_radius_input}px;padding:{padding}px;color:white;font-size:{self._scale_size(13)}px;font-family:'{font_family}';}}")
+                    self.window.font_path_input.setStyleSheet(
+                        f"QLineEdit{{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:{border_radius_input}px;padding:{padding}px;color:white;font-size:{self._scale_size(13)}px;font-family:{font_family_quoted};}}")
 
         # 更新语言标签
         if hasattr(self.window, 'language_content_layout'):
@@ -1175,10 +1179,102 @@ class UIBuilder:
                 if language_widget and language_widget.layout():
                     label = language_widget.layout().itemAt(0).widget()
                     if label:
-                        label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'{font_family}';")
+                        label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:{font_family_quoted};")
+                    # 更新语言 QComboBox 字体（直接从 window 属性获取）
+                    if hasattr(self.window, 'language_combo'):
+                        self._update_combobox_font(self.window.language_combo, font_family_quoted)
+
+    def _update_combobox_font(self, combo_widget, font_family_quoted):
+        """更新 QComboBox 的字体"""
+        padding = self._scale_size(6)
+        border_radius = self._scale_size(4)
+        combo_widget.setStyleSheet(
+            f"QComboBox{{"
+            f"background:rgba(0,0,0,0.3);"
+            f"border:1px solid rgba(255,255,255,0.15);"
+            f"border-radius:{border_radius}px;"
+            f"padding:{padding}px;"
+            f"color:rgba(255,255,255,0.95);"
+            f"font-size:{self._scale_size(13)}px;"
+            f"font-family:{font_family_quoted};"
+            f"}}"
+            f"QComboBox:hover{{"
+            f"background:rgba(0,0,0,0.4);"
+            f"border:1px solid rgba(255,255,255,0.25);"
+            f"}}"
+            f"QComboBox:focus{{"
+            f"background:rgba(0,0,0,0.5);"
+            f"border:1px solid rgba(100,150,255,0.6);"
+            f"}}"
+            f"QComboBox:on{{"
+            f"padding-top:{padding - 1}px;"
+            f"padding-bottom:{padding - 1}px;"
+            f"}}"
+            f"QComboBox::drop-down{{"
+            f"border:none;"
+            f"width:28px;"
+            f"background:transparent;"
+            f"}}"
+            f"QComboBox::down-arrow{{"
+            f"image:url(svg/x-diamond.svg);"
+            f"width:12px;"
+            f"height:12px;"
+            f"}}"
+            f"QComboBox QAbstractItemView{{"
+            f"background:rgba(0,0,0,0.9);"
+            f"border:1px solid rgba(255,255,255,0.1);"
+            f"border-radius:{border_radius}px;"
+            f"selection-background-color:rgba(64,128,255,0.8);"
+            f"selection-color:white;"
+            f"outline:none;"
+            f"padding:{self._scale_size(2)}px;"
+            f"font-family:{font_family_quoted};"
+            f"}}"
+            f"QComboBox QAbstractItemView::item{{"
+            f"height:{self._scale_size(28)}px;"
+            f"padding:{self._scale_size(6)}px {self._scale_size(8)}px;"
+            f"color:rgba(255,255,255,0.85);"
+            f"border-radius:{border_radius - 1}px;"
+            f"font-family:{font_family_quoted};"
+            f"}}"
+            f"QComboBox QAbstractItemView::item:hover{{"
+            f"background:rgba(255,255,255,0.08);"
+            f"}}"
+            f"QComboBox QAbstractItemView::item:selected{{"
+            f"background:rgba(64,128,255,0.9);"
+            f"color:white;"
+            f"}}"
+            f"QComboBox QScrollBar:vertical{{"
+            f"background:rgba(255,255,255,0.05);"
+            f"width:8px;"
+            f"margin:0px;"
+            f"border-radius:4px;"
+            f"}}"
+            f"QComboBox QScrollBar::handle:vertical{{"
+            f"background:rgba(255,255,255,0.3);"
+            f"min-height:20px;"
+            f"border-radius:4px;"
+            f"}}"
+            f"QComboBox QScrollBar::handle:vertical:hover{{"
+            f"background:rgba(255,255,255,0.5);"
+            f"}}"
+            f"QComboBox QScrollBar::add-line:vertical,"
+            f"QComboBox QScrollBar::sub-line:vertical{{"
+            f"border:none;"
+            f"background:none;"
+            f"}}"
+            f"QComboBox QScrollBar::add-page:vertical,"
+            f"QComboBox QScrollBar::sub-page:vertical{{"
+            f"background:none;"
+            f"}}"
+        )
 
     def _update_expandable_menu_font(self, container, font_family):
         """更新可展开菜单的字体"""
+        # 转义字体名称中的特殊字符
+        escaped_font = font_family.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"')
+        font_family_quoted = f'"{escaped_font}"'
+
         header = container.layout().itemAt(0).widget()
         if header and header.layout():
             header_layout = header.layout()
@@ -1191,12 +1287,16 @@ class UIBuilder:
                     if text_layout.count() >= 2:
                         title = text_layout.itemAt(0).widget()
                         desc = text_layout.itemAt(1).widget()
-                        title.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:'{font_family}';background:transparent;")
-                        desc.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:'{font_family}';background:transparent;")
+                        title.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:{font_family_quoted};background:transparent;")
+                        desc.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:{font_family_quoted};background:transparent;")
                         break
 
     def _update_bg_card_font(self, card, font_family):
         """更新卡片字体的样式"""
+        # 转义字体名称中的特殊字符
+        escaped_font = font_family.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"')
+        font_family_quoted = f'"{escaped_font}"'
+
         if not card or not card.layout():
             return
 
@@ -1206,8 +1306,8 @@ class UIBuilder:
             if text_container and text_container.count() >= 2:
                 title = text_container.itemAt(0).widget()
                 desc = text_container.itemAt(1).widget()
-                title.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:'{font_family}';background:transparent;")
-                desc.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:'{font_family}';background:transparent;")
+                title.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:{font_family_quoted};background:transparent;")
+                desc.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:{font_family_quoted};background:transparent;")
 
     def _update_bg_card(self, card, title_key, desc_key):
         """更新背景卡片的文本"""
