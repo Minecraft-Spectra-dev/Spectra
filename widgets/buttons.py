@@ -1,9 +1,9 @@
 """自定义按钮组件"""
 
-from PyQt6.QtWidgets import QPushButton, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QStylePainter, QStyleOptionButton
-from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
+from PyQt6.QtCore import QPropertyAnimation, QEasingCurve, Qt
 from PyQt6.QtGui import QPainter
-from styles import STYLE_BTN, STYLE_BTN_ACTIVE, STYLE_ICON, STYLE_TEXT
+from PyQt6.QtWidgets import (QHBoxLayout, QPushButton, QStyleOptionButton,
+                             QStylePainter, QVBoxLayout, QWidget)
 
 
 def make_transparent(widget):

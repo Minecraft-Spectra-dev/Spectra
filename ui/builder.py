@@ -1,14 +1,17 @@
 """UI构建器"""
 
 import os
-from PyQt6.QtWidgets import (QWidget, QPushButton, QHBoxLayout, QVBoxLayout, QLabel,
-                             QLineEdit, QSlider, QColorDialog)
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap, QColor
 
-from widgets import JellyButton, CardButton, ClickableLabel, make_transparent, get_current_font, set_current_font
-from styles import STYLE_BTN, STYLE_ICON, SLIDER_STYLE
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QPixmap, QFontDatabase
+from PyQt6.QtWidgets import (QColorDialog, QHBoxLayout, QLabel, QLineEdit,
+                             QPushButton, QSlider, QVBoxLayout, QWidget,
+                             QComboBox)
+
+from styles import SLIDER_STYLE, STYLE_BTN, STYLE_ICON
 from utils import load_svg_icon, scale_icon_for_display
+from widgets import (CardButton, ClickableLabel, JellyButton,
+                      get_current_font, make_transparent, set_current_font)
 
 
 class UIBuilder:
@@ -22,6 +25,197 @@ class UIBuilder:
     def _get_font_family(self):
         """获取当前字体系列"""
         return get_current_font()
+
+    def _get_scroll_area_stylesheet(self):
+        """获取统一的滚动区域样式表"""
+        return """
+            QScrollArea {
+                background: transparent;
+                border: none;
+            }
+            QScrollBar:vertical {
+                background: rgba(255, 255, 255, 0.1);
+                width: 8px;
+                border-radius: 4px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(255, 255, 255, 0.3);
+                min-height: 20px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: rgba(255, 255, 255, 0.5);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                border: none;
+                background: none;
+                height: 0px;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
+        """
+
+    def _create_scroll_area(self, parent=None):
+        """创建统一的滚动区域"""
+        from PyQt6.QtWidgets import QScrollArea
+        scroll_area = QScrollArea(parent)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setStyleSheet(self._get_scroll_area_stylesheet())
+        return scroll_area
+
+    def _create_scroll_content(self, margins=(0, 10, 0, 0), spacing=15):
+        """创建滚动内容容器"""
+        content = QWidget()
+        content.setStyleSheet("background: transparent;")
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(
+            self._scale_size(margins[0]),
+            self._scale_size(margins[1]),
+            self._scale_size(margins[2]),
+            self._scale_size(margins[3])
+        )
+        layout.setSpacing(self._scale_size(spacing))
+        return content, layout
+
+    def _create_page_title(self, text):
+        """创建页面标题"""
+        title = QLabel(text)
+        title.setStyleSheet(
+            f"color:white;font-size:{self._scale_size(20)}px;font-family:'{self._get_font_family()}';font-weight:bold;"
+        )
+        return title
+
+    def _get_lineedit_stylesheet(self, font_family=None):
+        """获取统一的LineEdit样式表"""
+        if font_family is None:
+            font_family = self._get_font_family()
+        escaped_font = font_family.replace("\\\\", "\\\\\\\\").replace("'", "\\'").replace('"', '\\"')
+        font_family_quoted = f'"{escaped_font}"'
+        padding = self._scale_size(6)
+        border_radius = self._scale_size(4)
+        return f"QLineEdit{{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:{border_radius}px;padding:{padding}px;color:white;font-size:{self._scale_size(13)}px;font-family:{font_family_quoted};}}"
+
+    def _create_label_with_style(self, text, font_size=13, color="rgba(255,255,255,0.8)"):
+        """创建带统一样式的标签"""
+        label = QLabel(text)
+        label.setStyleSheet(
+            f"color:{color};font-size:{self._scale_size(font_size)}px;font-family:'{self._get_font_family()}';"
+        )
+        return label
+
+    def _get_combobox_stylesheet(self, opacity_rgba=None, font_family=None):
+        """生成统一的 QComboBox 样式表"""
+        padding = self._scale_size(6)
+        border_radius = self._scale_size(4)
+        
+        # 使用传入的字体，或获取当前字体
+        if font_family is None:
+            font_family = self._get_font_family()
+        
+        # 转义字体名称中的特殊字符
+        escaped_font = font_family.replace("\\\\", "\\\\\\\\").replace("'", "\\\'").replace('"', '\\"')
+        font_family_quoted = f'"{escaped_font}"'
+        
+        # 计算透明度
+        if opacity_rgba is None:
+            blur_opacity = self.window.config.get("blur_opacity", 150)
+            opacity_value = min(255, blur_opacity + 20)
+            opacity_rgba = opacity_value / 255.0
+        else:
+            opacity_rgba = opacity_rgba
+
+        return f"""QComboBox{{
+            background:rgba(0,0,0,0.3);
+            border:1px solid rgba(255,255,255,0.15);
+            border-radius:{border_radius}px;
+            padding:{padding}px;
+            color:rgba(255,255,255,0.95);
+            font-size:{self._scale_size(13)}px;
+            font-family:{font_family_quoted};
+        }}
+        QComboBox:hover{{
+            background:rgba(0,0,0,0.4);
+            border:1px solid rgba(255,255,255,0.25);
+        }}
+        QComboBox:focus{{
+            background:rgba(0,0,0,0.5);
+            border:1px solid rgba(100,150,255,0.6);
+        }}
+        QComboBox:on{{
+            padding-top:{padding - 1}px;
+            padding-bottom:{padding - 1}px;
+        }}
+        QComboBox::drop-down{{
+            border:none;
+            width:28px;
+            background:transparent;
+        }}
+        QComboBox QAbstractItemView{{
+            background:rgba(0,0,0,{opacity_rgba:.2f});
+            border:1px solid rgba(255,255,255,0.1);
+            border-radius:{border_radius}px;
+            selection-background-color:rgba(255,255,255,0.15);
+            selection-color:white;
+            outline:none;
+            padding:{self._scale_size(2)}px;
+            font-family:{font_family_quoted};
+        }}
+        QComboBox QAbstractItemView::item{{
+            height:{self._scale_size(28)}px;
+            padding:{self._scale_size(6)}px {self._scale_size(8)}px;
+            color:rgba(255,255,255,0.85);
+            border-radius:{border_radius - 1}px;
+            font-family:{font_family_quoted};
+        }}
+        QComboBox QAbstractItemView::item:hover{{
+            background:rgba(255,255,255,0.1);
+        }}
+        QComboBox QAbstractItemView::item:selected{{
+            background:rgba(255,255,255,0.15);
+            color:white;
+        }}
+        QComboBox QScrollBar:vertical{{
+            background:rgba(255,255,255,0.05);
+            width:8px;
+            margin:0px;
+            border-radius:4px;
+        }}
+        QComboBox QScrollBar::handle:vertical{{
+            background:rgba(255,255,255,0.3);
+            min-height:20px;
+            border-radius:4px;
+        }}
+        QComboBox QScrollBar::handle:vertical:hover{{
+            background:rgba(255,255,255,0.5);
+        }}
+        QComboBox QScrollBar::add-line:vertical,
+        QComboBox QScrollBar::sub-line:vertical{{
+            border:none;
+            background:none;
+        }}
+        QComboBox QScrollBar::add-page:vertical,
+        QComboBox QScrollBar::sub-page:vertical{{
+            background:none;
+        }}"""
+
+    def _setup_combobox(self, combo, width=200, max_items=8):
+        """统一设置 QComboBox 属性"""
+        combo.setFixedHeight(self._scale_size(32))
+        combo.setFixedWidth(self._scale_size(width))
+        combo.setMaxVisibleItems(max_items)
+        combo.setStyleSheet(self._get_combobox_stylesheet())
+
+    def _update_combobox_font(self, combo_widget, font_family_quoted):
+        """更新 QComboBox 的字体"""
+        combo_widget.setStyleSheet(self._get_combobox_stylesheet(font_family=font_family_quoted))
+
+    def _update_single_combobox_opacity(self, combo, opacity_rgba):
+        """更新单个下拉框的透明度"""
+        combo.setStyleSheet(self._get_combobox_stylesheet(opacity_rgba=opacity_rgba))
 
     def create_nav_btn(self, icon, text, handler, page_index=None,
                        icon_path=None, icon_path_active=None):
@@ -734,78 +928,34 @@ class UIBuilder:
 
         return page
 
+    def _load_versions(self, minecraft_path):
+        """加载Minecraft版本列表（为兼容性保留）"""
+        self._load_version_list(minecraft_path)
+
+    def _on_version_changed(self, text):
+        """版本下拉框改变事件（为兼容性保留）"""
+        # 当前版本选择逻辑由点击版本卡片处理，此方法保留为空
+        pass
+
     def create_download_page(self):
         """创建下载页面"""
-        from PyQt6.QtWidgets import QScrollArea
-
         page = QWidget()
         page.setStyleSheet("background:transparent;")
         pl = QVBoxLayout(page)
         pl.setContentsMargins(self._scale_size(20), self._scale_size(10), self._scale_size(20), self._scale_size(20))
         pl.setSpacing(self._scale_size(15))
 
-        title = QLabel(self.window.language_manager.translate("page_downloads"))
-        title.setStyleSheet(f"color:white;font-size:{self._scale_size(20)}px;font-family:'{self._get_font_family()}';font-weight:bold;")
+        # 使用统一的标题创建方法
+        title = self._create_page_title(self.window.language_manager.translate("page_downloads"))
         pl.addWidget(title)
 
-        # 创建滚动区域
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        scroll_area.setStyleSheet("""
-            QScrollArea {
-                background: transparent;
-                border: none;
-            }
-            QScrollBar:vertical {
-                background: rgba(255, 255, 255, 0.1);
-                width: 8px;
-                border-radius: 4px;
-                margin: 0px;
-            }
-            QScrollBar::handle:vertical {
-                background: rgba(255, 255, 255, 0.3);
-                min-height: 20px;
-                border-radius: 4px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background: rgba(255, 255, 255, 0.5);
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                border: none;
-                background: none;
-                height: 0px;
-            }
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background: none;
-            }
-        """)
-
-        # 滚动内容区域
-        scroll_content = QWidget()
-        scroll_content.setStyleSheet("background: transparent;")
-        scroll_layout = QVBoxLayout(scroll_content)
-        scroll_layout.setContentsMargins(0, self._scale_size(10), 0, 0)
-        scroll_layout.setSpacing(self._scale_size(15))
+        # 使用统一的滚动区域创建方法
+        scroll_area = self._create_scroll_area()
+        scroll_content, scroll_layout = self._create_scroll_content()
         scroll_layout.addStretch()
 
         scroll_area.setWidget(scroll_content)
         pl.addWidget(scroll_area, 1)
-
-        # 加载保存的Minecraft路径（使用QTimer延迟执行，确保UI完全初始化）
-        saved_path = self.window.config.get("minecraft_path", "")
-        if saved_path and os.path.exists(saved_path):
-            self.window.instance_path_input.setText(saved_path)
-            # 使用QTimer延迟加载版本列表，确保UI完全初始化
-            from PyQt6.QtCore import QTimer
-            def delayed_load():
-                try:
-                    self._load_versions(saved_path)
-                except Exception as e:
-                    # 静默处理错误，避免崩溃
-                    pass
-            QTimer.singleShot(300, delayed_load)
 
         return page
 
@@ -846,38 +996,39 @@ class UIBuilder:
         path_layout.setContentsMargins(self._scale_size(35), self._scale_size(12), self._scale_size(15), self._scale_size(12))
         path_layout.setSpacing(self._scale_size(10))
 
-        path_label = QLabel(self.window.language_manager.translate("bg_image_path"))
-        path_label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'{self._get_font_family()}';")
+        path_label = self._create_label_with_style(self.window.language_manager.translate("bg_image_path"))
         path_layout.addWidget(path_label)
 
         self.window.path_input = QLineEdit()
         self.window.path_input.setText(self.window.config.get("background_image_path", ""))
-        padding = self._scale_size(6)
-        border_radius_input = self._scale_size(4)
-        self.window.path_input.setStyleSheet(
-            f"QLineEdit{{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:{border_radius_input}px;padding:{padding}px;color:white;font-size:{self._scale_size(13)}px;font-family:'{self._get_font_family()}';}}")
+        self.window.path_input.setStyleSheet(self._get_lineedit_stylesheet())
         self.window.path_input.editingFinished.connect(self.window.on_path_changed)
         path_layout.addWidget(self.window.path_input, 1)
 
         # 浏览按钮
+        browse_btn = self._create_browse_button(self.window.choose_background_image)
+        path_layout.addWidget(browse_btn)
+
+        self.window.path_widget.setVisible(self.window.config.get("background_mode") == "image")
+
+    def _create_browse_button(self, callback):
+        """创建统一的浏览按钮"""
+        border_radius_btn = self._scale_size(4)
         browse_btn = ClickableLabel()
         browse_btn.setFixedSize(self._scale_size(32), self._scale_size(32))
-        border_radius_btn = self._scale_size(4)
         browse_btn.setHoverStyle(
             f"background:rgba(255,255,255,0.1);border:none;border-radius:{border_radius_btn}px;",
             f"background:rgba(255,255,255,0.15);border:none;border-radius:{border_radius_btn}px;"
         )
         browse_btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
         browse_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        browse_btn.setCallback(self.window.choose_background_image)
+        browse_btn.setCallback(callback)
 
         folder_pixmap = load_svg_icon("svg/folder2.svg", self.dpi_scale)
         if folder_pixmap:
             browse_btn.setPixmap(scale_icon_for_display(folder_pixmap, 20, self.dpi_scale))
 
-        path_layout.addWidget(browse_btn)
-
-        self.window.path_widget.setVisible(self.window.config.get("background_mode") == "image")
+        return browse_btn
 
     def _create_color_picker(self):
         self.window.color_widget = QWidget()
@@ -887,32 +1038,22 @@ class UIBuilder:
         color_layout.setContentsMargins(self._scale_size(35), self._scale_size(12), self._scale_size(15), self._scale_size(12))
         color_layout.setSpacing(self._scale_size(10))
 
-        color_label = QLabel(self.window.language_manager.translate("bg_color"))
-        color_label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'{self._get_font_family()}';")
+        color_label = self._create_label_with_style(self.window.language_manager.translate("bg_color"))
         color_layout.addWidget(color_label)
 
         # 颜色预览和输入
         self.window.color_input = QLineEdit()
         self.window.color_input.setText(self.window.config.get("background_color", "#00000000"))
-        padding = self._scale_size(6)
-        border_radius_input = self._scale_size(4)
-        self.window.color_input.setStyleSheet(
-            f"QLineEdit{{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:{border_radius_input}px;padding:{padding}px;color:white;font-size:{self._scale_size(13)}px;font-family:'{self._get_font_family()}';}}")
+        self.window.color_input.setStyleSheet(self._get_lineedit_stylesheet())
         self.window.color_input.editingFinished.connect(self.window.on_color_changed)
         color_layout.addWidget(self.window.color_input, 1)
 
+        # 颜色选择按钮
         color_btn = QPushButton()
         color_btn.setFixedSize(self._scale_size(32), self._scale_size(32))
         border_radius_btn = self._scale_size(4)
-
         color_str = self.window.config.get("background_color", "#00000000")
-        try:
-            from PyQt6.QtGui import QColor
-            color = self._parse_color(color_str)
-            bg_color = color.name(QColor.NameFormat.HexArgb) if color else "#00000000"
-        except:
-            bg_color = "#00000000"
-
+        bg_color = self._parse_color_to_hex(color_str)
         color_btn.setStyleSheet(f"QPushButton{{background:{bg_color};border:1px solid rgba(255,255,255,0.3);border-radius:{border_radius_btn}px;}}QPushButton:hover{{background:{bg_color};border:1px solid rgba(255,255,255,0.5);}}")
         color_btn.clicked.connect(self.window.choose_background_color)
         color_layout.addWidget(color_btn)
@@ -920,16 +1061,19 @@ class UIBuilder:
 
         self.window.color_widget.setVisible(self.window.config.get("background_mode") == "solid")
 
-    def _parse_color(self, color_str):
-        from PyQt6.QtGui import QColor
+    def _parse_color_to_hex(self, color_str):
+        """解析颜色字符串并返回十六进制格式"""
         color = QColor(color_str)
         if color.isValid():
-            return color
+            return color.name(QColor.NameFormat.HexArgb)
         if len(color_str) == 7 and color_str.startswith('#'):
-            return QColor(f"#FF{color_str[1:]}")
-        return QColor("#00000000")
+            return QColor(f"#FF{color_str[1:]}").name(QColor.NameFormat.HexArgb)
+        return "#00000000"
 
     def _create_font_select_widget(self):
+        from PyQt6.QtGui import QFontDatabase
+        from PyQt6.QtWidgets import QComboBox
+
         self.window.font_select_widget = QWidget()
         border_radius = self._scale_size(8)
         self.window.font_select_widget.setStyleSheet(f"background:rgba(255,255,255,0);border-bottom-left-radius:{border_radius}px;border-bottom-right-radius:{border_radius}px;")
@@ -943,8 +1087,6 @@ class UIBuilder:
 
         font_select_layout.addStretch()
 
-        from PyQt6.QtWidgets import QComboBox
-        from PyQt6.QtGui import QFontDatabase
         self.window.font_combo = QComboBox()
         self.window.font_combo.setFixedHeight(self._scale_size(32))
         self.window.font_combo.setFixedWidth(self._scale_size(200))
@@ -984,11 +1126,6 @@ class UIBuilder:
             f"width:28px;"
             f"background:transparent;"
             f"}}"
-            # f"QComboBox::down-arrow{{"
-            # f"image:url(svg/x-diamond.svg);"
-            # f"width:12px;"
-            # f"height:12px;"
-            # f"}}"
             f"QComboBox QAbstractItemView{{"
             f"background:rgba(0,0,0,{dropdown_opacity_rgba:.2f});"
             f"border:1px solid rgba(255,255,255,0.1);"
@@ -1035,6 +1172,37 @@ class UIBuilder:
             f"background:none;"
             f"}}"
         )
+
+        # 获取系统字体
+        font_families = QFontDatabase.families()
+
+        # 添加常用字体到前面
+        common_fonts = ["Microsoft YaHei UI", "SimHei", "Arial", "Segoe UI", "Helvetica"]
+        added_fonts = set()
+
+        # 先添加常用字体
+        for font in common_fonts:
+            if font in font_families:
+                self.window.font_combo.addItem(font)
+                added_fonts.add(font)
+
+        # 添加其他字体
+        for font in font_families:
+            if font not in added_fonts:
+                self.window.font_combo.addItem(font)
+        
+        # 设置当前字体
+        current_font_family = self.window.config.get("custom_font_family", "Microsoft YaHei UI")
+        font_index = self.window.font_combo.findText(current_font_family)
+        if font_index >= 0:
+            self.window.font_combo.setCurrentIndex(font_index)
+        
+        # 连接字体选择事件
+        self.window.font_combo.currentTextChanged.connect(self.window.on_font_family_changed)
+        
+        font_select_layout.addWidget(self.window.font_combo)
+
+        return self.window.font_select_widget
 
     # 实例页面相关方法
     def _choose_instance_path(self):
@@ -1175,8 +1343,6 @@ class UIBuilder:
             self.window.instance_stack.removeWidget(current_widget)
             current_widget.deleteLater()
 
-        return self.window.font_select_widget
-
     def _create_font_path_widget(self):
         self.window.font_path_widget = QWidget()
         border_radius = self._scale_size(8)
@@ -1185,35 +1351,17 @@ class UIBuilder:
         font_path_layout.setContentsMargins(self._scale_size(35), self._scale_size(12), self._scale_size(15), self._scale_size(12))
         font_path_layout.setSpacing(self._scale_size(10))
 
-        font_path_label = QLabel(self.window.language_manager.translate("font_custom_label"))
-        font_path_label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'{self._get_font_family()}';")
+        font_path_label = self._create_label_with_style(self.window.language_manager.translate("font_custom_label"))
         font_path_layout.addWidget(font_path_label)
 
         self.window.font_path_input = QLineEdit()
         self.window.font_path_input.setText(self.window.config.get("custom_font_path", ""))
-        padding = self._scale_size(6)
-        border_radius_input = self._scale_size(4)
-        self.window.font_path_input.setStyleSheet(
-            f"QLineEdit{{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:{border_radius_input}px;padding:{padding}px;color:white;font-size:{self._scale_size(13)}px;font-family:'{self._get_font_family()}';}}")
+        self.window.font_path_input.setStyleSheet(self._get_lineedit_stylesheet())
         self.window.font_path_input.editingFinished.connect(self.window.on_font_path_changed)
         font_path_layout.addWidget(self.window.font_path_input, 1)
 
         # 浏览按钮
-        browse_btn = ClickableLabel()
-        browse_btn.setFixedSize(self._scale_size(32), self._scale_size(32))
-        border_radius_btn = self._scale_size(4)
-        browse_btn.setHoverStyle(
-            f"background:rgba(255,255,255,0.1);border:none;border-radius:{border_radius_btn}px;",
-            f"background:rgba(255,255,255,0.15);border:none;border-radius:{border_radius_btn}px;"
-        )
-        browse_btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        browse_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        browse_btn.setCallback(self.window.choose_font_file)
-
-        folder_pixmap = load_svg_icon("svg/folder2.svg", self.dpi_scale)
-        if folder_pixmap:
-            browse_btn.setPixmap(scale_icon_for_display(folder_pixmap, 20, self.dpi_scale))
-
+        browse_btn = self._create_browse_button(self.window.choose_font_file)
         font_path_layout.addWidget(browse_btn)
 
         self.window.font_path_widget.setVisible(self.window.config.get("font_mode") == 1)
@@ -1221,6 +1369,8 @@ class UIBuilder:
         return self.window.font_path_widget
 
     def _create_language_card(self):
+        from PyQt6.QtWidgets import QComboBox
+
         language_widget = QWidget()
         language_widget.setStyleSheet(f"background:rgba(255,255,255,0);border-bottom-left-radius:{self._scale_size(8)}px;border-bottom-right-radius:{self._scale_size(8)}px;")
         language_layout = QHBoxLayout(language_widget)
@@ -1233,248 +1383,21 @@ class UIBuilder:
 
         language_layout.addStretch()
 
-        from PyQt6.QtWidgets import QComboBox
         self.window.language_combo = QComboBox()
-        self.window.language_combo.setFixedHeight(self._scale_size(32))
-        self.window.language_combo.setFixedWidth(self._scale_size(150))
-        self.window.language_combo.setMaxVisibleItems(5)
-        padding = self._scale_size(6)
-        border_radius = self._scale_size(4)
+        self._setup_combobox(self.window.language_combo, width=150, max_items=5)
 
-        # 获取当前下拉框透明度（主页透明度 + 20）
-        blur_opacity = self.window.config.get("blur_opacity", 150)
-        dropdown_opacity_value = min(255, blur_opacity + 20)
-        dropdown_opacity_rgba = dropdown_opacity_value / 255.0
-
-        self.window.language_combo.setStyleSheet(
-            f"QComboBox{{"
-            f"background:rgba(0,0,0,0.3);"
-            f"border:1px solid rgba(255,255,255,0.15);"
-            f"border-radius:{border_radius}px;"
-            f"padding:{padding}px;"
-            f"color:rgba(255,255,255,0.95);"
-            f"font-size:{self._scale_size(13)}px;"
-            f"font-family:'{self._get_font_family()}';"
-            f"}}"
-            f"QComboBox:hover{{"
-            f"background:rgba(0,0,0,0.4);"
-            f"border:1px solid rgba(255,255,255,0.25);"
-            f"}}"
-            f"QComboBox:focus{{"
-            f"background:rgba(0,0,0,0.5);"
-            f"border:1px solid rgba(100,150,255,0.6);"
-            f"}}"
-            f"QComboBox:on{{"
-            f"padding-top:{padding - 1}px;"
-            f"padding-bottom:{padding - 1}px;"
-            f"}}"
-            f"QComboBox::drop-down{{"
-            f"border:none;"
-            f"width:28px;"
-            f"background:transparent;"
-            f"}}"
-            # f"QComboBox::down-arrow{{"
-            # f"image:url(svg/x-diamond.svg);"
-            # f"width:12px;"
-            # f"height:12px;"
-            # f"}}"
-            f"QComboBox QAbstractItemView{{"
-            f"background:rgba(0,0,0,{dropdown_opacity_rgba:.2f});"
-            f"border:1px solid rgba(255,255,255,0.1);"
-            f"border-radius:{border_radius}px;"
-            f"selection-background-color:rgba(255,255,255,0.15);"
-            f"selection-color:white;"
-            f"outline:none;"
-            f"padding:{self._scale_size(2)}px;"
-            f"}}"
-            f"QComboBox QAbstractItemView::item{{"
-            f"height:{self._scale_size(28)}px;"
-            f"padding:{self._scale_size(6)}px {self._scale_size(8)}px;"
-            f"color:rgba(255,255,255,0.85);"
-            f"border-radius:{border_radius - 1}px;"
-            f"}}"
-            f"QComboBox QAbstractItemView::item:hover{{"
-            f"background:rgba(255,255,255,0.1);"
-            f"}}"
-            f"QComboBox QAbstractItemView::item:selected{{"
-            f"background:rgba(255,255,255,0.15);"
-            f"color:white;"
-            f"}}"
-            f"QComboBox QScrollBar:vertical{{"
-            f"background:rgba(255,255,255,0.05);"
-            f"width:8px;"
-            f"margin:0px;"
-            f"border-radius:4px;"
-            f"}}"
-            f"QComboBox QScrollBar::handle:vertical{{"
-            f"background:rgba(255,255,255,0.3);"
-            f"min-height:20px;"
-            f"border-radius:4px;"
-            f"}}"
-            f"QComboBox QScrollBar::handle:vertical:hover{{"
-            f"background:rgba(255,255,255,0.5);"
-            f"}}"
-            f"QComboBox QScrollBar::add-line:vertical,"
-            f"QComboBox QScrollBar::sub-line:vertical{{"
-            f"border:none;"
-            f"background:none;"
-            f"}}"
-            f"QComboBox QScrollBar::add-page:vertical,"
-            f"QComboBox QScrollBar::sub-page:vertical{{"
-            f"background:none;"
-            f"}}"
-        )
-
-    # 实例页面相关方法
-    def _choose_instance_path(self):
-        """选择Minecraft路径"""
-        from PyQt6.QtWidgets import QFileDialog
-        path = QFileDialog.getExistingDirectory(
-            self.window,
-            self.window.language_manager.translate("instance_path_dialog_title"),
-            ""
-        )
-        if path:
-            self.window.instance_path_input.setText(path)
-            self._on_instance_path_changed()
-
-    def _on_instance_path_changed(self):
-        """Minecraft路径变化"""
-        import os
-        try:
-            path = self.window.instance_path_input.text().strip()
-            if path and os.path.exists(path):
-                # 保存路径到配置
-                self.window.config["minecraft_path"] = path
-                self.window.config_manager.save_config()
-
-                # 加载版本列表
-                self._load_version_list(path)
-            else:
-                # 清空版本列表
-                self._clear_version_list()
-        except Exception as e:
-            # 静默处理错误，避免崩溃
-            pass
-
-    def _load_version_list(self, minecraft_path):
-        """加载Minecraft版本列表（显示为可点击的卡片）"""
-        import os
-        try:
-            versions_path = os.path.join(minecraft_path, "versions")
-            self._clear_version_list()
-
-            # 添加根目录（resourcepacks）选项
-            self._add_version_item(minecraft_path, self.window.language_manager.translate("instance_version_root"))
-
-            if os.path.exists(versions_path) and os.path.isdir(versions_path):
-                for item in sorted(os.listdir(versions_path)):
-                    item_path = os.path.join(versions_path, item)
-                    if os.path.isdir(item_path):
-                        self._add_version_item(minecraft_path, item, is_version=True)
-        except Exception as e:
-            # 静默处理错误，避免崩溃
-            pass
-
-    def _clear_version_list(self):
-        """清空版本列表"""
-        if hasattr(self.window, 'instance_version_list_container'):
-            # 清空现有列表
-            while self.window.instance_version_list_container.count() > 0:
-                child = self.window.instance_version_list_container.takeAt(0)
-                if child.widget():
-                    child.widget().deleteLater()
-
-    def _add_version_item(self, minecraft_path, version_name, is_version=False):
-        """添加一个版本项到列表"""
-        from widgets import ClickableLabel, make_transparent
-        from utils import load_svg_icon, scale_icon_for_display
-
-        # 创建版本卡片
-        version_card = ClickableLabel()
-        version_card.setFixedHeight(self._scale_size(48))  # 版本卡片保持原高度48
-        version_card.setStyleSheet(f"""
-            ClickableLabel {{
-                background: rgba(255, 255, 255, 0.08);
-                border-radius: {self._scale_size(8)}px;
-            }}
-            ClickableLabel:hover {{
-                background: rgba(255, 255, 255, 0.15);
-            }}
-            ClickableLabel:pressed {{
-                background: rgba(255, 255, 255, 0.12);
-            }}
-        """)
-        version_card.setCursor(Qt.CursorShape.PointingHandCursor)
-
-        # 确定资源包路径
-        if is_version:
-            resourcepacks_path = os.path.join(minecraft_path, "versions", version_name, "resourcepacks")
-            display_name = version_name
-        else:
-            resourcepacks_path = os.path.join(minecraft_path, "resourcepacks")
-            display_name = self.window.language_manager.translate("instance_version_root")
-
-        # 点击事件：导航到资源包页面
-        version_card.setCallback(lambda rp=resourcepacks_path, dn=display_name: self._navigate_to_resourcepack_page(dn, rp))
-
-        # 卡片内容
-        card_layout = QHBoxLayout(version_card)
-        card_layout.setContentsMargins(self._scale_size(12), 0, self._scale_size(12), 0)
-        card_layout.setSpacing(self._scale_size(10))
-
-        # 图标
-        icon_label = QLabel()
-        icon_label.setFixedSize(self._scale_size(32), self._scale_size(32))  # 版本卡片图标保持原尺寸
-        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setStyleSheet("background:transparent;")
-        icon_pixmap = load_svg_icon("svg/box-fill.svg", self.dpi_scale)
-        if icon_pixmap:
-            icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20, self.dpi_scale))  # 版本卡片图标显示保持原尺寸
-        card_layout.addWidget(icon_label)
-
-        # 版本名称
-        name_label = QLabel(display_name)
-        name_label.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:'{self._get_font_family()}';background:transparent;")
-        card_layout.addWidget(name_label)
-        card_layout.addStretch()
-
-        # 箭头图标
-        arrow_label = QLabel()
-        arrow_label.setFixedSize(self._scale_size(20), self._scale_size(20))
-        arrow_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        arrow_label.setStyleSheet("background:transparent;")
-        arrow_pixmap = load_svg_icon("svg/arrow-bar-right.svg", self.dpi_scale)
-        if arrow_pixmap:
-            arrow_label.setPixmap(scale_icon_for_display(arrow_pixmap, 16, self.dpi_scale))
-        card_layout.addWidget(arrow_label)
-
-        self.window.instance_version_list_container.addWidget(version_card)
-
-    def _navigate_to_resourcepack_page(self, title, resourcepacks_path):
-        """导航到资源包页面（第二层）"""
-        resourcepack_page = self._create_instance_resourcepack_page(title, resourcepacks_path)
-        self.window.instance_stack.addWidget(resourcepack_page)
-        self.window.instance_stack.setCurrentWidget(resourcepack_page)
-
-    def _navigate_instance_back(self):
-        """返回上一页"""
-        current_widget = self.window.instance_stack.currentWidget()
-        if current_widget:
-            self.window.instance_stack.removeWidget(current_widget)
-            current_widget.deleteLater()
         # 添加语言选项
         languages = self.window.language_manager.get_all_languages()
         for lang_code, display_name in languages:
             self.window.language_combo.addItem(display_name, lang_code)
-        
+
         # 设置当前语言
         current_lang = self.window.language_manager.get_language()
         for i in range(self.window.language_combo.count()):
             if self.window.language_combo.itemData(i) == current_lang:
                 self.window.language_combo.setCurrentIndex(i)
                 break
-        
+
         # 连接语言切换事件
         self.window.language_combo.currentIndexChanged.connect(self.window.change_language)
 
@@ -1483,7 +1406,7 @@ class UIBuilder:
         self.window.language_content_layout.addWidget(language_widget)
 
         return language_widget
-    
+
     def _update_page_titles(self):
         """更新页面标题"""
         # 主页没有标题，跳过
@@ -1750,529 +1673,3 @@ class UIBuilder:
                     if hasattr(self.window, 'language_combo'):
                         self._update_combobox_font(self.window.language_combo, font_family_quoted)
 
-    def _update_combobox_font(self, combo_widget, font_family_quoted):
-        """更新 QComboBox 的字体"""
-        padding = self._scale_size(6)
-        border_radius = self._scale_size(4)
-        combo_widget.setStyleSheet(
-            f"QComboBox{{"
-            f"background:rgba(0,0,0,0.3);"
-            f"border:1px solid rgba(255,255,255,0.15);"
-            f"border-radius:{border_radius}px;"
-            f"padding:{padding}px;"
-            f"color:rgba(255,255,255,0.95);"
-            f"font-size:{self._scale_size(13)}px;"
-            f"font-family:{font_family_quoted};"
-            f"}}"
-            f"QComboBox:hover{{"
-            f"background:rgba(0,0,0,0.4);"
-            f"border:1px solid rgba(255,255,255,0.25);"
-            f"}}"
-            f"QComboBox:focus{{"
-            f"background:rgba(0,0,0,0.5);"
-            f"border:1px solid rgba(100,150,255,0.6);"
-            f"}}"
-            f"QComboBox:on{{"
-            f"padding-top:{padding - 1}px;"
-            f"padding-bottom:{padding - 1}px;"
-            f"}}"
-            f"QComboBox::drop-down{{"
-            f"border:none;"
-            f"width:28px;"
-            f"background:transparent;"
-            f"}}"
-            # f"QComboBox::down-arrow{{"
-            # f"image:url(svg/x-diamond.svg);"
-            # f"width:12px;"
-            # f"height:12px;"
-            # f"}}"
-            f"QComboBox QAbstractItemView{{"
-            f"background:rgba(0,0,0,0.5);"
-            f"border:1px solid rgba(255,255,255,0.1);"
-            f"border-radius:{border_radius}px;"
-            f"selection-background-color:rgba(255,255,255,0.15);"
-            f"selection-color:white;"
-            f"outline:none;"
-            f"padding:{self._scale_size(2)}px;"
-            f"font-family:{font_family_quoted};"
-            f"}}"
-            f"QComboBox QAbstractItemView::item{{"
-            f"height:{self._scale_size(28)}px;"
-            f"padding:{self._scale_size(6)}px {self._scale_size(8)}px;"
-            f"color:rgba(255,255,255,0.85);"
-            f"border-radius:{border_radius - 1}px;"
-            f"font-family:{font_family_quoted};"
-            f"}}"
-            f"QComboBox QAbstractItemView::item:hover{{"
-            f"background:rgba(255,255,255,0.1);"
-            f"}}"
-            f"QComboBox QAbstractItemView::item:selected{{"
-            f"background:rgba(255,255,255,0.15);"
-            f"color:white;"
-            f"}}"
-            f"QComboBox QScrollBar:vertical{{"
-            f"background:rgba(255,255,255,0.05);"
-            f"width:8px;"
-            f"margin:0px;"
-            f"border-radius:4px;"
-            f"}}"
-            f"QComboBox QScrollBar::handle:vertical{{"
-            f"background:rgba(255,255,255,0.3);"
-            f"min-height:20px;"
-            f"border-radius:4px;"
-            f"}}"
-            f"QComboBox QScrollBar::handle:vertical:hover{{"
-            f"background:rgba(255,255,255,0.5);"
-            f"}}"
-            f"QComboBox QScrollBar::add-line:vertical,"
-            f"QComboBox QScrollBar::sub-line:vertical{{"
-            f"border:none;"
-            f"background:none;"
-            f"}}"
-            f"QComboBox QScrollBar::add-page:vertical,"
-            f"QComboBox QScrollBar::sub-page:vertical{{"
-            f"background:none;"
-            f"}}"
-        )
-
-    # 实例页面相关方法
-    def _choose_instance_path(self):
-        """选择Minecraft路径"""
-        from PyQt6.QtWidgets import QFileDialog
-        path = QFileDialog.getExistingDirectory(
-            self.window,
-            self.window.language_manager.translate("instance_path_dialog_title"),
-            ""
-        )
-        if path:
-            self.window.instance_path_input.setText(path)
-            self._on_instance_path_changed()
-
-    def _on_instance_path_changed(self):
-        """Minecraft路径变化"""
-        import os
-        try:
-            path = self.window.instance_path_input.text().strip()
-            if path and os.path.exists(path):
-                # 保存路径到配置
-                self.window.config["minecraft_path"] = path
-                self.window.config_manager.save_config()
-
-                # 加载版本列表
-                self._load_version_list(path)
-            else:
-                # 清空版本列表
-                self._clear_version_list()
-        except Exception as e:
-            # 静默处理错误，避免崩溃
-            pass
-
-    def _load_version_list(self, minecraft_path):
-        """加载Minecraft版本列表（显示为可点击的卡片）"""
-        import os
-        try:
-            versions_path = os.path.join(minecraft_path, "versions")
-            self._clear_version_list()
-
-            # 添加根目录（resourcepacks）选项
-            self._add_version_item(minecraft_path, self.window.language_manager.translate("instance_version_root"))
-
-            if os.path.exists(versions_path) and os.path.isdir(versions_path):
-                for item in sorted(os.listdir(versions_path)):
-                    item_path = os.path.join(versions_path, item)
-                    if os.path.isdir(item_path):
-                        self._add_version_item(minecraft_path, item, is_version=True)
-        except Exception as e:
-            # 静默处理错误，避免崩溃
-            pass
-
-    def _clear_version_list(self):
-        """清空版本列表"""
-        if hasattr(self.window, 'instance_version_list_container'):
-            # 清空现有列表
-            while self.window.instance_version_list_container.count() > 0:
-                child = self.window.instance_version_list_container.takeAt(0)
-                if child.widget():
-                    child.widget().deleteLater()
-
-    def _add_version_item(self, minecraft_path, version_name, is_version=False):
-        """添加一个版本项到列表"""
-        from widgets import ClickableLabel, make_transparent
-        from utils import load_svg_icon, scale_icon_for_display
-
-        # 创建版本卡片
-        version_card = ClickableLabel()
-        version_card.setFixedHeight(self._scale_size(48))  # 版本卡片保持原高度48
-        version_card.setStyleSheet(f"""
-            ClickableLabel {{
-                background: rgba(255, 255, 255, 0.08);
-                border-radius: {self._scale_size(8)}px;
-            }}
-            ClickableLabel:hover {{
-                background: rgba(255, 255, 255, 0.15);
-            }}
-            ClickableLabel:pressed {{
-                background: rgba(255, 255, 255, 0.12);
-            }}
-        """)
-        version_card.setCursor(Qt.CursorShape.PointingHandCursor)
-
-        # 确定资源包路径
-        if is_version:
-            resourcepacks_path = os.path.join(minecraft_path, "versions", version_name, "resourcepacks")
-            display_name = version_name
-        else:
-            resourcepacks_path = os.path.join(minecraft_path, "resourcepacks")
-            display_name = self.window.language_manager.translate("instance_version_root")
-
-        # 点击事件：导航到资源包页面
-        version_card.setCallback(lambda rp=resourcepacks_path, dn=display_name: self._navigate_to_resourcepack_page(dn, rp))
-
-        # 卡片内容
-        card_layout = QHBoxLayout(version_card)
-        card_layout.setContentsMargins(self._scale_size(12), 0, self._scale_size(12), 0)
-        card_layout.setSpacing(self._scale_size(10))
-
-        # 图标
-        icon_label = QLabel()
-        icon_label.setFixedSize(self._scale_size(32), self._scale_size(32))  # 版本卡片图标保持原尺寸
-        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setStyleSheet("background:transparent;")
-        icon_pixmap = load_svg_icon("svg/box-fill.svg", self.dpi_scale)
-        if icon_pixmap:
-            icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20, self.dpi_scale))  # 版本卡片图标显示保持原尺寸
-        card_layout.addWidget(icon_label)
-
-        # 版本名称
-        name_label = QLabel(display_name)
-        name_label.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:'{self._get_font_family()}';background:transparent;")
-        card_layout.addWidget(name_label)
-        card_layout.addStretch()
-
-        # 箭头图标
-        arrow_label = QLabel()
-        arrow_label.setFixedSize(self._scale_size(20), self._scale_size(20))
-        arrow_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        arrow_label.setStyleSheet("background:transparent;")
-        arrow_pixmap = load_svg_icon("svg/arrow-bar-right.svg", self.dpi_scale)
-        if arrow_pixmap:
-            arrow_label.setPixmap(scale_icon_for_display(arrow_pixmap, 16, self.dpi_scale))
-        card_layout.addWidget(arrow_label)
-
-        self.window.instance_version_list_container.addWidget(version_card)
-
-    def _navigate_to_resourcepack_page(self, title, resourcepacks_path):
-        """导航到资源包页面（第二层）"""
-        resourcepack_page = self._create_instance_resourcepack_page(title, resourcepacks_path)
-        self.window.instance_stack.addWidget(resourcepack_page)
-        self.window.instance_stack.setCurrentWidget(resourcepack_page)
-
-    def _navigate_instance_back(self):
-        """返回上一页"""
-        current_widget = self.window.instance_stack.currentWidget()
-        if current_widget:
-            self.window.instance_stack.removeWidget(current_widget)
-            current_widget.deleteLater()
-
-    def _update_expandable_menu_font(self, container, font_family):
-        """更新可展开菜单的字体"""
-        # 转义字体名称中的特殊字符
-        escaped_font = font_family.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"')
-        font_family_quoted = f'"{escaped_font}"'
-
-        header = container.layout().itemAt(0).widget()
-        if header and header.layout():
-            header_layout = header.layout()
-            # 查找文本布局
-            for i in range(header_layout.count()):
-                item = header_layout.itemAt(i)
-                if item and isinstance(item.layout(), QVBoxLayout):
-                    text_layout = item.layout()
-                    # 第一个是标题，第二个是描述
-                    if text_layout.count() >= 2:
-                        title = text_layout.itemAt(0).widget()
-                        desc = text_layout.itemAt(1).widget()
-                        if title and hasattr(title, 'setStyleSheet'):
-                            title.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:{font_family_quoted};background:transparent;")
-                        if desc and hasattr(desc, 'setStyleSheet'):
-                            desc.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:{font_family_quoted};background:transparent;")
-                        break
-
-    def _update_bg_card_font(self, card, font_family):
-        """更新卡片字体的样式"""
-        # 转义字体名称中的特殊字符
-        escaped_font = font_family.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"')
-        font_family_quoted = f'"{escaped_font}"'
-
-        if not card or not card.layout():
-            return
-
-        card_layout = card.layout()
-        if card_layout.count() >= 2:
-            text_container = card_layout.itemAt(1).layout()
-            if text_container and text_container.count() >= 2:
-                title = text_container.itemAt(0).widget()
-                desc = text_container.itemAt(1).widget()
-                if title and hasattr(title, 'setStyleSheet'):
-                    title.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:{font_family_quoted};background:transparent;")
-                if desc and hasattr(desc, 'setStyleSheet'):
-                    desc.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:{font_family_quoted};background:transparent;")
-
-    def _update_bg_card(self, card, title_key, desc_key):
-        """更新背景卡片的文本"""
-        if not card or not card.layout():
-            return
-
-        card_layout = card.layout()
-        if card_layout.count() >= 2:
-            text_container = card_layout.itemAt(1).layout()
-            if text_container and text_container.count() >= 2:
-                title = text_container.itemAt(0).widget()
-                desc = text_container.itemAt(1).widget()
-                if title and hasattr(title, 'setText'):
-                    title.setText(self.window.language_manager.translate(title_key))
-                if desc and hasattr(desc, 'setText'):
-                    desc.setText(self.window.language_manager.translate(desc_key))
-
-    def update_combobox_opacity(self, opacity_rgba):
-        """更新下拉框的透明度"""
-        # 更新字体选择下拉框
-        if hasattr(self.window, 'font_combo'):
-            self._update_single_combobox_opacity(self.window.font_combo, opacity_rgba)
-        # 更新语言选择下拉框
-        if hasattr(self.window, 'language_combo'):
-            self._update_single_combobox_opacity(self.window.language_combo, opacity_rgba)
-        # 更新实例版本下拉框
-        if hasattr(self.window, 'instance_version_combo'):
-            self._update_single_combobox_opacity(self.window.instance_version_combo, opacity_rgba)
-
-    def _update_single_combobox_opacity(self, combo, opacity_rgba):
-        """更新单个下拉框的透明度"""
-        # 获取当前字体
-        font_family = self._get_font_family()
-        # 转义字体名称中的特殊字符
-        escaped_font = font_family.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"')
-        font_family_quoted = f'"{escaped_font}"'
-
-        padding = self._scale_size(6)
-        border_radius = self._scale_size(4)
-
-        combo.setStyleSheet(
-            f"QComboBox{{"
-            f"background:rgba(0,0,0,0.3);"
-            f"border:1px solid rgba(255,255,255,0.15);"
-            f"border-radius:{border_radius}px;"
-            f"padding:{padding}px;"
-            f"color:rgba(255,255,255,0.95);"
-            f"font-size:{self._scale_size(13)}px;"
-            f"font-family:{font_family_quoted};"
-            f"}}"
-            f"QComboBox:hover{{"
-            f"background:rgba(0,0,0,0.4);"
-            f"border:1px solid rgba(255,255,255,0.25);"
-            f"}}"
-            f"QComboBox:focus{{"
-            f"background:rgba(0,0,0,0.5);"
-            f"border:1px solid rgba(100,150,255,0.6);"
-            f"}}"
-            f"QComboBox:on{{"
-            f"padding-top:{padding - 1}px;"
-            f"padding-bottom:{padding - 1}px;"
-            f"}}"
-            f"QComboBox::drop-down{{"
-            f"border:none;"
-            f"width:28px;"
-            f"background:transparent;"
-            f"}}"
-            # f"QComboBox::down-arrow{{"
-            # f"image:url(svg/x-diamond.svg);"
-            # f"width:12px;"
-            # f"height:12px;"
-            # f"}}"
-            f"QComboBox QAbstractItemView{{"
-            f"background:rgba(0,0,0,{opacity_rgba:.2f});"
-            f"border:1px solid rgba(255,255,255,0.1);"
-            f"border-radius:{border_radius}px;"
-            f"selection-background-color:rgba(255,255,255,0.15);"
-            f"selection-color:white;"
-            f"outline:none;"
-            f"padding:{self._scale_size(2)}px;"
-            f"font-family:{font_family_quoted};"
-            f"}}"
-            f"QComboBox QAbstractItemView::item{{"
-            f"height:{self._scale_size(28)}px;"
-            f"padding:{self._scale_size(6)}px {self._scale_size(8)}px;"
-            f"color:rgba(255,255,255,0.85);"
-            f"border-radius:{border_radius - 1}px;"
-            f"font-family:{font_family_quoted};"
-            f"}}"
-            f"QComboBox QAbstractItemView::item:hover{{"
-            f"background:rgba(255,255,255,0.1);"
-            f"}}"
-            f"QComboBox QAbstractItemView::item:selected{{"
-            f"background:rgba(255,255,255,0.15);"
-            f"color:white;"
-            f"}}"
-            f"QComboBox QScrollBar:vertical{{"
-            f"background:rgba(255,255,255,0.05);"
-            f"width:8px;"
-            f"margin:0px;"
-            f"border-radius:4px;"
-            f"}}"
-            f"QComboBox QScrollBar::handle:vertical{{"
-            f"background:rgba(255,255,255,0.3);"
-            f"min-height:20px;"
-            f"border-radius:4px;"
-            f"}}"
-            f"QComboBox QScrollBar::handle:vertical:hover{{"
-            f"background:rgba(255,255,255,0.5);"
-            f"}}"
-            f"QComboBox QScrollBar::add-line:vertical,"
-            f"QComboBox QScrollBar::sub-line:vertical{{"
-            f"border:none;"
-            f"background:none;"
-            f"}}"
-            f"QComboBox QScrollBar::add-page:vertical,"
-            f"QComboBox QScrollBar::sub-page:vertical{{"
-            f"background:none;"
-            f"}}"
-        )
-
-    # 实例页面相关方法
-    def _choose_instance_path(self):
-        """选择Minecraft路径"""
-        from PyQt6.QtWidgets import QFileDialog
-        path = QFileDialog.getExistingDirectory(
-            self.window,
-            self.window.language_manager.translate("instance_path_dialog_title"),
-            ""
-        )
-        if path:
-            self.window.instance_path_input.setText(path)
-            self._on_instance_path_changed()
-
-    def _on_instance_path_changed(self):
-        """Minecraft路径变化"""
-        import os
-        try:
-            path = self.window.instance_path_input.text().strip()
-            if path and os.path.exists(path):
-                # 保存路径到配置
-                self.window.config["minecraft_path"] = path
-                self.window.config_manager.save_config()
-
-                # 加载版本列表
-                self._load_version_list(path)
-            else:
-                # 清空版本列表
-                self._clear_version_list()
-        except Exception as e:
-            # 静默处理错误，避免崩溃
-            pass
-
-    def _load_version_list(self, minecraft_path):
-        """加载Minecraft版本列表（显示为可点击的卡片）"""
-        import os
-        try:
-            versions_path = os.path.join(minecraft_path, "versions")
-            self._clear_version_list()
-
-            # 添加根目录（resourcepacks）选项
-            self._add_version_item(minecraft_path, self.window.language_manager.translate("instance_version_root"))
-
-            if os.path.exists(versions_path) and os.path.isdir(versions_path):
-                for item in sorted(os.listdir(versions_path)):
-                    item_path = os.path.join(versions_path, item)
-                    if os.path.isdir(item_path):
-                        self._add_version_item(minecraft_path, item, is_version=True)
-        except Exception as e:
-            # 静默处理错误，避免崩溃
-            pass
-
-    def _clear_version_list(self):
-        """清空版本列表"""
-        if hasattr(self.window, 'instance_version_list_container'):
-            # 清空现有列表
-            while self.window.instance_version_list_container.count() > 0:
-                child = self.window.instance_version_list_container.takeAt(0)
-                if child.widget():
-                    child.widget().deleteLater()
-
-    def _add_version_item(self, minecraft_path, version_name, is_version=False):
-        """添加一个版本项到列表"""
-        from widgets import ClickableLabel, make_transparent
-        from utils import load_svg_icon, scale_icon_for_display
-
-        # 创建版本卡片
-        version_card = ClickableLabel()
-        version_card.setFixedHeight(self._scale_size(48))  # 版本卡片保持原高度48
-        version_card.setStyleSheet(f"""
-            ClickableLabel {{
-                background: rgba(255, 255, 255, 0.08);
-                border-radius: {self._scale_size(8)}px;
-            }}
-            ClickableLabel:hover {{
-                background: rgba(255, 255, 255, 0.15);
-            }}
-            ClickableLabel:pressed {{
-                background: rgba(255, 255, 255, 0.12);
-            }}
-        """)
-        version_card.setCursor(Qt.CursorShape.PointingHandCursor)
-
-        # 确定资源包路径
-        if is_version:
-            resourcepacks_path = os.path.join(minecraft_path, "versions", version_name, "resourcepacks")
-            display_name = version_name
-        else:
-            resourcepacks_path = os.path.join(minecraft_path, "resourcepacks")
-            display_name = self.window.language_manager.translate("instance_version_root")
-
-        # 点击事件：导航到资源包页面
-        version_card.setCallback(lambda rp=resourcepacks_path, dn=display_name: self._navigate_to_resourcepack_page(dn, rp))
-
-        # 卡片内容
-        card_layout = QHBoxLayout(version_card)
-        card_layout.setContentsMargins(self._scale_size(12), 0, self._scale_size(12), 0)
-        card_layout.setSpacing(self._scale_size(10))
-
-        # 图标
-        icon_label = QLabel()
-        icon_label.setFixedSize(self._scale_size(32), self._scale_size(32))  # 版本卡片图标保持原尺寸
-        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setStyleSheet("background:transparent;")
-        icon_pixmap = load_svg_icon("svg/box-fill.svg", self.dpi_scale)
-        if icon_pixmap:
-            icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20, self.dpi_scale))  # 版本卡片图标显示保持原尺寸
-        card_layout.addWidget(icon_label)
-
-        # 版本名称
-        name_label = QLabel(display_name)
-        name_label.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:'{self._get_font_family()}';background:transparent;")
-        card_layout.addWidget(name_label)
-        card_layout.addStretch()
-
-        # 箭头图标
-        arrow_label = QLabel()
-        arrow_label.setFixedSize(self._scale_size(20), self._scale_size(20))
-        arrow_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        arrow_label.setStyleSheet("background:transparent;")
-        arrow_pixmap = load_svg_icon("svg/arrow-bar-right.svg", self.dpi_scale)
-        if arrow_pixmap:
-            arrow_label.setPixmap(scale_icon_for_display(arrow_pixmap, 16, self.dpi_scale))
-        card_layout.addWidget(arrow_label)
-
-        self.window.instance_version_list_container.addWidget(version_card)
-
-    def _navigate_to_resourcepack_page(self, title, resourcepacks_path):
-        """导航到资源包页面（第二层）"""
-        resourcepack_page = self._create_instance_resourcepack_page(title, resourcepacks_path)
-        self.window.instance_stack.addWidget(resourcepack_page)
-        self.window.instance_stack.setCurrentWidget(resourcepack_page)
-
-    def _navigate_instance_back(self):
-        """返回上一页"""
-        current_widget = self.window.instance_stack.currentWidget()
-        if current_widget:
-            self.window.instance_stack.removeWidget(current_widget)
-            current_widget.deleteLater()

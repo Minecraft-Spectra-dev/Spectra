@@ -1,23 +1,26 @@
 """主窗口"""
 
+import ctypes
+import functools
 import os
 import sys
-import ctypes
+
 import json
-import functools
-from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QLabel,
-                             QFileDialog, QStackedWidget, QApplication,
-                             QColorDialog)
-from PyQt6.QtCore import Qt, QRect, QPropertyAnimation, QEasingCurve, QTimer, QThread, QUrl, QEventLoop, QPoint
-from PyQt6.QtGui import QCursor, QColor
-from PyQt6.QtNetwork import QNetworkRequest, QNetworkReply, QNetworkAccessManager
+from PyQt6.QtCore import (QEventLoop, QPoint, QPropertyAnimation,
+                           QEasingCurve, QThread, QUrl, QRect, Qt, QTimer)
+from PyQt6.QtGui import QColor, QCursor, QIcon
+from PyQt6.QtNetwork import (QNetworkAccessManager, QNetworkReply,
+                             QNetworkRequest)
+from PyQt6.QtWidgets import (QApplication, QColorDialog, QFileDialog,
+                             QHBoxLayout, QLabel, QStackedWidget, QVBoxLayout,
+                             QWidget)
 from BlurWindow.blurWindow import blur
 
+from managers import BackgroundManager, ConfigManager, LanguageManager
 from styles import STYLE_BTN, STYLE_BTN_ACTIVE
-from utils import load_svg_icon, scale_icon_for_display
-from managers import ConfigManager, BackgroundManager, LanguageManager
 from ui import UIBuilder
-from widgets import NewsCard, set_current_font
+from utils import load_svg_icon, scale_icon_for_display
+from widgets import NewsCard, make_transparent, set_current_font
 
 
 class NewsFetchThread(QThread):
@@ -72,7 +75,6 @@ class Window(QWidget):
 
         self.setWindowTitle(self.language_manager.translate("app_title"))
         if os.path.exists("icon.png"):
-            from PyQt6.QtGui import QIcon
             self.setWindowIcon(QIcon("icon.png"))
 
         self.resize(self.config.get("window_width", 900), self.config.get("window_height", 600))
@@ -548,74 +550,54 @@ class Window(QWidget):
         self.config["background_mode"] = mode
         self.config_manager.save_config()
 
+        # 样式表常量
+        bg_card_selected = "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.05);}"
+        bg_card_unselected = "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}"
+
+        def set_card_selected(card, selected):
+            card.setStyleSheet(bg_card_selected if selected else bg_card_unselected)
+            if selected:
+                check_pixmap = load_svg_icon("svg/check-lg.svg", self.dpi_scale)
+                if check_pixmap:
+                    card.check_label.setPixmap(scale_icon_for_display(check_pixmap, 20, self.dpi_scale))
+            else:
+                card.check_label.clear()
+
         if mode == "blur":
-            self.blur_card.setStyleSheet(
-                "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.05);}")
-            check_pixmap = load_svg_icon("svg/check-lg.svg", self.dpi_scale)
-            if check_pixmap:
-                self.blur_card.check_label.setPixmap(scale_icon_for_display(check_pixmap, 20, self.dpi_scale))
-
-            # 清除其他卡片选中状态
+            set_card_selected(self.blur_card, True)
             if hasattr(self, 'solid_card'):
-                self.solid_card.setStyleSheet(
-                    "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
-                self.solid_card.check_label.clear()
+                set_card_selected(self.solid_card, False)
                 self.color_widget.setVisible(False)
-
-            self.image_card.setStyleSheet(
-                "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
-            self.image_card.check_label.clear()
+            set_card_selected(self.image_card, False)
             self.path_widget.setVisible(False)
             self.opacity_widget.setVisible(True)
             self.apply_opacity()
-
             blur(self.winId())
             self.bg_manager.hide()
 
         elif mode == "solid":
-            self.blur_card.setStyleSheet(
-                "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
-            self.blur_card.check_label.clear()
-
-            self.solid_card.setStyleSheet(
-                "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.05);}")
-            check_pixmap = load_svg_icon("svg/check-lg.svg", self.dpi_scale)
-            if check_pixmap:
-                self.solid_card.check_label.setPixmap(scale_icon_for_display(check_pixmap, 20, self.dpi_scale))
-
-            self.image_card.setStyleSheet(
-                "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
-            self.image_card.check_label.clear()
-
-            self.path_widget.setVisible(False)
+            set_card_selected(self.blur_card, False)
+            if hasattr(self, 'solid_card'):
+                set_card_selected(self.solid_card, True)
+            set_card_selected(self.image_card, False)
+            if hasattr(self, 'solid_card'):
+                self.path_widget.setVisible(False)
             self.opacity_widget.setVisible(False)
             self.color_widget.setVisible(True)
-
-            # 应用纯色背景
             color = self.config.get("background_color", "#00000000")
             self.bg_manager.set_solid_color(color)
 
         elif mode == "image":
-            self.blur_card.setStyleSheet(
-                "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
-            self.blur_card.check_label.clear()
-
+            set_card_selected(self.blur_card, False)
             if hasattr(self, 'solid_card'):
-                self.solid_card.setStyleSheet(
-                    "QPushButton{background:rgba(255,255,255,0.05);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.03);}")
-                self.solid_card.check_label.clear()
+                set_card_selected(self.solid_card, False)
                 self.color_widget.setVisible(False)
-
-            self.image_card.setStyleSheet(
-                "QPushButton{background:rgba(255,255,255,0.15);border:none;border-radius:0px;}QPushButton:hover{background:rgba(255,255,255,0.1);}QPushButton:pressed{background:rgba(255,255,255,0.05);}")
-            check_pixmap = load_svg_icon("svg/check-lg.svg", self.dpi_scale)
-            if check_pixmap:
-                self.image_card.check_label.setPixmap(scale_icon_for_display(check_pixmap, 20, self.dpi_scale))
-
-            self.path_widget.setVisible(True)
+            set_card_selected(self.image_card, True)
+            if hasattr(self, 'solid_card'):
+                self.path_widget.setVisible(True)
             self.opacity_widget.setVisible(False)
-            self.color_widget.setVisible(False)
-
+            if hasattr(self, 'solid_card'):
+                self.color_widget.setVisible(False)
             if self.config.get("background_image_path") and os.path.exists(self.config.get("background_image_path")):
                 self.set_background_image(self.config.get("background_image_path"))
 
@@ -645,9 +627,9 @@ class Window(QWidget):
         self.right_panel.setStyleSheet(f"background:rgba(0,0,0,{opacity_value});")
         self.sidebar.setStyleSheet(f"background:rgba(0,0,0,{opacity_value});")
         # 更新下拉框的透明度（主页透明度 + 20）
-        dropdown_opacity_value = min(255, opacity_value + 20)
-        dropdown_opacity_rgba = dropdown_opacity_value / 255.0
-        self.ui_builder.update_combobox_opacity(dropdown_opacity_rgba)
+        # dropdown_opacity_value = min(255, opacity_value + 20)
+        # dropdown_opacity_rgba = dropdown_opacity_value / 255.0
+        # self.ui_builder.update_combobox_opacity(dropdown_opacity_rgba)
 
     def choose_background_image(self):
         """选择背景图像"""
@@ -853,7 +835,7 @@ class Window(QWidget):
 
     def apply_font(self):
         """应用字体设置"""
-        from PyQt6.QtGui import QFontDatabase, QFont
+        from PyQt6.QtGui import QFont, QFontDatabase
         font_mode = self.config.get("font_mode", 0)
         font_family = "Microsoft YaHei UI"
         font_path = self.config.get("custom_font_path", "")

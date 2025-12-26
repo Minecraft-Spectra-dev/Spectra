@@ -1,9 +1,10 @@
 """启动画面"""
 
 import os
-from PyQt6.QtWidgets import QApplication, QWidget, QHBoxLayout, QLabel
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
+from PyQt6.QtWidgets import QApplication, QWidget, QHBoxLayout, QLabel
 
 
 class SplashScreen(QWidget):

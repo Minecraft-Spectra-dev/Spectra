@@ -1,9 +1,9 @@
 """自定义卡片组件"""
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QGraphicsOpacityEffect
-from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QTimer
+from PyQt6.QtCore import (QPropertyAnimation, QEasingCurve, QTimer, Qt)
 from PyQt6.QtGui import QFont
-from utils import load_svg_icon, scale_icon_for_display
+from PyQt6.QtWidgets import (QGraphicsOpacityEffect, QHBoxLayout, QLabel,
+                             QPushButton, QVBoxLayout, QWidget)
 
 
 # 全局字体变量

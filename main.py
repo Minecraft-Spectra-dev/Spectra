@@ -13,8 +13,8 @@ os.environ["QT_LOGGING_RULES"] = "qt.multimedia*=false"
 os.environ["QT_MEDIA_BACKEND"] = "ffmpeg"
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "hwaccel;none"
 
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import QTimer, Qt
 from splash_screen import SplashScreen
 from window import Window
 

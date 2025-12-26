@@ -1,11 +1,12 @@
 """背景管理器"""
 
 import os
-from PyQt6.QtCore import Qt, QUrl, QSizeF
+
+from PyQt6.QtCore import QUrl, QSizeF, Qt
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
-from PyQt6.QtWidgets import QLabel, QGraphicsView, QGraphicsScene
+from PyQt6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PyQt6.QtMultimediaWidgets import QGraphicsVideoItem
+from PyQt6.QtWidgets import QGraphicsScene, QGraphicsView, QLabel
 
 
 class BackgroundManager:

@@ -1,11 +1,13 @@
 """文件浏览器组件"""
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTreeWidget, QTreeWidgetItem, QHeaderView, QFileDialog
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
-from PyQt6.QtGui import QFont, QPixmap, QIcon
 import os
 import zipfile
-import tempfile
+
+from PyQt6.QtCore import Qt, pyqtSignal, QSize
+from PyQt6.QtGui import QFont, QIcon, QPixmap
+from PyQt6.QtWidgets import (QFileDialog, QHBoxLayout, QHeaderView, QLabel,
+                             QPushButton, QTreeWidget, QTreeWidgetItem,
+                             QVBoxLayout, QWidget)
 
 
 class FileExplorer(QWidget):
