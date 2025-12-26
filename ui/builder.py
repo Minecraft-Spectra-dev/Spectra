@@ -922,32 +922,27 @@ class UIBuilder:
     
     def _update_page_titles(self):
         """更新页面标题"""
-        # 更新主页标题
-        home_page = self.window.stack.widget(0)
-        if home_page and home_page.layout():
-            title = home_page.layout().itemAt(0).widget()
-            if title:
-                title.setText(self.window.language_manager.translate("page_home"))
+        # 主页没有标题，跳过
         
         # 更新实例页面标题
         instance_page = self.window.stack.widget(1)
         if instance_page and instance_page.layout():
             title = instance_page.layout().itemAt(0).widget()
-            if title:
+            if title and hasattr(title, 'setText'):
                 title.setText(self.window.language_manager.translate("page_instances"))
         
         # 更新下载页面标题
         download_page = self.window.stack.widget(2)
         if download_page and download_page.layout():
             title = download_page.layout().itemAt(0).widget()
-            if title:
+            if title and hasattr(title, 'setText'):
                 title.setText(self.window.language_manager.translate("page_downloads"))
         
         # 更新设置页面标题
         settings_page = self.window.stack.widget(3)
         if settings_page and settings_page.layout():
             title = settings_page.layout().itemAt(0).widget()
-            if title:
+            if title and hasattr(title, 'setText'):
                 title.setText(self.window.language_manager.translate("page_settings"))
     
     def _update_settings_page(self):
@@ -1016,17 +1011,20 @@ class UIBuilder:
                     if text_layout.count() >= 2:
                         title = text_layout.itemAt(0).widget()
                         desc = text_layout.itemAt(1).widget()
-                        title.setText(self.window.language_manager.translate("settings_language"))
-                        desc.setText(self.window.language_manager.translate("settings_language_desc"))
+                        if title and hasattr(title, 'setText'):
+                            title.setText(self.window.language_manager.translate("settings_language"))
+                        if desc and hasattr(desc, 'setText'):
+                            desc.setText(self.window.language_manager.translate("settings_language_desc"))
                         break
-        
+
         # 更新语言标签
         if hasattr(self.window, 'language_content_layout'):
             if self.window.language_content_layout.count() > 0:
                 language_widget = self.window.language_content_layout.itemAt(0).widget()
                 if language_widget and language_widget.layout():
                     label = language_widget.layout().itemAt(0).widget()
-                    label.setText(self.window.language_manager.translate("settings_language_label"))
+                    if label and hasattr(label, 'setText'):
+                        label.setText(self.window.language_manager.translate("settings_language_label"))
 
         # 更新字体设置容器
         font_header = self.window.font_container.layout().itemAt(0).widget()
@@ -1039,8 +1037,10 @@ class UIBuilder:
                     if text_layout.count() >= 2:
                         title = text_layout.itemAt(0).widget()
                         desc = text_layout.itemAt(1).widget()
-                        title.setText(self.window.language_manager.translate("settings_font"))
-                        desc.setText(self.window.language_manager.translate("settings_font_desc"))
+                        if title and hasattr(title, 'setText'):
+                            title.setText(self.window.language_manager.translate("settings_font"))
+                        if desc and hasattr(desc, 'setText'):
+                            desc.setText(self.window.language_manager.translate("settings_font_desc"))
                         break
 
         # 更新字体卡片
@@ -1052,14 +1052,16 @@ class UIBuilder:
             font_select_layout = self.window.font_select_widget.layout()
             if font_select_layout and font_select_layout.count() > 0:
                 label = font_select_layout.itemAt(0).widget()
-                label.setText(self.window.language_manager.translate("font_select_label"))
+                if label and hasattr(label, 'setText'):
+                    label.setText(self.window.language_manager.translate("font_select_label"))
 
         # 更新字体路径标签
         if hasattr(self.window, 'font_path_widget'):
             font_path_layout = self.window.font_path_widget.layout()
             if font_path_layout and font_path_layout.count() > 0:
                 label = font_path_layout.itemAt(0).widget()
-                label.setText(self.window.language_manager.translate("font_custom_label"))
+                if label and hasattr(label, 'setText'):
+                    label.setText(self.window.language_manager.translate("font_custom_label"))
 
     def _update_settings_font(self, font_family):
         """更新设置页面的字体"""
@@ -1287,8 +1289,10 @@ class UIBuilder:
                     if text_layout.count() >= 2:
                         title = text_layout.itemAt(0).widget()
                         desc = text_layout.itemAt(1).widget()
-                        title.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:{font_family_quoted};background:transparent;")
-                        desc.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:{font_family_quoted};background:transparent;")
+                        if title and hasattr(title, 'setStyleSheet'):
+                            title.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:{font_family_quoted};background:transparent;")
+                        if desc and hasattr(desc, 'setStyleSheet'):
+                            desc.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:{font_family_quoted};background:transparent;")
                         break
 
     def _update_bg_card_font(self, card, font_family):
@@ -1306,8 +1310,10 @@ class UIBuilder:
             if text_container and text_container.count() >= 2:
                 title = text_container.itemAt(0).widget()
                 desc = text_container.itemAt(1).widget()
-                title.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:{font_family_quoted};background:transparent;")
-                desc.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:{font_family_quoted};background:transparent;")
+                if title and hasattr(title, 'setStyleSheet'):
+                    title.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:{font_family_quoted};background:transparent;")
+                if desc and hasattr(desc, 'setStyleSheet'):
+                    desc.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:{font_family_quoted};background:transparent;")
 
     def _update_bg_card(self, card, title_key, desc_key):
         """更新背景卡片的文本"""
@@ -1320,5 +1326,7 @@ class UIBuilder:
             if text_container and text_container.count() >= 2:
                 title = text_container.itemAt(0).widget()
                 desc = text_container.itemAt(1).widget()
-                title.setText(self.window.language_manager.translate(title_key))
-                desc.setText(self.window.language_manager.translate(desc_key))
+                if title and hasattr(title, 'setText'):
+                    title.setText(self.window.language_manager.translate(title_key))
+                if desc and hasattr(desc, 'setText'):
+                    desc.setText(self.window.language_manager.translate(desc_key))
