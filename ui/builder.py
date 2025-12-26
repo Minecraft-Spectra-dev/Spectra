@@ -1,5 +1,6 @@
 """UI构建器"""
 
+import os
 from PyQt6.QtWidgets import (QWidget, QPushButton, QHBoxLayout, QVBoxLayout, QLabel,
                              QLineEdit, QSlider, QColorDialog)
 from PyQt6.QtCore import Qt
@@ -390,7 +391,9 @@ class UIBuilder:
 
     def create_instance_page(self):
         """创建实例页面"""
-        from PyQt6.QtWidgets import QScrollArea
+        from PyQt6.QtWidgets import QScrollArea, QComboBox, QLabel as QtLabel
+        from widgets import FileExplorer
+        from utils import load_svg_icon, scale_icon_for_display
 
         page = QWidget()
         page.setStyleSheet("background:transparent;")
@@ -442,10 +445,146 @@ class UIBuilder:
         scroll_layout = QVBoxLayout(scroll_content)
         scroll_layout.setContentsMargins(0, self._scale_size(10), 0, 0)
         scroll_layout.setSpacing(self._scale_size(15))
+
+        # Minecraft路径选择区域
+        path_container = QWidget()
+        path_container.setStyleSheet(f"background:rgba(255,255,255,0.08);border-radius:{self._scale_size(8)}px;")
+        path_layout = QVBoxLayout(path_container)
+        path_layout.setContentsMargins(self._scale_size(15), self._scale_size(12), self._scale_size(15), self._scale_size(12))
+        path_layout.setSpacing(self._scale_size(10))
+
+        # 路径标题
+        path_title = QtLabel(self.window.language_manager.translate("instance_path_title"))
+        path_title.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-weight:bold;font-family:'{self._get_font_family()}';background:transparent;")
+        path_layout.addWidget(path_title)
+
+        # 路径描述
+        path_desc = QtLabel(self.window.language_manager.translate("instance_path_desc"))
+        path_desc.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:'{self._get_font_family()}';background:transparent;")
+        path_desc.setWordWrap(True)
+        path_layout.addWidget(path_desc)
+
+        # 路径输入和选择按钮
+        path_input_layout = QHBoxLayout()
+        path_input_layout.setSpacing(self._scale_size(10))
+
+        from PyQt6.QtWidgets import QLineEdit
+        self.window.instance_path_input = QLineEdit()
+        self.window.instance_path_input.setPlaceholderText(self.window.language_manager.translate("instance_path_placeholder"))
+        padding = self._scale_size(6)
+        border_radius_input = self._scale_size(4)
+        self.window.instance_path_input.setStyleSheet(
+            f"QLineEdit{{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:{border_radius_input}px;padding:{padding}px;color:white;font-size:{self._scale_size(13)}px;font-family:'{self._get_font_family()}';}}"
+        )
+        self.window.instance_path_input.editingFinished.connect(self._on_instance_path_changed)
+        path_input_layout.addWidget(self.window.instance_path_input, 1)
+
+        # 浏览按钮
+        browse_btn = ClickableLabel()
+        browse_btn.setFixedSize(self._scale_size(32), self._scale_size(32))
+        browse_btn.setHoverStyle(
+            f"background:rgba(255,255,255,0.1);border:none;border-radius:{border_radius_input}px;",
+            f"background:rgba(255,255,255,0.15);border:none;border-radius:{border_radius_input}px;"
+        )
+        browse_btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        browse_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        browse_btn.setCallback(self._choose_instance_path)
+        folder_pixmap = load_svg_icon("svg/folder2.svg", self.dpi_scale)
+        if folder_pixmap:
+            browse_btn.setPixmap(scale_icon_for_display(folder_pixmap, 20, self.dpi_scale))
+        path_input_layout.addWidget(browse_btn)
+
+        path_layout.addLayout(path_input_layout)
+
+        # 版本选择区域
+        version_layout = QHBoxLayout()
+        version_layout.setSpacing(self._scale_size(10))
+
+        version_label = QtLabel(self.window.language_manager.translate("instance_version_label"))
+        version_label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'{self._get_font_family()}';background:transparent;")
+        version_layout.addWidget(version_label)
+
+        # 版本下拉框
+        self.window.instance_version_combo = QComboBox()
+        self.window.instance_version_combo.setFixedHeight(self._scale_size(32))
+        self.window.instance_version_combo.setFixedWidth(self._scale_size(200))
+        self.window.instance_version_combo.setMaxVisibleItems(8)
+        blur_opacity = self.window.config.get("blur_opacity", 150)
+        dropdown_opacity_value = min(255, blur_opacity + 20)
+        dropdown_opacity_rgba = dropdown_opacity_value / 255.0
+        self.window.instance_version_combo.setStyleSheet(
+            f"QComboBox{{"
+            f"background:rgba(0,0,0,0.3);"
+            f"border:1px solid rgba(255,255,255,0.15);"
+            f"border-radius:{border_radius_input}px;"
+            f"padding:{padding}px;"
+            f"color:rgba(255,255,255,0.95);"
+            f"font-size:{self._scale_size(13)}px;"
+            f"font-family:'{self._get_font_family()}';"
+            f"}}"
+            f"QComboBox:hover{{"
+            f"background:rgba(0,0,0,0.4);"
+            f"border:1px solid rgba(255,255,255,0.25);"
+            f"}}"
+            f"QComboBox:focus{{"
+            f"background:rgba(0,0,0,0.5);"
+            f"border:1px solid rgba(100,150,255,0.6);"
+            f"}}"
+            f"QComboBox QAbstractItemView{{"
+            f"background:rgba(0,0,0,{dropdown_opacity_rgba:.2f});"
+            f"border:1px solid rgba(255,255,255,0.1);"
+            f"border-radius:{border_radius_input}px;"
+            f"selection-background-color:rgba(255,255,255,0.15);"
+            f"selection-color:white;"
+            f"outline:none;"
+            f"padding:{self._scale_size(2)}px;"
+            f"}}"
+            f"QComboBox QAbstractItemView::item{{"
+            f"height:{self._scale_size(28)}px;"
+            f"padding:{self._scale_size(6)}px {self._scale_size(8)}px;"
+            f"color:rgba(255,255,255,0.85);"
+            f"border-radius:{border_radius_input - 1}px;"
+            f"}}"
+            f"QComboBox QAbstractItemView::item:hover{{"
+            f"background:rgba(255,255,255,0.1);"
+            f"}}"
+            f"QComboBox QAbstractItemView::item:selected{{"
+            f"background:rgba(255,255,255,0.15);"
+            f"color:white;"
+            f"}}"
+        )
+        self.window.instance_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))
+        self.window.instance_version_combo.currentTextChanged.connect(self._on_version_changed)
+        version_layout.addWidget(self.window.instance_version_combo)
+        version_layout.addStretch()
+
+        path_layout.addLayout(version_layout)
+
+        scroll_layout.addWidget(path_container)
+
+        # 文件浏览器
+        self.window.file_explorer = FileExplorer(dpi_scale=self.dpi_scale)
+        self.window.file_explorer.setFixedHeight(self._scale_size(400))
+        scroll_layout.addWidget(self.window.file_explorer)
+
         scroll_layout.addStretch()
 
         scroll_area.setWidget(scroll_content)
         pl.addWidget(scroll_area, 1)
+
+        # 加载保存的Minecraft路径（使用QTimer延迟执行，确保UI完全初始化）
+        saved_path = self.window.config.get("minecraft_path", "")
+        if saved_path and os.path.exists(saved_path):
+            self.window.instance_path_input.setText(saved_path)
+            # 使用QTimer延迟加载版本列表，确保UI完全初始化
+            from PyQt6.QtCore import QTimer
+            def delayed_load():
+                try:
+                    self._load_versions(saved_path)
+                except Exception as e:
+                    # 静默处理错误，避免崩溃
+                    pass
+            QTimer.singleShot(300, delayed_load)
 
         return page
 
@@ -507,6 +646,20 @@ class UIBuilder:
 
         scroll_area.setWidget(scroll_content)
         pl.addWidget(scroll_area, 1)
+
+        # 加载保存的Minecraft路径（使用QTimer延迟执行，确保UI完全初始化）
+        saved_path = self.window.config.get("minecraft_path", "")
+        if saved_path and os.path.exists(saved_path):
+            self.window.instance_path_input.setText(saved_path)
+            # 使用QTimer延迟加载版本列表，确保UI完全初始化
+            from PyQt6.QtCore import QTimer
+            def delayed_load():
+                try:
+                    self._load_versions(saved_path)
+                except Exception as e:
+                    # 静默处理错误，避免崩溃
+                    pass
+            QTimer.singleShot(300, delayed_load)
 
         return page
 
@@ -736,6 +889,128 @@ class UIBuilder:
             f"background:none;"
             f"}}"
         )
+
+    # 实例页面相关方法
+    def _choose_instance_path(self):
+        """选择Minecraft路径"""
+        from PyQt6.QtWidgets import QFileDialog
+        path = QFileDialog.getExistingDirectory(
+            self.window,
+            self.window.language_manager.translate("instance_path_dialog_title"),
+            ""
+        )
+        if path:
+            self.window.instance_path_input.setText(path)
+            self._on_instance_path_changed()
+
+    def _on_instance_path_changed(self):
+        """Minecraft路径变化"""
+        import os
+        try:
+            path = self.window.instance_path_input.text().strip()
+            if path and os.path.exists(path):
+                # 保存路径到配置
+                self.window.config["minecraft_path"] = path
+                self.window.config_manager.save_config()
+
+                # 加载版本列表
+                self._load_versions(path)
+            else:
+                # 清空版本列表
+                self.window.instance_version_combo.clear()
+                self.window.instance_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass
+
+    def _load_versions(self, minecraft_path):
+        """加载Minecraft版本列表"""
+        import os
+        try:
+            versions_path = os.path.join(minecraft_path, "versions")
+            self.window.instance_version_combo.clear()
+            self.window.instance_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))
+
+            if os.path.exists(versions_path) and os.path.isdir(versions_path):
+                for item in sorted(os.listdir(versions_path)):
+                    item_path = os.path.join(versions_path, item)
+                    if os.path.isdir(item_path):
+                        self.window.instance_version_combo.addItem(item)
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass
+
+    def _on_version_changed(self, version):
+        """版本选择变化"""
+        import os
+        try:
+            path = self.window.instance_path_input.text().strip()
+            if not path or not os.path.exists(path):
+                return
+
+            root_item = self.window.language_manager.translate("instance_version_root")
+            if version == root_item or not version:
+                # 显示根目录
+                self.window.file_explorer.set_minecraft_path(path)
+            else:
+                # 显示版本的resourcepacks
+                self.window.file_explorer.navigate_to_version_resourcepacks(version)
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass
+
+    def _show_root_directory(self):
+        """显示根目录"""
+        path = self.window.instance_path_input.text().strip()
+        if path and os.path.exists(path):
+            self.window.file_explorer.set_minecraft_path(path)
+
+    def _show_root_resourcepacks_directory(self):
+        """显示根目录的resourcepacks目录"""
+        import os
+        try:
+            path = self.window.instance_path_input.text().strip()
+
+            if not path or not os.path.exists(path):
+                return
+
+            # 导航到根目录的resourcepacks文件夹
+            resourcepacks_path = os.path.join(path, "resourcepacks")
+            if os.path.exists(resourcepacks_path):
+                self.window.file_explorer.set_minecraft_path(path)
+                self.window.file_explorer.navigate_to_directory(resourcepacks_path)
+            else:
+                # 如果没有resourcepacks文件夹，显示根目录
+                self.window.file_explorer.set_minecraft_path(path)
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass
+
+    def _show_version_resourcepacks_directory(self):
+        """显示版本的resourcepacks目录"""
+        import os
+        try:
+            path = self.window.instance_path_input.text().strip()
+            version = self.window.instance_version_combo.currentText()
+
+            if not path or not os.path.exists(path):
+                return
+
+            root_item = self.window.language_manager.translate("instance_version_root")
+            if version == root_item or not version:
+                # 显示根目录的resourcepacks
+                resourcepacks_path = os.path.join(path, "resourcepacks")
+                if os.path.exists(resourcepacks_path):
+                    self.window.file_explorer.set_minecraft_path(path)
+                    self.window.file_explorer.navigate_to_directory(resourcepacks_path)
+                else:
+                    self.window.file_explorer.set_minecraft_path(path)
+            else:
+                # 显示版本的resourcepacks
+                self.window.file_explorer.navigate_to_version_resourcepacks(version)
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass
         # 获取系统字体
         families = QFontDatabase.families()
         # 过滤一些常见的系统字体
@@ -911,6 +1186,128 @@ class UIBuilder:
             f"background:none;"
             f"}}"
         )
+
+    # 实例页面相关方法
+    def _choose_instance_path(self):
+        """选择Minecraft路径"""
+        from PyQt6.QtWidgets import QFileDialog
+        path = QFileDialog.getExistingDirectory(
+            self.window,
+            self.window.language_manager.translate("instance_path_dialog_title"),
+            ""
+        )
+        if path:
+            self.window.instance_path_input.setText(path)
+            self._on_instance_path_changed()
+
+    def _on_instance_path_changed(self):
+        """Minecraft路径变化"""
+        import os
+        try:
+            path = self.window.instance_path_input.text().strip()
+            if path and os.path.exists(path):
+                # 保存路径到配置
+                self.window.config["minecraft_path"] = path
+                self.window.config_manager.save_config()
+
+                # 加载版本列表
+                self._load_versions(path)
+            else:
+                # 清空版本列表
+                self.window.instance_version_combo.clear()
+                self.window.instance_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass
+
+    def _load_versions(self, minecraft_path):
+        """加载Minecraft版本列表"""
+        import os
+        try:
+            versions_path = os.path.join(minecraft_path, "versions")
+            self.window.instance_version_combo.clear()
+            self.window.instance_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))
+
+            if os.path.exists(versions_path) and os.path.isdir(versions_path):
+                for item in sorted(os.listdir(versions_path)):
+                    item_path = os.path.join(versions_path, item)
+                    if os.path.isdir(item_path):
+                        self.window.instance_version_combo.addItem(item)
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass
+
+    def _on_version_changed(self, version):
+        """版本选择变化"""
+        import os
+        try:
+            path = self.window.instance_path_input.text().strip()
+            if not path or not os.path.exists(path):
+                return
+
+            root_item = self.window.language_manager.translate("instance_version_root")
+            if version == root_item or not version:
+                # 显示根目录
+                self.window.file_explorer.set_minecraft_path(path)
+            else:
+                # 显示版本的resourcepacks
+                self.window.file_explorer.navigate_to_version_resourcepacks(version)
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass
+
+    def _show_root_directory(self):
+        """显示根目录"""
+        path = self.window.instance_path_input.text().strip()
+        if path and os.path.exists(path):
+            self.window.file_explorer.set_minecraft_path(path)
+
+    def _show_root_resourcepacks_directory(self):
+        """显示根目录的resourcepacks目录"""
+        import os
+        try:
+            path = self.window.instance_path_input.text().strip()
+
+            if not path or not os.path.exists(path):
+                return
+
+            # 导航到根目录的resourcepacks文件夹
+            resourcepacks_path = os.path.join(path, "resourcepacks")
+            if os.path.exists(resourcepacks_path):
+                self.window.file_explorer.set_minecraft_path(path)
+                self.window.file_explorer.navigate_to_directory(resourcepacks_path)
+            else:
+                # 如果没有resourcepacks文件夹，显示根目录
+                self.window.file_explorer.set_minecraft_path(path)
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass
+
+    def _show_version_resourcepacks_directory(self):
+        """显示版本的resourcepacks目录"""
+        import os
+        try:
+            path = self.window.instance_path_input.text().strip()
+            version = self.window.instance_version_combo.currentText()
+
+            if not path or not os.path.exists(path):
+                return
+
+            root_item = self.window.language_manager.translate("instance_version_root")
+            if version == root_item or not version:
+                # 显示根目录的resourcepacks
+                resourcepacks_path = os.path.join(path, "resourcepacks")
+                if os.path.exists(resourcepacks_path):
+                    self.window.file_explorer.set_minecraft_path(path)
+                    self.window.file_explorer.navigate_to_directory(resourcepacks_path)
+                else:
+                    self.window.file_explorer.set_minecraft_path(path)
+            else:
+                # 显示版本的resourcepacks
+                self.window.file_explorer.navigate_to_version_resourcepacks(version)
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass
         # 添加语言选项
         languages = self.window.language_manager.get_all_languages()
         for lang_code, display_name in languages:
@@ -1283,6 +1680,128 @@ class UIBuilder:
             f"}}"
         )
 
+    # 实例页面相关方法
+    def _choose_instance_path(self):
+        """选择Minecraft路径"""
+        from PyQt6.QtWidgets import QFileDialog
+        path = QFileDialog.getExistingDirectory(
+            self.window,
+            self.window.language_manager.translate("instance_path_dialog_title"),
+            ""
+        )
+        if path:
+            self.window.instance_path_input.setText(path)
+            self._on_instance_path_changed()
+
+    def _on_instance_path_changed(self):
+        """Minecraft路径变化"""
+        import os
+        try:
+            path = self.window.instance_path_input.text().strip()
+            if path and os.path.exists(path):
+                # 保存路径到配置
+                self.window.config["minecraft_path"] = path
+                self.window.config_manager.save_config()
+
+                # 加载版本列表
+                self._load_versions(path)
+            else:
+                # 清空版本列表
+                self.window.instance_version_combo.clear()
+                self.window.instance_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass
+
+    def _load_versions(self, minecraft_path):
+        """加载Minecraft版本列表"""
+        import os
+        try:
+            versions_path = os.path.join(minecraft_path, "versions")
+            self.window.instance_version_combo.clear()
+            self.window.instance_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))
+
+            if os.path.exists(versions_path) and os.path.isdir(versions_path):
+                for item in sorted(os.listdir(versions_path)):
+                    item_path = os.path.join(versions_path, item)
+                    if os.path.isdir(item_path):
+                        self.window.instance_version_combo.addItem(item)
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass
+
+    def _on_version_changed(self, version):
+        """版本选择变化"""
+        import os
+        try:
+            path = self.window.instance_path_input.text().strip()
+            if not path or not os.path.exists(path):
+                return
+
+            root_item = self.window.language_manager.translate("instance_version_root")
+            if version == root_item or not version:
+                # 显示根目录
+                self.window.file_explorer.set_minecraft_path(path)
+            else:
+                # 显示版本的resourcepacks
+                self.window.file_explorer.navigate_to_version_resourcepacks(version)
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass
+
+    def _show_root_directory(self):
+        """显示根目录"""
+        path = self.window.instance_path_input.text().strip()
+        if path and os.path.exists(path):
+            self.window.file_explorer.set_minecraft_path(path)
+
+    def _show_root_resourcepacks_directory(self):
+        """显示根目录的resourcepacks目录"""
+        import os
+        try:
+            path = self.window.instance_path_input.text().strip()
+
+            if not path or not os.path.exists(path):
+                return
+
+            # 导航到根目录的resourcepacks文件夹
+            resourcepacks_path = os.path.join(path, "resourcepacks")
+            if os.path.exists(resourcepacks_path):
+                self.window.file_explorer.set_minecraft_path(path)
+                self.window.file_explorer.navigate_to_directory(resourcepacks_path)
+            else:
+                # 如果没有resourcepacks文件夹，显示根目录
+                self.window.file_explorer.set_minecraft_path(path)
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass
+
+    def _show_version_resourcepacks_directory(self):
+        """显示版本的resourcepacks目录"""
+        import os
+        try:
+            path = self.window.instance_path_input.text().strip()
+            version = self.window.instance_version_combo.currentText()
+
+            if not path or not os.path.exists(path):
+                return
+
+            root_item = self.window.language_manager.translate("instance_version_root")
+            if version == root_item or not version:
+                # 显示根目录的resourcepacks
+                resourcepacks_path = os.path.join(path, "resourcepacks")
+                if os.path.exists(resourcepacks_path):
+                    self.window.file_explorer.set_minecraft_path(path)
+                    self.window.file_explorer.navigate_to_directory(resourcepacks_path)
+                else:
+                    self.window.file_explorer.set_minecraft_path(path)
+            else:
+                # 显示版本的resourcepacks
+                self.window.file_explorer.navigate_to_version_resourcepacks(version)
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass
+
     def _update_expandable_menu_font(self, container, font_family):
         """更新可展开菜单的字体"""
         # 转义字体名称中的特殊字符
@@ -1351,6 +1870,9 @@ class UIBuilder:
         # 更新语言选择下拉框
         if hasattr(self.window, 'language_combo'):
             self._update_single_combobox_opacity(self.window.language_combo, opacity_rgba)
+        # 更新实例版本下拉框
+        if hasattr(self.window, 'instance_version_combo'):
+            self._update_single_combobox_opacity(self.window.instance_version_combo, opacity_rgba)
 
     def _update_single_combobox_opacity(self, combo, opacity_rgba):
         """更新单个下拉框的透明度"""
@@ -1443,3 +1965,125 @@ class UIBuilder:
             f"background:none;"
             f"}}"
         )
+
+    # 实例页面相关方法
+    def _choose_instance_path(self):
+        """选择Minecraft路径"""
+        from PyQt6.QtWidgets import QFileDialog
+        path = QFileDialog.getExistingDirectory(
+            self.window,
+            self.window.language_manager.translate("instance_path_dialog_title"),
+            ""
+        )
+        if path:
+            self.window.instance_path_input.setText(path)
+            self._on_instance_path_changed()
+
+    def _on_instance_path_changed(self):
+        """Minecraft路径变化"""
+        import os
+        try:
+            path = self.window.instance_path_input.text().strip()
+            if path and os.path.exists(path):
+                # 保存路径到配置
+                self.window.config["minecraft_path"] = path
+                self.window.config_manager.save_config()
+
+                # 加载版本列表
+                self._load_versions(path)
+            else:
+                # 清空版本列表
+                self.window.instance_version_combo.clear()
+                self.window.instance_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass
+
+    def _load_versions(self, minecraft_path):
+        """加载Minecraft版本列表"""
+        import os
+        try:
+            versions_path = os.path.join(minecraft_path, "versions")
+            self.window.instance_version_combo.clear()
+            self.window.instance_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))
+
+            if os.path.exists(versions_path) and os.path.isdir(versions_path):
+                for item in sorted(os.listdir(versions_path)):
+                    item_path = os.path.join(versions_path, item)
+                    if os.path.isdir(item_path):
+                        self.window.instance_version_combo.addItem(item)
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass
+
+    def _on_version_changed(self, version):
+        """版本选择变化"""
+        import os
+        try:
+            path = self.window.instance_path_input.text().strip()
+            if not path or not os.path.exists(path):
+                return
+
+            root_item = self.window.language_manager.translate("instance_version_root")
+            if version == root_item or not version:
+                # 显示根目录
+                self.window.file_explorer.set_minecraft_path(path)
+            else:
+                # 显示版本的resourcepacks
+                self.window.file_explorer.navigate_to_version_resourcepacks(version)
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass
+
+    def _show_root_directory(self):
+        """显示根目录"""
+        path = self.window.instance_path_input.text().strip()
+        if path and os.path.exists(path):
+            self.window.file_explorer.set_minecraft_path(path)
+
+    def _show_root_resourcepacks_directory(self):
+        """显示根目录的resourcepacks目录"""
+        import os
+        try:
+            path = self.window.instance_path_input.text().strip()
+
+            if not path or not os.path.exists(path):
+                return
+
+            # 导航到根目录的resourcepacks文件夹
+            resourcepacks_path = os.path.join(path, "resourcepacks")
+            if os.path.exists(resourcepacks_path):
+                self.window.file_explorer.set_minecraft_path(path)
+                self.window.file_explorer.navigate_to_directory(resourcepacks_path)
+            else:
+                # 如果没有resourcepacks文件夹，显示根目录
+                self.window.file_explorer.set_minecraft_path(path)
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass
+
+    def _show_version_resourcepacks_directory(self):
+        """显示版本的resourcepacks目录"""
+        import os
+        try:
+            path = self.window.instance_path_input.text().strip()
+            version = self.window.instance_version_combo.currentText()
+
+            if not path or not os.path.exists(path):
+                return
+
+            root_item = self.window.language_manager.translate("instance_version_root")
+            if version == root_item or not version:
+                # 显示根目录的resourcepacks
+                resourcepacks_path = os.path.join(path, "resourcepacks")
+                if os.path.exists(resourcepacks_path):
+                    self.window.file_explorer.set_minecraft_path(path)
+                    self.window.file_explorer.navigate_to_directory(resourcepacks_path)
+                else:
+                    self.window.file_explorer.set_minecraft_path(path)
+            else:
+                # 显示版本的resourcepacks
+                self.window.file_explorer.navigate_to_version_resourcepacks(version)
+        except Exception as e:
+            # 静默处理错误，避免崩溃
+            pass

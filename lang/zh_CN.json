@@ -36,6 +36,14 @@
     "font_custom": "自定义字体",
     "font_custom_desc": "从字体文件中选择",
     "font_select_label": "系统字体",
-    "font_custom_label": "字体文件路径"
+    "font_custom_label": "字体文件路径",
+    "instance_path_title": "Minecraft 路径",
+    "instance_path_desc": "选择 Minecraft 安装目录以管理资源包",
+    "instance_path_placeholder": "请选择 .minecraft 目录",
+    "instance_path_dialog_title": "选择 Minecraft 安装目录",
+    "instance_version_label": "版本",
+    "instance_version_root": "根目录",
+    "instance_show_root_resourcepacks": "显示根目录资源包",
+    "instance_show_version_resourcepacks": "显示版本资源包"
   }
 }

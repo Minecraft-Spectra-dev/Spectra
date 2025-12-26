@@ -23,7 +23,8 @@ class ConfigManager:
                     "font_mode": config.get("font_mode", 0),
                     "custom_font_family": config.get("custom_font_family", "Microsoft YaHei UI"),
                     "custom_font_path": config.get("custom_font_path", ""),
-                    "language": config.get("language", "zh_CN")
+                    "language": config.get("language", "zh_CN"),
+                    "minecraft_path": config.get("minecraft_path", "")
                 }
         except:
             return {
@@ -36,7 +37,8 @@ class ConfigManager:
                 "font_mode": 0,
                 "custom_font_family": "Microsoft YaHei UI",
                 "custom_font_path": "",
-                "language": "zh_CN"
+                "language": "zh_CN",
+                "minecraft_path": ""
             }
 
     def save_config(self):

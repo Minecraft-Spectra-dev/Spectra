@@ -36,6 +36,14 @@
     "font_custom": "Custom Font",
     "font_custom_desc": "Choose from font files",
     "font_select_label": "System Font",
-    "font_custom_label": "Font File Path"
+    "font_custom_label": "Font File Path",
+    "instance_path_title": "Minecraft Path",
+    "instance_path_desc": "Select Minecraft installation directory to manage resource packs",
+    "instance_path_placeholder": "Select .minecraft directory",
+    "instance_path_dialog_title": "Select Minecraft Installation Directory",
+    "instance_version_label": "Version",
+    "instance_version_root": "Root Directory",
+    "instance_show_root_resourcepacks": "Show Root Resource Packs",
+    "instance_show_version_resourcepacks": "Show Version Resource Packs"
   }
 }

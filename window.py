@@ -916,6 +916,11 @@ class Window(QWidget):
                     for card in scroll_content.news_cards:
                         card.update_font(font_family)
 
+        # 更新实例页面文件浏览器的字体
+        instance_page = self.stack.widget(1)
+        if instance_page and hasattr(self, 'file_explorer'):
+            self.file_explorer.update_font(font_family)
+
         # 触发 UI 更新以刷新设置页面的字体
         try:
             self.ui_builder._update_settings_font(font_family)
