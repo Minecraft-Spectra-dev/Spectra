@@ -390,9 +390,33 @@ class UIBuilder:
         return page
 
     def create_instance_page(self):
-        """创建实例页面"""
-        from PyQt6.QtWidgets import QScrollArea, QComboBox, QLabel as QtLabel
+        """创建实例页面 - 使用多层级导航结构"""
+        from PyQt6.QtWidgets import QScrollArea, QStackedWidget, QLabel as QtLabel
         from widgets import FileExplorer
+        from utils import load_svg_icon, scale_icon_for_display
+
+        page = QWidget()
+        page.setStyleSheet("background:transparent;")
+        pl = QVBoxLayout(page)
+        pl.setContentsMargins(0, 0, 0, 0)
+        pl.setSpacing(0)
+
+        # 创建堆叠窗口用于多层级页面导航
+        self.window.instance_stack = QStackedWidget()
+        self.window.instance_stack.setStyleSheet("background:transparent;")
+        self.window.instance_pages = []  # 存储页面历史
+
+        # 第一层：主页面（路径选择和版本列表）
+        main_page = self._create_instance_main_page()
+        self.window.instance_stack.addWidget(main_page)
+
+        pl.addWidget(self.window.instance_stack)
+
+        return page
+
+    def _create_instance_main_page(self):
+        """创建实例主页面（第一层）"""
+        from PyQt6.QtWidgets import QScrollArea, QLabel as QtLabel
         from utils import load_svg_icon, scale_icon_for_display
 
         page = QWidget()
@@ -496,17 +520,139 @@ class UIBuilder:
 
         path_layout.addLayout(path_input_layout)
 
-        # 版本选择区域
-        version_layout = QHBoxLayout()
-        version_layout.setSpacing(self._scale_size(10))
+        scroll_layout.addWidget(path_container)
 
-        version_label = QtLabel(self.window.language_manager.translate("instance_version_label"))
-        version_label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'{self._get_font_family()}';background:transparent;")
-        version_layout.addWidget(version_label)
+        # 版本列表容器
+        version_container = QWidget()
+        version_container.setStyleSheet(f"background:rgba(255,255,255,0.08);border-radius:{self._scale_size(8)}px;")
+        version_container_layout = QVBoxLayout(version_container)
+        version_container_layout.setContentsMargins(self._scale_size(15), self._scale_size(12), self._scale_size(15), self._scale_size(12))
+        version_container_layout.setSpacing(self._scale_size(8))
 
-        # 版本下拉框
-        self.window.instance_version_combo = QComboBox()
-        self.window.instance_version_combo.setFixedHeight(self._scale_size(32))
+        # 版本列表标题
+        version_title = QtLabel(self.window.language_manager.translate("instance_version_label"))
+        version_title.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-weight:bold;font-family:'{self._get_font_family()}';background:transparent;")
+        version_container_layout.addWidget(version_title)
+
+        # 版本列表（滚动区域）
+        from PyQt6.QtWidgets import QWidget as QtWidget
+        version_list_widget = QtWidget()
+        version_list_layout = QVBoxLayout(version_list_widget)
+        version_list_layout.setContentsMargins(0, 0, 0, 0)
+        version_list_layout.setSpacing(self._scale_size(6))
+
+        # 版本列表容器引用，用于动态更新
+        self.window.instance_version_list_container = version_list_layout
+
+        version_container_layout.addWidget(version_list_widget)
+        scroll_layout.addWidget(version_container)
+
+        scroll_layout.addStretch()
+
+        scroll_area.setWidget(scroll_content)
+        pl.addWidget(scroll_area, 1)
+
+        # 加载保存的Minecraft路径和版本列表
+        saved_path = self.window.config.get("minecraft_path", "")
+        if saved_path and os.path.exists(saved_path):
+            self.window.instance_path_input.setText(saved_path)
+            # 使用QTimer延迟加载版本列表，确保UI完全初始化
+            from PyQt6.QtCore import QTimer
+            def delayed_load():
+                try:
+                    self._load_version_list(saved_path)
+                except Exception as e:
+                    pass
+            QTimer.singleShot(300, delayed_load)
+
+        return page
+
+    def _create_instance_resourcepack_page(self, title, resourcepacks_path):
+        """创建资源包页面（第二层）"""
+        from PyQt6.QtWidgets import QScrollArea
+        from widgets import FileExplorer
+
+        page = QWidget()
+        page.setStyleSheet("background:transparent;")
+        pl = QVBoxLayout(page)
+        pl.setContentsMargins(0, 0, 0, 0)
+        pl.setSpacing(0)
+
+        # 顶部导航栏（包含标题和返回按钮）
+        nav_bar = QWidget()
+        nav_bar.setFixedHeight(self._scale_size(40))
+        nav_bar.setStyleSheet("background:rgba(255,255,255,0.05);")
+        nav_layout = QHBoxLayout(nav_bar)
+        nav_layout.setContentsMargins(self._scale_size(20), 0, self._scale_size(20), 0)
+        nav_layout.setSpacing(self._scale_size(10))
+
+        # 返回按钮（更小，使用x.svg图标）
+        from widgets import ClickableLabel
+        back_btn = ClickableLabel()
+        back_btn.setFixedSize(self._scale_size(28), self._scale_size(28))
+        back_btn.setHoverStyle(
+            f"background:rgba(255,255,255,0.1);border-radius:{self._scale_size(14)}px;",
+            f"background:rgba(255,255,255,0.15);border-radius:{self._scale_size(14)}px;"
+        )
+        back_btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        back_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        from utils import load_svg_icon, scale_icon_for_display
+        x_pixmap = load_svg_icon("svg/x.svg", self.dpi_scale)
+        if x_pixmap:
+            back_btn.setPixmap(scale_icon_for_display(x_pixmap, 16, self.dpi_scale))
+        back_btn.setCallback(lambda: self._navigate_instance_back())
+        nav_layout.addWidget(back_btn)
+
+        # 页面标题
+        title_label = QLabel(title)
+        title_label.setStyleSheet(f"color:white;font-size:{self._scale_size(16)}px;font-weight:bold;font-family:'{self._get_font_family()}';background:transparent;")
+        nav_layout.addWidget(title_label)
+        nav_layout.addStretch()
+
+        pl.addWidget(nav_bar)
+
+        # 文件浏览器
+        self.window.file_explorer = FileExplorer(dpi_scale=self.dpi_scale)
+
+        # 设置资源包路径
+        if resourcepacks_path and os.path.exists(resourcepacks_path):
+            # 获取.minecraft路径
+            minecraft_path = None
+            if "\\versions\\" in resourcepacks_path or "/versions/" in resourcepacks_path:
+                # 版本路径
+                parts = resourcepacks_path.replace("\\", "/").split("/versions/")
+                if len(parts) > 1:
+                    minecraft_path = parts[0]
+            else:
+                # 根目录路径
+                parts = resourcepacks_path.replace("\\", "/").split("/resourcepacks")
+                if len(parts) > 1:
+                    minecraft_path = parts[0]
+
+            # 使用新的set_resourcepacks_path方法
+            if minecraft_path:
+                self.window.file_explorer.set_resourcepacks_path(resourcepacks_path, minecraft_path)
+            else:
+                # 兜底方案：如果没有找到minecraft路径
+                self.window.file_explorer.root_path = os.path.dirname(resourcepacks_path)
+                self.window.file_explorer.base_path = resourcepacks_path
+                self.window.file_explorer.current_path = resourcepacks_path
+                self.window.file_explorer.resourcepack_mode = True
+                display_path = self.window.file_explorer._format_path_display(resourcepacks_path)
+                self.window.file_explorer.path_label.setText(display_path)
+                self.window.file_explorer.path_label.show()
+                self.window.file_explorer.back_btn.setEnabled(False)
+                self.window.file_explorer.empty_label.hide()
+                self.window.file_explorer.file_tree.show()
+                self.window.file_explorer._load_directory(resourcepacks_path)
+        else:
+            self.window.file_explorer.empty_label.setText(f"路径不存在: {resourcepacks_path}")
+            self.window.file_explorer.empty_label.show()
+            self.window.file_explorer.file_tree.hide()
+
+        pl.addWidget(self.window.file_explorer, 1)
+
+        return page
         self.window.instance_version_combo.setFixedWidth(self._scale_size(200))
         self.window.instance_version_combo.setMaxVisibleItems(8)
         blur_opacity = self.window.config.get("blur_opacity", 150)
@@ -914,128 +1060,120 @@ class UIBuilder:
                 self.window.config_manager.save_config()
 
                 # 加载版本列表
-                self._load_versions(path)
+                self._load_version_list(path)
             else:
                 # 清空版本列表
-                self.window.instance_version_combo.clear()
-                self.window.instance_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))
+                self._clear_version_list()
         except Exception as e:
             # 静默处理错误，避免崩溃
             pass
 
-    def _load_versions(self, minecraft_path):
-        """加载Minecraft版本列表"""
+    def _load_version_list(self, minecraft_path):
+        """加载Minecraft版本列表（显示为可点击的卡片）"""
         import os
         try:
             versions_path = os.path.join(minecraft_path, "versions")
-            self.window.instance_version_combo.clear()
-            self.window.instance_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))
+            self._clear_version_list()
+
+            # 添加根目录（resourcepacks）选项
+            self._add_version_item(minecraft_path, self.window.language_manager.translate("instance_version_root"))
 
             if os.path.exists(versions_path) and os.path.isdir(versions_path):
                 for item in sorted(os.listdir(versions_path)):
                     item_path = os.path.join(versions_path, item)
                     if os.path.isdir(item_path):
-                        self.window.instance_version_combo.addItem(item)
+                        self._add_version_item(minecraft_path, item, is_version=True)
         except Exception as e:
             # 静默处理错误，避免崩溃
             pass
 
-    def _on_version_changed(self, version):
-        """版本选择变化"""
-        import os
-        try:
-            path = self.window.instance_path_input.text().strip()
-            if not path or not os.path.exists(path):
-                return
+    def _clear_version_list(self):
+        """清空版本列表"""
+        if hasattr(self.window, 'instance_version_list_container'):
+            # 清空现有列表
+            while self.window.instance_version_list_container.count() > 0:
+                child = self.window.instance_version_list_container.takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
 
-            root_item = self.window.language_manager.translate("instance_version_root")
-            if version == root_item or not version:
-                # 显示根目录
-                self.window.file_explorer.set_minecraft_path(path)
-            else:
-                # 显示版本的resourcepacks
-                self.window.file_explorer.navigate_to_version_resourcepacks(version)
-        except Exception as e:
-            # 静默处理错误，避免崩溃
-            pass
+    def _add_version_item(self, minecraft_path, version_name, is_version=False):
+        """添加一个版本项到列表"""
+        from widgets import ClickableLabel, make_transparent
+        from utils import load_svg_icon, scale_icon_for_display
 
-    def _show_root_directory(self):
-        """显示根目录"""
-        path = self.window.instance_path_input.text().strip()
-        if path and os.path.exists(path):
-            self.window.file_explorer.set_minecraft_path(path)
+        # 创建版本卡片
+        version_card = ClickableLabel()
+        version_card.setFixedHeight(self._scale_size(48))  # 版本卡片保持原高度48
+        version_card.setStyleSheet(f"""
+            ClickableLabel {{
+                background: rgba(255, 255, 255, 0.08);
+                border-radius: {self._scale_size(8)}px;
+            }}
+            ClickableLabel:hover {{
+                background: rgba(255, 255, 255, 0.15);
+            }}
+            ClickableLabel:pressed {{
+                background: rgba(255, 255, 255, 0.12);
+            }}
+        """)
+        version_card.setCursor(Qt.CursorShape.PointingHandCursor)
 
-    def _show_root_resourcepacks_directory(self):
-        """显示根目录的resourcepacks目录"""
-        import os
-        try:
-            path = self.window.instance_path_input.text().strip()
+        # 确定资源包路径
+        if is_version:
+            resourcepacks_path = os.path.join(minecraft_path, "versions", version_name, "resourcepacks")
+            display_name = version_name
+        else:
+            resourcepacks_path = os.path.join(minecraft_path, "resourcepacks")
+            display_name = self.window.language_manager.translate("instance_version_root")
 
-            if not path or not os.path.exists(path):
-                return
+        # 点击事件：导航到资源包页面
+        version_card.setCallback(lambda rp=resourcepacks_path, dn=display_name: self._navigate_to_resourcepack_page(dn, rp))
 
-            # 导航到根目录的resourcepacks文件夹
-            resourcepacks_path = os.path.join(path, "resourcepacks")
-            if os.path.exists(resourcepacks_path):
-                self.window.file_explorer.set_minecraft_path(path)
-                self.window.file_explorer.navigate_to_directory(resourcepacks_path)
-            else:
-                # 如果没有resourcepacks文件夹，显示根目录
-                self.window.file_explorer.set_minecraft_path(path)
-        except Exception as e:
-            # 静默处理错误，避免崩溃
-            pass
+        # 卡片内容
+        card_layout = QHBoxLayout(version_card)
+        card_layout.setContentsMargins(self._scale_size(12), 0, self._scale_size(12), 0)
+        card_layout.setSpacing(self._scale_size(10))
 
-    def _show_version_resourcepacks_directory(self):
-        """显示版本的resourcepacks目录"""
-        import os
-        try:
-            path = self.window.instance_path_input.text().strip()
-            version = self.window.instance_version_combo.currentText()
+        # 图标
+        icon_label = QLabel()
+        icon_label.setFixedSize(self._scale_size(32), self._scale_size(32))  # 版本卡片图标保持原尺寸
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_label.setStyleSheet("background:transparent;")
+        icon_pixmap = load_svg_icon("svg/box-fill.svg", self.dpi_scale)
+        if icon_pixmap:
+            icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20, self.dpi_scale))  # 版本卡片图标显示保持原尺寸
+        card_layout.addWidget(icon_label)
 
-            if not path or not os.path.exists(path):
-                return
+        # 版本名称
+        name_label = QLabel(display_name)
+        name_label.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:'{self._get_font_family()}';background:transparent;")
+        card_layout.addWidget(name_label)
+        card_layout.addStretch()
 
-            root_item = self.window.language_manager.translate("instance_version_root")
-            if version == root_item or not version:
-                # 显示根目录的resourcepacks
-                resourcepacks_path = os.path.join(path, "resourcepacks")
-                if os.path.exists(resourcepacks_path):
-                    self.window.file_explorer.set_minecraft_path(path)
-                    self.window.file_explorer.navigate_to_directory(resourcepacks_path)
-                else:
-                    self.window.file_explorer.set_minecraft_path(path)
-            else:
-                # 显示版本的resourcepacks
-                self.window.file_explorer.navigate_to_version_resourcepacks(version)
-        except Exception as e:
-            # 静默处理错误，避免崩溃
-            pass
-        # 获取系统字体
-        families = QFontDatabase.families()
-        # 过滤一些常见的系统字体
-        common_fonts = ["Microsoft YaHei UI", "Microsoft YaHei", "SimSun", "SimHei", "Arial", "Tahoma", "Verdana", "Segoe UI"]
-        for font in common_fonts:
-            if font in families:
-                self.window.font_combo.addItem(font)
-        # 添加剩余字体
-        for font in families:
-            if font not in common_fonts:
-                self.window.font_combo.addItem(font)
+        # 箭头图标
+        arrow_label = QLabel()
+        arrow_label.setFixedSize(self._scale_size(20), self._scale_size(20))
+        arrow_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        arrow_label.setStyleSheet("background:transparent;")
+        arrow_pixmap = load_svg_icon("svg/arrow-bar-right.svg", self.dpi_scale)
+        if arrow_pixmap:
+            arrow_label.setPixmap(scale_icon_for_display(arrow_pixmap, 16, self.dpi_scale))
+        card_layout.addWidget(arrow_label)
 
-        # 设置当前字体
-        current_font = self.window.config.get("custom_font_family", "Microsoft YaHei UI")
-        for i in range(self.window.font_combo.count()):
-            if self.window.font_combo.itemText(i) == current_font:
-                self.window.font_combo.setCurrentIndex(i)
-                break
+        self.window.instance_version_list_container.addWidget(version_card)
 
-        # 连接字体选择事件
-        self.window.font_combo.currentTextChanged.connect(self.window.on_font_family_changed)
+    def _navigate_to_resourcepack_page(self, title, resourcepacks_path):
+        """导航到资源包页面（第二层）"""
+        resourcepack_page = self._create_instance_resourcepack_page(title, resourcepacks_path)
+        self.window.instance_stack.addWidget(resourcepack_page)
+        self.window.instance_stack.setCurrentWidget(resourcepack_page)
 
-        font_select_layout.addWidget(self.window.font_combo)
-
-        self.window.font_select_widget.setVisible(self.window.config.get("font_mode") == 0)
+    def _navigate_instance_back(self):
+        """返回上一页"""
+        current_widget = self.window.instance_stack.currentWidget()
+        if current_widget:
+            self.window.instance_stack.removeWidget(current_widget)
+            current_widget.deleteLater()
 
         return self.window.font_select_widget
 
@@ -1211,103 +1349,120 @@ class UIBuilder:
                 self.window.config_manager.save_config()
 
                 # 加载版本列表
-                self._load_versions(path)
+                self._load_version_list(path)
             else:
                 # 清空版本列表
-                self.window.instance_version_combo.clear()
-                self.window.instance_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))
+                self._clear_version_list()
         except Exception as e:
             # 静默处理错误，避免崩溃
             pass
 
-    def _load_versions(self, minecraft_path):
-        """加载Minecraft版本列表"""
+    def _load_version_list(self, minecraft_path):
+        """加载Minecraft版本列表（显示为可点击的卡片）"""
         import os
         try:
             versions_path = os.path.join(minecraft_path, "versions")
-            self.window.instance_version_combo.clear()
-            self.window.instance_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))
+            self._clear_version_list()
+
+            # 添加根目录（resourcepacks）选项
+            self._add_version_item(minecraft_path, self.window.language_manager.translate("instance_version_root"))
 
             if os.path.exists(versions_path) and os.path.isdir(versions_path):
                 for item in sorted(os.listdir(versions_path)):
                     item_path = os.path.join(versions_path, item)
                     if os.path.isdir(item_path):
-                        self.window.instance_version_combo.addItem(item)
+                        self._add_version_item(minecraft_path, item, is_version=True)
         except Exception as e:
             # 静默处理错误，避免崩溃
             pass
 
-    def _on_version_changed(self, version):
-        """版本选择变化"""
-        import os
-        try:
-            path = self.window.instance_path_input.text().strip()
-            if not path or not os.path.exists(path):
-                return
+    def _clear_version_list(self):
+        """清空版本列表"""
+        if hasattr(self.window, 'instance_version_list_container'):
+            # 清空现有列表
+            while self.window.instance_version_list_container.count() > 0:
+                child = self.window.instance_version_list_container.takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
 
-            root_item = self.window.language_manager.translate("instance_version_root")
-            if version == root_item or not version:
-                # 显示根目录
-                self.window.file_explorer.set_minecraft_path(path)
-            else:
-                # 显示版本的resourcepacks
-                self.window.file_explorer.navigate_to_version_resourcepacks(version)
-        except Exception as e:
-            # 静默处理错误，避免崩溃
-            pass
+    def _add_version_item(self, minecraft_path, version_name, is_version=False):
+        """添加一个版本项到列表"""
+        from widgets import ClickableLabel, make_transparent
+        from utils import load_svg_icon, scale_icon_for_display
 
-    def _show_root_directory(self):
-        """显示根目录"""
-        path = self.window.instance_path_input.text().strip()
-        if path and os.path.exists(path):
-            self.window.file_explorer.set_minecraft_path(path)
+        # 创建版本卡片
+        version_card = ClickableLabel()
+        version_card.setFixedHeight(self._scale_size(48))  # 版本卡片保持原高度48
+        version_card.setStyleSheet(f"""
+            ClickableLabel {{
+                background: rgba(255, 255, 255, 0.08);
+                border-radius: {self._scale_size(8)}px;
+            }}
+            ClickableLabel:hover {{
+                background: rgba(255, 255, 255, 0.15);
+            }}
+            ClickableLabel:pressed {{
+                background: rgba(255, 255, 255, 0.12);
+            }}
+        """)
+        version_card.setCursor(Qt.CursorShape.PointingHandCursor)
 
-    def _show_root_resourcepacks_directory(self):
-        """显示根目录的resourcepacks目录"""
-        import os
-        try:
-            path = self.window.instance_path_input.text().strip()
+        # 确定资源包路径
+        if is_version:
+            resourcepacks_path = os.path.join(minecraft_path, "versions", version_name, "resourcepacks")
+            display_name = version_name
+        else:
+            resourcepacks_path = os.path.join(minecraft_path, "resourcepacks")
+            display_name = self.window.language_manager.translate("instance_version_root")
 
-            if not path or not os.path.exists(path):
-                return
+        # 点击事件：导航到资源包页面
+        version_card.setCallback(lambda rp=resourcepacks_path, dn=display_name: self._navigate_to_resourcepack_page(dn, rp))
 
-            # 导航到根目录的resourcepacks文件夹
-            resourcepacks_path = os.path.join(path, "resourcepacks")
-            if os.path.exists(resourcepacks_path):
-                self.window.file_explorer.set_minecraft_path(path)
-                self.window.file_explorer.navigate_to_directory(resourcepacks_path)
-            else:
-                # 如果没有resourcepacks文件夹，显示根目录
-                self.window.file_explorer.set_minecraft_path(path)
-        except Exception as e:
-            # 静默处理错误，避免崩溃
-            pass
+        # 卡片内容
+        card_layout = QHBoxLayout(version_card)
+        card_layout.setContentsMargins(self._scale_size(12), 0, self._scale_size(12), 0)
+        card_layout.setSpacing(self._scale_size(10))
 
-    def _show_version_resourcepacks_directory(self):
-        """显示版本的resourcepacks目录"""
-        import os
-        try:
-            path = self.window.instance_path_input.text().strip()
-            version = self.window.instance_version_combo.currentText()
+        # 图标
+        icon_label = QLabel()
+        icon_label.setFixedSize(self._scale_size(32), self._scale_size(32))  # 版本卡片图标保持原尺寸
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_label.setStyleSheet("background:transparent;")
+        icon_pixmap = load_svg_icon("svg/box-fill.svg", self.dpi_scale)
+        if icon_pixmap:
+            icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20, self.dpi_scale))  # 版本卡片图标显示保持原尺寸
+        card_layout.addWidget(icon_label)
 
-            if not path or not os.path.exists(path):
-                return
+        # 版本名称
+        name_label = QLabel(display_name)
+        name_label.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:'{self._get_font_family()}';background:transparent;")
+        card_layout.addWidget(name_label)
+        card_layout.addStretch()
 
-            root_item = self.window.language_manager.translate("instance_version_root")
-            if version == root_item or not version:
-                # 显示根目录的resourcepacks
-                resourcepacks_path = os.path.join(path, "resourcepacks")
-                if os.path.exists(resourcepacks_path):
-                    self.window.file_explorer.set_minecraft_path(path)
-                    self.window.file_explorer.navigate_to_directory(resourcepacks_path)
-                else:
-                    self.window.file_explorer.set_minecraft_path(path)
-            else:
-                # 显示版本的resourcepacks
-                self.window.file_explorer.navigate_to_version_resourcepacks(version)
-        except Exception as e:
-            # 静默处理错误，避免崩溃
-            pass
+        # 箭头图标
+        arrow_label = QLabel()
+        arrow_label.setFixedSize(self._scale_size(20), self._scale_size(20))
+        arrow_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        arrow_label.setStyleSheet("background:transparent;")
+        arrow_pixmap = load_svg_icon("svg/arrow-bar-right.svg", self.dpi_scale)
+        if arrow_pixmap:
+            arrow_label.setPixmap(scale_icon_for_display(arrow_pixmap, 16, self.dpi_scale))
+        card_layout.addWidget(arrow_label)
+
+        self.window.instance_version_list_container.addWidget(version_card)
+
+    def _navigate_to_resourcepack_page(self, title, resourcepacks_path):
+        """导航到资源包页面（第二层）"""
+        resourcepack_page = self._create_instance_resourcepack_page(title, resourcepacks_path)
+        self.window.instance_stack.addWidget(resourcepack_page)
+        self.window.instance_stack.setCurrentWidget(resourcepack_page)
+
+    def _navigate_instance_back(self):
+        """返回上一页"""
+        current_widget = self.window.instance_stack.currentWidget()
+        if current_widget:
+            self.window.instance_stack.removeWidget(current_widget)
+            current_widget.deleteLater()
         # 添加语言选项
         languages = self.window.language_manager.get_all_languages()
         for lang_code, display_name in languages:
@@ -1704,103 +1859,120 @@ class UIBuilder:
                 self.window.config_manager.save_config()
 
                 # 加载版本列表
-                self._load_versions(path)
+                self._load_version_list(path)
             else:
                 # 清空版本列表
-                self.window.instance_version_combo.clear()
-                self.window.instance_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))
+                self._clear_version_list()
         except Exception as e:
             # 静默处理错误，避免崩溃
             pass
 
-    def _load_versions(self, minecraft_path):
-        """加载Minecraft版本列表"""
+    def _load_version_list(self, minecraft_path):
+        """加载Minecraft版本列表（显示为可点击的卡片）"""
         import os
         try:
             versions_path = os.path.join(minecraft_path, "versions")
-            self.window.instance_version_combo.clear()
-            self.window.instance_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))
+            self._clear_version_list()
+
+            # 添加根目录（resourcepacks）选项
+            self._add_version_item(minecraft_path, self.window.language_manager.translate("instance_version_root"))
 
             if os.path.exists(versions_path) and os.path.isdir(versions_path):
                 for item in sorted(os.listdir(versions_path)):
                     item_path = os.path.join(versions_path, item)
                     if os.path.isdir(item_path):
-                        self.window.instance_version_combo.addItem(item)
+                        self._add_version_item(minecraft_path, item, is_version=True)
         except Exception as e:
             # 静默处理错误，避免崩溃
             pass
 
-    def _on_version_changed(self, version):
-        """版本选择变化"""
-        import os
-        try:
-            path = self.window.instance_path_input.text().strip()
-            if not path or not os.path.exists(path):
-                return
+    def _clear_version_list(self):
+        """清空版本列表"""
+        if hasattr(self.window, 'instance_version_list_container'):
+            # 清空现有列表
+            while self.window.instance_version_list_container.count() > 0:
+                child = self.window.instance_version_list_container.takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
 
-            root_item = self.window.language_manager.translate("instance_version_root")
-            if version == root_item or not version:
-                # 显示根目录
-                self.window.file_explorer.set_minecraft_path(path)
-            else:
-                # 显示版本的resourcepacks
-                self.window.file_explorer.navigate_to_version_resourcepacks(version)
-        except Exception as e:
-            # 静默处理错误，避免崩溃
-            pass
+    def _add_version_item(self, minecraft_path, version_name, is_version=False):
+        """添加一个版本项到列表"""
+        from widgets import ClickableLabel, make_transparent
+        from utils import load_svg_icon, scale_icon_for_display
 
-    def _show_root_directory(self):
-        """显示根目录"""
-        path = self.window.instance_path_input.text().strip()
-        if path and os.path.exists(path):
-            self.window.file_explorer.set_minecraft_path(path)
+        # 创建版本卡片
+        version_card = ClickableLabel()
+        version_card.setFixedHeight(self._scale_size(48))  # 版本卡片保持原高度48
+        version_card.setStyleSheet(f"""
+            ClickableLabel {{
+                background: rgba(255, 255, 255, 0.08);
+                border-radius: {self._scale_size(8)}px;
+            }}
+            ClickableLabel:hover {{
+                background: rgba(255, 255, 255, 0.15);
+            }}
+            ClickableLabel:pressed {{
+                background: rgba(255, 255, 255, 0.12);
+            }}
+        """)
+        version_card.setCursor(Qt.CursorShape.PointingHandCursor)
 
-    def _show_root_resourcepacks_directory(self):
-        """显示根目录的resourcepacks目录"""
-        import os
-        try:
-            path = self.window.instance_path_input.text().strip()
+        # 确定资源包路径
+        if is_version:
+            resourcepacks_path = os.path.join(minecraft_path, "versions", version_name, "resourcepacks")
+            display_name = version_name
+        else:
+            resourcepacks_path = os.path.join(minecraft_path, "resourcepacks")
+            display_name = self.window.language_manager.translate("instance_version_root")
 
-            if not path or not os.path.exists(path):
-                return
+        # 点击事件：导航到资源包页面
+        version_card.setCallback(lambda rp=resourcepacks_path, dn=display_name: self._navigate_to_resourcepack_page(dn, rp))
 
-            # 导航到根目录的resourcepacks文件夹
-            resourcepacks_path = os.path.join(path, "resourcepacks")
-            if os.path.exists(resourcepacks_path):
-                self.window.file_explorer.set_minecraft_path(path)
-                self.window.file_explorer.navigate_to_directory(resourcepacks_path)
-            else:
-                # 如果没有resourcepacks文件夹，显示根目录
-                self.window.file_explorer.set_minecraft_path(path)
-        except Exception as e:
-            # 静默处理错误，避免崩溃
-            pass
+        # 卡片内容
+        card_layout = QHBoxLayout(version_card)
+        card_layout.setContentsMargins(self._scale_size(12), 0, self._scale_size(12), 0)
+        card_layout.setSpacing(self._scale_size(10))
 
-    def _show_version_resourcepacks_directory(self):
-        """显示版本的resourcepacks目录"""
-        import os
-        try:
-            path = self.window.instance_path_input.text().strip()
-            version = self.window.instance_version_combo.currentText()
+        # 图标
+        icon_label = QLabel()
+        icon_label.setFixedSize(self._scale_size(32), self._scale_size(32))  # 版本卡片图标保持原尺寸
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_label.setStyleSheet("background:transparent;")
+        icon_pixmap = load_svg_icon("svg/box-fill.svg", self.dpi_scale)
+        if icon_pixmap:
+            icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20, self.dpi_scale))  # 版本卡片图标显示保持原尺寸
+        card_layout.addWidget(icon_label)
 
-            if not path or not os.path.exists(path):
-                return
+        # 版本名称
+        name_label = QLabel(display_name)
+        name_label.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:'{self._get_font_family()}';background:transparent;")
+        card_layout.addWidget(name_label)
+        card_layout.addStretch()
 
-            root_item = self.window.language_manager.translate("instance_version_root")
-            if version == root_item or not version:
-                # 显示根目录的resourcepacks
-                resourcepacks_path = os.path.join(path, "resourcepacks")
-                if os.path.exists(resourcepacks_path):
-                    self.window.file_explorer.set_minecraft_path(path)
-                    self.window.file_explorer.navigate_to_directory(resourcepacks_path)
-                else:
-                    self.window.file_explorer.set_minecraft_path(path)
-            else:
-                # 显示版本的resourcepacks
-                self.window.file_explorer.navigate_to_version_resourcepacks(version)
-        except Exception as e:
-            # 静默处理错误，避免崩溃
-            pass
+        # 箭头图标
+        arrow_label = QLabel()
+        arrow_label.setFixedSize(self._scale_size(20), self._scale_size(20))
+        arrow_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        arrow_label.setStyleSheet("background:transparent;")
+        arrow_pixmap = load_svg_icon("svg/arrow-bar-right.svg", self.dpi_scale)
+        if arrow_pixmap:
+            arrow_label.setPixmap(scale_icon_for_display(arrow_pixmap, 16, self.dpi_scale))
+        card_layout.addWidget(arrow_label)
+
+        self.window.instance_version_list_container.addWidget(version_card)
+
+    def _navigate_to_resourcepack_page(self, title, resourcepacks_path):
+        """导航到资源包页面（第二层）"""
+        resourcepack_page = self._create_instance_resourcepack_page(title, resourcepacks_path)
+        self.window.instance_stack.addWidget(resourcepack_page)
+        self.window.instance_stack.setCurrentWidget(resourcepack_page)
+
+    def _navigate_instance_back(self):
+        """返回上一页"""
+        current_widget = self.window.instance_stack.currentWidget()
+        if current_widget:
+            self.window.instance_stack.removeWidget(current_widget)
+            current_widget.deleteLater()
 
     def _update_expandable_menu_font(self, container, font_family):
         """更新可展开菜单的字体"""
@@ -1990,100 +2162,117 @@ class UIBuilder:
                 self.window.config_manager.save_config()
 
                 # 加载版本列表
-                self._load_versions(path)
+                self._load_version_list(path)
             else:
                 # 清空版本列表
-                self.window.instance_version_combo.clear()
-                self.window.instance_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))
+                self._clear_version_list()
         except Exception as e:
             # 静默处理错误，避免崩溃
             pass
 
-    def _load_versions(self, minecraft_path):
-        """加载Minecraft版本列表"""
+    def _load_version_list(self, minecraft_path):
+        """加载Minecraft版本列表（显示为可点击的卡片）"""
         import os
         try:
             versions_path = os.path.join(minecraft_path, "versions")
-            self.window.instance_version_combo.clear()
-            self.window.instance_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))
+            self._clear_version_list()
+
+            # 添加根目录（resourcepacks）选项
+            self._add_version_item(minecraft_path, self.window.language_manager.translate("instance_version_root"))
 
             if os.path.exists(versions_path) and os.path.isdir(versions_path):
                 for item in sorted(os.listdir(versions_path)):
                     item_path = os.path.join(versions_path, item)
                     if os.path.isdir(item_path):
-                        self.window.instance_version_combo.addItem(item)
+                        self._add_version_item(minecraft_path, item, is_version=True)
         except Exception as e:
             # 静默处理错误，避免崩溃
             pass
 
-    def _on_version_changed(self, version):
-        """版本选择变化"""
-        import os
-        try:
-            path = self.window.instance_path_input.text().strip()
-            if not path or not os.path.exists(path):
-                return
+    def _clear_version_list(self):
+        """清空版本列表"""
+        if hasattr(self.window, 'instance_version_list_container'):
+            # 清空现有列表
+            while self.window.instance_version_list_container.count() > 0:
+                child = self.window.instance_version_list_container.takeAt(0)
+                if child.widget():
+                    child.widget().deleteLater()
 
-            root_item = self.window.language_manager.translate("instance_version_root")
-            if version == root_item or not version:
-                # 显示根目录
-                self.window.file_explorer.set_minecraft_path(path)
-            else:
-                # 显示版本的resourcepacks
-                self.window.file_explorer.navigate_to_version_resourcepacks(version)
-        except Exception as e:
-            # 静默处理错误，避免崩溃
-            pass
+    def _add_version_item(self, minecraft_path, version_name, is_version=False):
+        """添加一个版本项到列表"""
+        from widgets import ClickableLabel, make_transparent
+        from utils import load_svg_icon, scale_icon_for_display
 
-    def _show_root_directory(self):
-        """显示根目录"""
-        path = self.window.instance_path_input.text().strip()
-        if path and os.path.exists(path):
-            self.window.file_explorer.set_minecraft_path(path)
+        # 创建版本卡片
+        version_card = ClickableLabel()
+        version_card.setFixedHeight(self._scale_size(48))  # 版本卡片保持原高度48
+        version_card.setStyleSheet(f"""
+            ClickableLabel {{
+                background: rgba(255, 255, 255, 0.08);
+                border-radius: {self._scale_size(8)}px;
+            }}
+            ClickableLabel:hover {{
+                background: rgba(255, 255, 255, 0.15);
+            }}
+            ClickableLabel:pressed {{
+                background: rgba(255, 255, 255, 0.12);
+            }}
+        """)
+        version_card.setCursor(Qt.CursorShape.PointingHandCursor)
 
-    def _show_root_resourcepacks_directory(self):
-        """显示根目录的resourcepacks目录"""
-        import os
-        try:
-            path = self.window.instance_path_input.text().strip()
+        # 确定资源包路径
+        if is_version:
+            resourcepacks_path = os.path.join(minecraft_path, "versions", version_name, "resourcepacks")
+            display_name = version_name
+        else:
+            resourcepacks_path = os.path.join(minecraft_path, "resourcepacks")
+            display_name = self.window.language_manager.translate("instance_version_root")
 
-            if not path or not os.path.exists(path):
-                return
+        # 点击事件：导航到资源包页面
+        version_card.setCallback(lambda rp=resourcepacks_path, dn=display_name: self._navigate_to_resourcepack_page(dn, rp))
 
-            # 导航到根目录的resourcepacks文件夹
-            resourcepacks_path = os.path.join(path, "resourcepacks")
-            if os.path.exists(resourcepacks_path):
-                self.window.file_explorer.set_minecraft_path(path)
-                self.window.file_explorer.navigate_to_directory(resourcepacks_path)
-            else:
-                # 如果没有resourcepacks文件夹，显示根目录
-                self.window.file_explorer.set_minecraft_path(path)
-        except Exception as e:
-            # 静默处理错误，避免崩溃
-            pass
+        # 卡片内容
+        card_layout = QHBoxLayout(version_card)
+        card_layout.setContentsMargins(self._scale_size(12), 0, self._scale_size(12), 0)
+        card_layout.setSpacing(self._scale_size(10))
 
-    def _show_version_resourcepacks_directory(self):
-        """显示版本的resourcepacks目录"""
-        import os
-        try:
-            path = self.window.instance_path_input.text().strip()
-            version = self.window.instance_version_combo.currentText()
+        # 图标
+        icon_label = QLabel()
+        icon_label.setFixedSize(self._scale_size(32), self._scale_size(32))  # 版本卡片图标保持原尺寸
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_label.setStyleSheet("background:transparent;")
+        icon_pixmap = load_svg_icon("svg/box-fill.svg", self.dpi_scale)
+        if icon_pixmap:
+            icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20, self.dpi_scale))  # 版本卡片图标显示保持原尺寸
+        card_layout.addWidget(icon_label)
 
-            if not path or not os.path.exists(path):
-                return
+        # 版本名称
+        name_label = QLabel(display_name)
+        name_label.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:'{self._get_font_family()}';background:transparent;")
+        card_layout.addWidget(name_label)
+        card_layout.addStretch()
 
-            root_item = self.window.language_manager.translate("instance_version_root")
-            if version == root_item or not version:
-                # 显示根目录的resourcepacks
-                resourcepacks_path = os.path.join(path, "resourcepacks")
-                if os.path.exists(resourcepacks_path):
-                    self.window.file_explorer.set_minecraft_path(path)
-                    self.window.file_explorer.navigate_to_directory(resourcepacks_path)
-                else:
-                    self.window.file_explorer.set_minecraft_path(path)
-            else:
-                # 显示版本的resourcepacks
-                self.window.file_explorer.navigate_to_version_resourcepacks(version)
-        except Exception as e:
-            # 静默处理错误，避免崩溃
-            pass
+        # 箭头图标
+        arrow_label = QLabel()
+        arrow_label.setFixedSize(self._scale_size(20), self._scale_size(20))
+        arrow_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        arrow_label.setStyleSheet("background:transparent;")
+        arrow_pixmap = load_svg_icon("svg/arrow-bar-right.svg", self.dpi_scale)
+        if arrow_pixmap:
+            arrow_label.setPixmap(scale_icon_for_display(arrow_pixmap, 16, self.dpi_scale))
+        card_layout.addWidget(arrow_label)
+
+        self.window.instance_version_list_container.addWidget(version_card)
+
+    def _navigate_to_resourcepack_page(self, title, resourcepacks_path):
+        """导航到资源包页面（第二层）"""
+        resourcepack_page = self._create_instance_resourcepack_page(title, resourcepacks_path)
+        self.window.instance_stack.addWidget(resourcepack_page)
+        self.window.instance_stack.setCurrentWidget(resourcepack_page)
+
+    def _navigate_instance_back(self):
+        """返回上一页"""
+        current_widget = self.window.instance_stack.currentWidget()
+        if current_widget:
+            self.window.instance_stack.removeWidget(current_widget)
+            current_widget.deleteLater()

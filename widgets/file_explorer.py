@@ -1,21 +1,25 @@
 """文件浏览器组件"""
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTreeWidget, QTreeWidgetItem, QHeaderView, QFileDialog
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, pyqtSignal, QSize
+from PyQt6.QtGui import QFont, QPixmap, QIcon
 import os
+import zipfile
+import tempfile
 
 
 class FileExplorer(QWidget):
     """文件浏览器组件"""
-    
+
     file_selected = pyqtSignal(str)  # 文件选择信号
-    
+
     def __init__(self, parent=None, dpi_scale=1.0):
         super().__init__(parent)
         self.dpi_scale = dpi_scale
         self.current_path = None
-        self.root_path = None
+        self.root_path = None  # 保存minecraft路径
+        self.base_path = None  # 保存当前resourcepacks路径作为返回的根目录
+        self.resourcepack_mode = False  # 是否为资源包浏览模式
         self._init_ui()
     
     def _init_ui(self):
@@ -23,7 +27,7 @@ class FileExplorer(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        
+
         # 工具栏
         toolbar = QWidget()
         toolbar.setFixedHeight(int(36 * self.dpi_scale))
@@ -31,8 +35,8 @@ class FileExplorer(QWidget):
         toolbar_layout = QHBoxLayout(toolbar)
         toolbar_layout.setContentsMargins(int(12 * self.dpi_scale), 0, int(12 * self.dpi_scale), 0)
         toolbar_layout.setSpacing(int(8 * self.dpi_scale))
-        
-        # 当前路径标签
+
+        # 当前路径标签（默认隐藏）
         self.path_label = QLabel("未选择路径")
         self.path_label.setStyleSheet(f"""
             QLabel {{
@@ -42,9 +46,9 @@ class FileExplorer(QWidget):
             }}
         """)
         toolbar_layout.addWidget(self.path_label)
-        
+
         toolbar_layout.addStretch()
-        
+
         # 返回按钮
         self.back_btn = QPushButton("返回根目录")
         self.back_btn.setFixedHeight(int(24 * self.dpi_scale))
@@ -68,14 +72,16 @@ class FileExplorer(QWidget):
         self.back_btn.clicked.connect(self.navigate_to_root)
         self.back_btn.setEnabled(False)
         toolbar_layout.addWidget(self.back_btn)
-        
+
         layout.addWidget(toolbar)
         
         # 文件树
         self.file_tree = QTreeWidget()
-        self.file_tree.setHeaderHidden(False)
-        self.file_tree.setColumnCount(2)
-        self.file_tree.setHeaderLabels(["名称", "大小"])
+        self.file_tree.setHeaderHidden(True)  # 隐藏表头（包含名称和大小列）
+        self.file_tree.setColumnCount(1)  # 只显示一列（名称）
+        # 设置图标大小（88px，适配卡片高度96px）
+        self.file_tree.setIconSize(QSize(int(88 * self.dpi_scale), int(88 * self.dpi_scale)))
+        # 设置资源包项目的高度（DPI缩放前的96px）
         self.file_tree.setStyleSheet(f"""
             QTreeWidget {{
                 background: rgba(0, 0, 0, 0.2);
@@ -85,6 +91,7 @@ class FileExplorer(QWidget):
             }}
             QTreeWidget::item {{
                 padding: {int(4 * self.dpi_scale)}px;
+                height: {int(96 * self.dpi_scale)}px;
             }}
             QTreeWidget::item:hover {{
                 background: rgba(255, 255, 255, 0.1);
@@ -136,15 +143,17 @@ class FileExplorer(QWidget):
         layout.addWidget(self.empty_label, 1)
     
     def set_minecraft_path(self, path):
-        """设置Minecraft路径"""
+        """设置Minecraft路径（根目录使用resourcepacks文件夹）"""
         self.root_path = path
         # 根目录应该是 .minecraft/resourcepacks
         resourcepacks_path = os.path.join(path, "resourcepacks")
         self.current_path = resourcepacks_path if os.path.exists(resourcepacks_path) else path
+        self.base_path = self.current_path  # 设置返回根目录的基础路径
         # 统一使用反斜杠显示路径
         display_path = self._format_path_display(self.current_path)
         self.path_label.setText(display_path)
         self.back_btn.setEnabled(False)
+        self.resourcepack_mode = True  # 启用资源包模式
 
         if os.path.exists(self.current_path):
             self.empty_label.hide()
@@ -156,18 +165,27 @@ class FileExplorer(QWidget):
             self.file_tree.hide()
 
     def _format_path_display(self, path):
-        """格式化路径显示（统一使用反斜杠）"""
-        if len(path) < 50:
-            return path.replace("/", "\\")
+        """格式化路径显示（统一使用反斜杠，只显示base_path内的路径）"""
+        # 在资源包模式下，只显示base_path内的路径
+        if self.resourcepack_mode and self.base_path:
+            if path.startswith(self.base_path):
+                # 只显示base_path文件夹内的路径
+                sub_path = path[len(self.base_path):].lstrip(os.sep).lstrip("/")
+                # 统一使用反斜杠
+                sub_path = sub_path.replace("/", "\\")
+                return sub_path if sub_path else "资源包文件夹"
+
+        # 默认显示完整路径
+        full_path = path.replace("/", "\\")
+        if len(full_path) < 50:
+            return full_path
         else:
-            return "..." + path[-47:].replace("/", "\\")
-    
+            return "..." + full_path[-47:]
+
     def navigate_to_root(self):
-        """返回根目录（resourcepacks文件夹）"""
-        if self.root_path:
-            # 根目录应该是 .minecraft/resourcepacks
-            resourcepacks_path = os.path.join(self.root_path, "resourcepacks")
-            self.current_path = resourcepacks_path if os.path.exists(resourcepacks_path) else self.root_path
+        """返回根目录（base_path，即当前选定的resourcepacks文件夹）"""
+        if self.base_path and os.path.exists(self.base_path):
+            self.current_path = self.base_path
             display_path = self._format_path_display(self.current_path)
             self.path_label.setText(display_path)
             self.back_btn.setEnabled(False)
@@ -188,6 +206,25 @@ class FileExplorer(QWidget):
         self.empty_label.hide()
         self.file_tree.show()
         self._load_directory(path)
+
+    def set_resourcepacks_path(self, path, minecraft_path):
+        """直接设置resourcepacks路径（用于多层级导航）"""
+        self.root_path = minecraft_path
+        self.base_path = path  # 当前resourcepacks路径作为返回的根目录
+        self.current_path = path
+        self.resourcepack_mode = True
+
+        if os.path.exists(self.current_path):
+            display_path = self._format_path_display(self.current_path)
+            self.path_label.setText(display_path)
+            self.back_btn.setEnabled(False)
+            self.empty_label.hide()
+            self.file_tree.show()
+            self._load_directory(self.current_path)
+        else:
+            self.empty_label.setText(f"路径不存在: {self.current_path}")
+            self.empty_label.show()
+            self.file_tree.hide()
     
     def navigate_to_version_resourcepacks(self, version_name):
         """导航到指定版本的resourcepacks文件夹"""
@@ -265,16 +302,18 @@ class FileExplorer(QWidget):
                 item = QTreeWidgetItem()
                 item.setText(0, name)
 
+                # 资源包模式：显示pack.png图标
+                if self.resourcepack_mode and (is_dir or name.endswith('.zip')):
+                    icon = self._get_resourcepack_icon(full_path, is_dir)
+                    if icon:
+                        item.setIcon(0, icon)
+
                 if is_dir:
-                    # 只在图标不为None时才设置图标
-                    folder_icon = self._get_folder_icon()
-                    if folder_icon is not None:
-                        item.setIcon(0, folder_icon)
                     item.setData(0, Qt.ItemDataRole.UserRole, full_path)
                     # 添加占位子项
                     QTreeWidgetItem(item).setText(0, "...")
                 else:
-                    item.setText(1, self._format_size(os.path.getsize(full_path)))
+                    # 文件：设置路径（不再显示大小）
                     item.setData(0, Qt.ItemDataRole.UserRole, full_path)
 
                 self.file_tree.addTopLevelItem(item)
@@ -304,6 +343,52 @@ class FileExplorer(QWidget):
         """获取文件夹图标"""
         # 可以根据需要返回不同的图标
         return None
+
+    def _get_resourcepack_icon(self, full_path, is_dir):
+        """获取资源包图标（pack.png），图标大小适配卡片高度96px"""
+        try:
+            icon_path = None
+
+            if is_dir:
+                # 文件夹形式的资源包
+                icon_path = os.path.join(full_path, "pack.png")
+                if os.path.exists(icon_path):
+                    pixmap = QPixmap(icon_path)
+                    if not pixmap.isNull():
+                        # 缩放图标以适配卡片高度（96px，留一些padding）
+                        icon_size = int(88 * self.dpi_scale)
+                        scaled_pixmap = pixmap.scaled(
+                            icon_size, icon_size,
+                            Qt.AspectRatioMode.KeepAspectRatio,
+                            Qt.TransformationMode.SmoothTransformation
+                        )
+                        return QIcon(scaled_pixmap)
+            elif full_path.endswith('.zip'):
+                # 压缩包形式的资源包
+                try:
+                    with zipfile.ZipFile(full_path, 'r') as zip_ref:
+                        # 查找pack.png（不区分大小写）
+                        pack_png_files = [f for f in zip_ref.namelist() if f.lower().endswith('pack.png')]
+                        if pack_png_files:
+                            pack_png_path = pack_png_files[0]
+                            with zip_ref.open(pack_png_path) as img_file:
+                                img_data = img_file.read()
+                                pixmap = QPixmap()
+                                if pixmap.loadFromData(img_data):
+                                    # 缩放图标以适配卡片高度（96px，留一些padding）
+                                    icon_size = int(88 * self.dpi_scale)
+                                    scaled_pixmap = pixmap.scaled(
+                                        icon_size, icon_size,
+                                        Qt.AspectRatioMode.KeepAspectRatio,
+                                        Qt.TransformationMode.SmoothTransformation
+                                    )
+                                    return QIcon(scaled_pixmap)
+                except Exception:
+                    pass
+
+            return None
+        except Exception:
+            return None
     
     def _format_size(self, size):
         """格式化文件大小"""
