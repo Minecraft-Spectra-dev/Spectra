@@ -103,7 +103,12 @@ class Window(QWidget):
         self.cursor_timer.timeout.connect(update_cursor_safe)
         self.cursor_timer.start(50)
 
-        if self.config.get("background_mode") == "image" and self.config.get("background_image_path"):
+        # 根据配置加载背景
+        background_mode = self.config.get("background_mode", "image")
+        if background_mode == "solid":
+            color = self.config.get("background_color", "#00000000")
+            self.bg_manager.set_solid_color(color)
+        elif background_mode == "image" and self.config.get("background_image_path"):
             if os.path.exists(self.config.get("background_image_path")):
                 self.set_background_image(self.config.get("background_image_path"))
 

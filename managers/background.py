@@ -39,6 +39,10 @@ class BackgroundManager:
         if not os.path.exists(path):
             return
 
+        # 隐藏纯色背景
+        if self.solid_bg_widget:
+            self.solid_bg_widget.hide()
+
         ext = os.path.splitext(path)[1].lower()
 
         # 视频格式
@@ -115,16 +119,16 @@ class BackgroundManager:
         qcolor = QColor(color)
 
         # 计算灰度值（使用人眼感知的加权公式）
-        r, g, b, _ = qcolor.getRgb()
+        r, g, b, a = qcolor.getRgb()
         luminance = 0.299 * r + 0.587 * g + 0.114 * b
 
         # 如果明度超过90，进行缩放
         if luminance > 90:
             scale_factor = 90 / luminance
-            qcolor.setRgb(int(r * scale_factor), int(g * scale_factor), int(b * scale_factor))
+            qcolor.setRgb(int(r * scale_factor), int(g * scale_factor), int(b * scale_factor), a)
 
         w, h = self.parent.width(), self.parent.height()
-        self.solid_bg_widget.setStyleSheet(f"background:{qcolor.name()};")
+        self.solid_bg_widget.setStyleSheet(f"background:{qcolor.name(QColor.NameFormat.HexArgb)};")
         self.solid_bg_widget.setGeometry(0, 0, w, h)
         self.solid_bg_widget.show()
 
