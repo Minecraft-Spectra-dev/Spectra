@@ -220,6 +220,8 @@ class UIBuilder:
 
     def create_config_page(self):
         """创建设置页面"""
+        from PyQt6.QtWidgets import QScrollArea
+
         page = QWidget()
         page.setStyleSheet("background:transparent;")
         pl = QVBoxLayout(page)
@@ -230,6 +232,51 @@ class UIBuilder:
         title.setStyleSheet(f"color:white;font-size:{self._scale_size(20)}px;font-family:'{self._get_font_family()}';font-weight:bold;")
         pl.addWidget(title)
 
+        # 创建滚动区域
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                background: transparent;
+                border: none;
+            }
+            QScrollBar:vertical {
+                background: rgba(255, 255, 255, 0.1);
+                width: 8px;
+                border-radius: 4px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(255, 255, 255, 0.3);
+                min-height: 20px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: rgba(255, 255, 255, 0.5);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                border: none;
+                background: none;
+                height: 0px;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
+        """)
+
+        # 滚动内容区域
+        scroll_content = QWidget()
+        scroll_content.setStyleSheet("background: transparent;")
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_layout.setSpacing(self._scale_size(15))
+        scroll_layout.addStretch()
+
+        scroll_area.setWidget(scroll_content)
+        pl.addWidget(scroll_area, 1)
+
         # 外观设置容器
         self.window.appearance_container = self.create_expandable_menu(
             self.window.language_manager.translate("settings_appearance"),
@@ -237,7 +284,7 @@ class UIBuilder:
             "svg/palette.svg", "svg/palette-fill.svg",
             content_attr="appearance"
         )
-        pl.addWidget(self.window.appearance_container)
+        scroll_layout.insertWidget(scroll_layout.count() - 1, self.window.appearance_container)
 
         self.window.appearance_content = self.window.appearance_container.layout().itemAt(1).widget()
 
@@ -290,7 +337,7 @@ class UIBuilder:
             toggle_handler=self.window.toggle_language_menu,
             content_attr="language"
         )
-        pl.addWidget(self.window.language_container)
+        scroll_layout.insertWidget(scroll_layout.count() - 1, self.window.language_container)
 
         self.window.language_content = self.window.language_container.layout().itemAt(1).widget()
 
@@ -307,7 +354,7 @@ class UIBuilder:
             toggle_handler=self.window.toggle_font_menu,
             content_attr="font"
         )
-        pl.addWidget(self.window.font_container)
+        scroll_layout.insertWidget(scroll_layout.count() - 1, self.window.font_container)
 
         self.window.font_content = self.window.font_container.layout().itemAt(1).widget()
 
@@ -339,10 +386,12 @@ class UIBuilder:
 
         self.window.font_content.setVisible(False)
 
-        pl.addStretch()
         return page
 
     def create_instance_page(self):
+        """创建实例页面"""
+        from PyQt6.QtWidgets import QScrollArea
+
         page = QWidget()
         page.setStyleSheet("background:transparent;")
         pl = QVBoxLayout(page)
@@ -353,10 +402,57 @@ class UIBuilder:
         title.setStyleSheet(f"color:white;font-size:{self._scale_size(20)}px;font-family:'{self._get_font_family()}';font-weight:bold;")
         pl.addWidget(title)
 
-        pl.addStretch()
+        # 创建滚动区域
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                background: transparent;
+                border: none;
+            }
+            QScrollBar:vertical {
+                background: rgba(255, 255, 255, 0.1);
+                width: 8px;
+                border-radius: 4px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(255, 255, 255, 0.3);
+                min-height: 20px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: rgba(255, 255, 255, 0.5);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                border: none;
+                background: none;
+                height: 0px;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
+        """)
+
+        # 滚动内容区域
+        scroll_content = QWidget()
+        scroll_content.setStyleSheet("background: transparent;")
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(0, self._scale_size(10), 0, 0)
+        scroll_layout.setSpacing(self._scale_size(15))
+        scroll_layout.addStretch()
+
+        scroll_area.setWidget(scroll_content)
+        pl.addWidget(scroll_area, 1)
+
         return page
 
     def create_download_page(self):
+        """创建下载页面"""
+        from PyQt6.QtWidgets import QScrollArea
+
         page = QWidget()
         page.setStyleSheet("background:transparent;")
         pl = QVBoxLayout(page)
@@ -367,7 +463,51 @@ class UIBuilder:
         title.setStyleSheet(f"color:white;font-size:{self._scale_size(20)}px;font-family:'{self._get_font_family()}';font-weight:bold;")
         pl.addWidget(title)
 
-        pl.addStretch()
+        # 创建滚动区域
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                background: transparent;
+                border: none;
+            }
+            QScrollBar:vertical {
+                background: rgba(255, 255, 255, 0.1);
+                width: 8px;
+                border-radius: 4px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(255, 255, 255, 0.3);
+                min-height: 20px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: rgba(255, 255, 255, 0.5);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                border: none;
+                background: none;
+                height: 0px;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
+        """)
+
+        # 滚动内容区域
+        scroll_content = QWidget()
+        scroll_content.setStyleSheet("background: transparent;")
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(0, self._scale_size(10), 0, 0)
+        scroll_layout.setSpacing(self._scale_size(15))
+        scroll_layout.addStretch()
+
+        scroll_area.setWidget(scroll_content)
+        pl.addWidget(scroll_area, 1)
+
         return page
 
     def _create_opacity_slider(self):

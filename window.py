@@ -274,27 +274,67 @@ class Window(QWidget):
     
     def _create_home_page(self):
         """创建主页"""
+        from PyQt6.QtWidgets import QScrollArea
+
         home_widget = QWidget()
         home_layout = QVBoxLayout(home_widget)
         home_layout.setContentsMargins(self.ui_builder._scale_size(20), 0, self.ui_builder._scale_size(20), self.ui_builder._scale_size(20))
         home_layout.setSpacing(self.ui_builder._scale_size(15))
-        
-        # 添加顶部间距，使卡片与左侧按钮顶部对齐
-        top_spacer = QWidget()
-        top_spacer.setFixedHeight(self.ui_builder._scale_size(10))
-        home_layout.addWidget(top_spacer)
-        
+
+        # 创建滚动区域
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                background: transparent;
+                border: none;
+            }
+            QScrollBar:vertical {
+                background: rgba(255, 255, 255, 0.1);
+                width: 8px;
+                border-radius: 4px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(255, 255, 255, 0.3);
+                min-height: 20px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: rgba(255, 255, 255, 0.5);
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                border: none;
+                background: none;
+                height: 0px;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
+        """)
+
+        # 滚动内容区域
+        scroll_content = QWidget()
+        scroll_content.setStyleSheet("background: transparent;")
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(0, self.ui_builder._scale_size(10), 0, 0)
+        scroll_layout.setSpacing(self.ui_builder._scale_size(15))
+        scroll_layout.addStretch()
+
+        scroll_area.setWidget(scroll_content)
+        home_layout.addWidget(scroll_area, 1)
+
         # 存储新闻卡片的列表
-        home_widget.news_cards = []
-        
+        scroll_content.news_cards = []
+
         # 启动新闻获取线程
         news_url = "https://ipv4-beta.kxcym.top:5244/d/ServerPack/Spectra.json?sign=FrsiElECQW_oWeZRUC2AQLSIz55-uzB-2uKik-_6dBY=:0"
         self.news_thread = NewsFetchThread(news_url)
-        self.news_thread.finished.connect(lambda: self._on_news_loaded(home_layout, self.news_thread))
+        self.news_thread.finished.connect(lambda: self._on_news_loaded(scroll_layout, self.news_thread))
         self.news_thread.start()
-        
-        home_layout.addStretch()
-        
+
         return home_widget
     
     def _on_news_loaded(self, layout, thread):
@@ -307,8 +347,8 @@ class Window(QWidget):
                 dpi_scale=self.dpi_scale
             )
             error_card.set_on_close(functools.partial(self._close_news_card, layout, error_card))
-            # 在顶部间距后插入错误卡片
-            layout.insertWidget(1, error_card)
+            # 在 stretch 前插入错误卡片
+            layout.insertWidget(layout.count() - 1, error_card)
             QTimer.singleShot(100, error_card.fade_in)
             layout.parent().news_cards.append(error_card)
         elif thread.news_data and "news" in thread.news_data:
@@ -322,8 +362,8 @@ class Window(QWidget):
                         dpi_scale=self.dpi_scale
                     )
                     news_card.set_on_close(functools.partial(self._close_news_card, layout, news_card))
-                    # 在顶部间距后插入卡片
-                    layout.insertWidget(i + 1, news_card)
+                    # 在 stretch 前插入卡片
+                    layout.insertWidget(layout.count() - 1, news_card)
                     # 延迟淡入动画
                     QTimer.singleShot(100 + i * 100, news_card.fade_in)
                     layout.parent().news_cards.append(news_card)
@@ -335,7 +375,7 @@ class Window(QWidget):
                     dpi_scale=self.dpi_scale
                 )
                 empty_card.set_on_close(functools.partial(self._close_news_card, layout, empty_card))
-                layout.insertWidget(1, empty_card)
+                layout.insertWidget(layout.count() - 1, empty_card)
                 QTimer.singleShot(100, empty_card.fade_in)
                 layout.parent().news_cards.append(empty_card)
     
