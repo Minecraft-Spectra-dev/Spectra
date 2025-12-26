@@ -3,17 +3,56 @@
 import os
 import sys
 import ctypes
+import json
+import functools
 from PyQt6.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QLabel,
                              QFileDialog, QStackedWidget, QApplication,
                              QColorDialog)
-from PyQt6.QtCore import Qt, QRect, QPropertyAnimation, QEasingCurve, QTimer
+from PyQt6.QtCore import Qt, QRect, QPropertyAnimation, QEasingCurve, QTimer, QThread, QUrl, QEventLoop, QPoint
 from PyQt6.QtGui import QCursor, QColor
+from PyQt6.QtNetwork import QNetworkRequest, QNetworkReply, QNetworkAccessManager
 from BlurWindow.blurWindow import blur
 
 from styles import STYLE_BTN, STYLE_BTN_ACTIVE
 from utils import load_svg_icon, scale_icon_for_display
 from managers import ConfigManager, BackgroundManager, LanguageManager
 from ui import UIBuilder
+from widgets import NewsCard
+
+
+class NewsFetchThread(QThread):
+    """新闻获取线程"""
+    
+    def __init__(self, url):
+        super().__init__()
+        self.url = url
+        self.news_data = None
+        self.error = None
+    
+    def run(self):
+        """使用 QNetworkAccessManager 进行异步网络请求"""
+        self.manager = QNetworkAccessManager()
+        self.manager.finished.connect(self._on_request_finished)
+        request = QNetworkRequest(QUrl(self.url))
+        self.reply = self.manager.get(request)
+        
+        # 创建事件循环等待请求完成
+        self.loop = QEventLoop()
+        self.exec()
+    
+    def _on_request_finished(self, reply):
+        """请求完成回调"""
+        try:
+            if reply.error() == QNetworkReply.NetworkError.NoError:
+                data = reply.readAll().data().decode('utf-8')
+                self.news_data = json.loads(data)
+            else:
+                self.error = f"网络错误: {reply.errorString()}"
+        except Exception as e:
+            self.error = str(e)
+        finally:
+            reply.deleteLater()
+            self.quit()
 
 
 class Window(QWidget):
@@ -171,18 +210,18 @@ class Window(QWidget):
         self.menu_icon_label = menu_btn_container.findChild(QLabel, "nav_icon")
         sb.addWidget(menu_btn_container)
 
-        home_icon = load_svg_icon("svg/houses.svg", self.dpi_scale)
-        home_icon_active = load_svg_icon("svg/houses-fill.svg", self.dpi_scale)
+        home_icon = load_svg_icon("svg/grid-1x2.svg", self.dpi_scale)
+        home_icon_active = load_svg_icon("svg/grid-1x2-fill.svg", self.dpi_scale)
         sb.addWidget(self.ui_builder.create_nav_btn(
             home_icon if home_icon else "\uE80F", self.language_manager.translate("nav_home"),
-            lambda: self.switch_page(0), 0, "svg/houses.svg", "svg/houses-fill.svg"
+            lambda: self.switch_page(0), 0, "svg/grid-1x2.svg", "svg/grid-1x2-fill.svg"
         ))
 
-        instance_icon = load_svg_icon("svg/kanban.svg")
-        instance_icon_active = load_svg_icon("svg/kanban-fill.svg")
+        instance_icon = load_svg_icon("svg/box.svg")
+        instance_icon_active = load_svg_icon("svg/box-fill.svg")
         sb.addWidget(self.ui_builder.create_nav_btn(
             instance_icon if instance_icon else "\uE7A8", self.language_manager.translate("nav_instances"),
-            lambda: self.switch_page(1), 1, "svg/kanban.svg", "svg/kanban-fill.svg"
+            lambda: self.switch_page(1), 1, "svg/box.svg", "svg/box-fill.svg"
         ))
 
         download_icon = load_svg_icon("svg/arrow-down-circle.svg")
@@ -225,13 +264,117 @@ class Window(QWidget):
         rl.addWidget(titlebar)
         self.stack = QStackedWidget()
         self.stack.setStyleSheet("background:transparent;")
-        self.stack.addWidget(QWidget())
+        self.stack.addWidget(self._create_home_page())
         self.stack.addWidget(self.ui_builder.create_instance_page())
         self.stack.addWidget(self.ui_builder.create_download_page())
         self.stack.addWidget(self.ui_builder.create_config_page())
         rl.addWidget(self.stack, 1)
 
         self.layout().addWidget(self.right_panel, 1)
+    
+    def _create_home_page(self):
+        """创建主页"""
+        home_widget = QWidget()
+        home_layout = QVBoxLayout(home_widget)
+        home_layout.setContentsMargins(self.ui_builder._scale_size(20), 0, self.ui_builder._scale_size(20), self.ui_builder._scale_size(20))
+        home_layout.setSpacing(self.ui_builder._scale_size(15))
+        
+        # 添加顶部间距，使卡片与左侧按钮顶部对齐
+        top_spacer = QWidget()
+        top_spacer.setFixedHeight(self.ui_builder._scale_size(10))
+        home_layout.addWidget(top_spacer)
+        
+        # 存储新闻卡片的列表
+        home_widget.news_cards = []
+        
+        # 启动新闻获取线程
+        news_url = "https://ipv4-beta.kxcym.top:5244/d/ServerPack/Spectra.json?sign=FrsiElECQW_oWeZRUC2AQLSIz55-uzB-2uKik-_6dBY=:0"
+        self.news_thread = NewsFetchThread(news_url)
+        self.news_thread.finished.connect(lambda: self._on_news_loaded(home_layout, self.news_thread))
+        self.news_thread.start()
+        
+        home_layout.addStretch()
+        
+        return home_widget
+    
+    def _on_news_loaded(self, layout, thread):
+        """新闻加载完成回调"""
+        if thread.error:
+            # 网络错误，显示错误卡片
+            error_card = NewsCard(
+                title="网络不可用",
+                content="无法连接到服务器获取新闻信息。请检查网络连接后重试。",
+                dpi_scale=self.dpi_scale
+            )
+            error_card.set_on_close(functools.partial(self._close_news_card, layout, error_card))
+            # 在顶部间距后插入错误卡片
+            layout.insertWidget(1, error_card)
+            QTimer.singleShot(100, error_card.fade_in)
+            layout.parent().news_cards.append(error_card)
+        elif thread.news_data and "news" in thread.news_data:
+            # 成功获取新闻数据
+            news_list = thread.news_data["news"]
+            if news_list:
+                for i, news in enumerate(news_list):
+                    news_card = NewsCard(
+                        title=news.get("title", "无标题"),
+                        content=news.get("text", "无内容"),
+                        dpi_scale=self.dpi_scale
+                    )
+                    news_card.set_on_close(functools.partial(self._close_news_card, layout, news_card))
+                    # 在顶部间距后插入卡片
+                    layout.insertWidget(i + 1, news_card)
+                    # 延迟淡入动画
+                    QTimer.singleShot(100 + i * 100, news_card.fade_in)
+                    layout.parent().news_cards.append(news_card)
+            else:
+                # 新闻列表为空
+                empty_card = NewsCard(
+                    title="暂无新闻",
+                    content="当前没有可显示的新闻内容。",
+                    dpi_scale=self.dpi_scale
+                )
+                empty_card.set_on_close(functools.partial(self._close_news_card, layout, empty_card))
+                layout.insertWidget(1, empty_card)
+                QTimer.singleShot(100, empty_card.fade_in)
+                layout.parent().news_cards.append(empty_card)
+    
+    def _close_news_card(self, layout, card):
+        """关闭新闻卡片"""
+        if card and not card.isVisible():
+            return  # 如果卡片已经不可见，不需要重复处理
+        
+        # 获取要移除卡片的索引
+        card_index = -1
+        news_cards = getattr(layout.parent(), 'news_cards', [])
+        for i, c in enumerate(news_cards):
+            if c == card:
+                card_index = i
+                break
+        
+        # 计算需要移动的高度
+        card_height = card.height() + int(15 * self.dpi_scale)  # 卡片高度 + 间距
+        
+        # 为剩余的卡片添加向上移动动画
+        if card_index >= 0:
+            for i in range(card_index, len(news_cards)):
+                remaining_card = news_cards[i]
+                current_pos = remaining_card.pos()
+                target_pos = QPoint(current_pos.x(), current_pos.y() - card_height)
+                
+                # 创建位移动画
+                pos_anim = QPropertyAnimation(remaining_card, b"pos")
+                pos_anim.setDuration(200)
+                pos_anim.setEasingCurve(QEasingCurve.Type.OutQuad)
+                pos_anim.setStartValue(current_pos)
+                pos_anim.setEndValue(target_pos)
+                pos_anim.start()
+        
+        # 移除卡片
+        layout.removeWidget(card)
+        if card in news_cards:
+            news_cards.remove(card)
+        card.deleteLater()
 
     def showEvent(self, event):
         super().showEvent(event)
