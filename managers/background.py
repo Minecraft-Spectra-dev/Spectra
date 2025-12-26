@@ -100,6 +100,8 @@ class BackgroundManager:
             self.current_bg_path = path
 
     def set_solid_color(self, color):
+        from PyQt6.QtGui import QColor
+
         if self.bg_label_widget:
             self.bg_label_widget.hide()
         self.player.stop()
@@ -109,8 +111,20 @@ class BackgroundManager:
             self.solid_bg_widget = QLabel(self.parent)
             self.solid_bg_widget.lower()
 
+        # 解析颜色并限制明度
+        qcolor = QColor(color)
+
+        # 计算灰度值（使用人眼感知的加权公式）
+        r, g, b, _ = qcolor.getRgb()
+        luminance = 0.299 * r + 0.587 * g + 0.114 * b
+
+        # 如果明度超过90，进行缩放
+        if luminance > 90:
+            scale_factor = 90 / luminance
+            qcolor.setRgb(int(r * scale_factor), int(g * scale_factor), int(b * scale_factor))
+
         w, h = self.parent.width(), self.parent.height()
-        self.solid_bg_widget.setStyleSheet(f"background:{color};")
+        self.solid_bg_widget.setStyleSheet(f"background:{qcolor.name()};")
         self.solid_bg_widget.setGeometry(0, 0, w, h)
         self.solid_bg_widget.show()
 
