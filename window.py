@@ -639,6 +639,10 @@ class Window(QWidget):
         opacity_value = self.config.get("blur_opacity", 150)
         self.right_panel.setStyleSheet(f"background:rgba(0,0,0,{opacity_value});")
         self.sidebar.setStyleSheet(f"background:rgba(0,0,0,{opacity_value});")
+        # 更新下拉框的透明度（主页透明度 + 20）
+        dropdown_opacity_value = min(255, opacity_value + 20)
+        dropdown_opacity_rgba = dropdown_opacity_value / 255.0
+        self.ui_builder.update_combobox_opacity(dropdown_opacity_rgba)
 
     def choose_background_image(self):
         """选择背景图像"""

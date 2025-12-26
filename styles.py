@@ -19,7 +19,7 @@ QSlider::handle:horizontal {
     margin: -6px 0;
 }
 QSlider::sub-page:horizontal {
-    background: #4080ff;
+    background: #ffffff;
     border-radius: 2px;
 }
 """

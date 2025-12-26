@@ -652,6 +652,12 @@ class UIBuilder:
         self.window.font_combo.setMaxVisibleItems(8)
         padding = self._scale_size(6)
         border_radius = self._scale_size(4)
+
+        # 获取当前下拉框透明度（主页透明度 + 20）
+        blur_opacity = self.window.config.get("blur_opacity", 150)
+        dropdown_opacity_value = min(255, blur_opacity + 20)
+        dropdown_opacity_rgba = dropdown_opacity_value / 255.0
+
         self.window.font_combo.setStyleSheet(
             f"QComboBox{{"
             f"background:rgba(0,0,0,0.3);"
@@ -679,16 +685,16 @@ class UIBuilder:
             f"width:28px;"
             f"background:transparent;"
             f"}}"
-            f"QComboBox::down-arrow{{"
-            f"image:url(svg/x-diamond.svg);"
-            f"width:12px;"
-            f"height:12px;"
-            f"}}"
+            # f"QComboBox::down-arrow{{"
+            # f"image:url(svg/x-diamond.svg);"
+            # f"width:12px;"
+            # f"height:12px;"
+            # f"}}"
             f"QComboBox QAbstractItemView{{"
-            f"background:rgba(0,0,0,0.9);"
+            f"background:rgba(0,0,0,{dropdown_opacity_rgba:.2f});"
             f"border:1px solid rgba(255,255,255,0.1);"
             f"border-radius:{border_radius}px;"
-            f"selection-background-color:rgba(64,128,255,0.8);"
+            f"selection-background-color:rgba(255,255,255,0.15);"
             f"selection-color:white;"
             f"outline:none;"
             f"padding:{self._scale_size(2)}px;"
@@ -700,10 +706,10 @@ class UIBuilder:
             f"border-radius:{border_radius - 1}px;"
             f"}}"
             f"QComboBox QAbstractItemView::item:hover{{"
-            f"background:rgba(255,255,255,0.08);"
+            f"background:rgba(255,255,255,0.1);"
             f"}}"
             f"QComboBox QAbstractItemView::item:selected{{"
-            f"background:rgba(64,128,255,0.9);"
+            f"background:rgba(255,255,255,0.15);"
             f"color:white;"
             f"}}"
             f"QComboBox QScrollBar:vertical{{"
@@ -821,6 +827,12 @@ class UIBuilder:
         self.window.language_combo.setMaxVisibleItems(5)
         padding = self._scale_size(6)
         border_radius = self._scale_size(4)
+
+        # 获取当前下拉框透明度（主页透明度 + 20）
+        blur_opacity = self.window.config.get("blur_opacity", 150)
+        dropdown_opacity_value = min(255, blur_opacity + 20)
+        dropdown_opacity_rgba = dropdown_opacity_value / 255.0
+
         self.window.language_combo.setStyleSheet(
             f"QComboBox{{"
             f"background:rgba(0,0,0,0.3);"
@@ -848,16 +860,16 @@ class UIBuilder:
             f"width:28px;"
             f"background:transparent;"
             f"}}"
-            f"QComboBox::down-arrow{{"
-            f"image:url(svg/x-diamond.svg);"
-            f"width:12px;"
-            f"height:12px;"
-            f"}}"
+            # f"QComboBox::down-arrow{{"
+            # f"image:url(svg/x-diamond.svg);"
+            # f"width:12px;"
+            # f"height:12px;"
+            # f"}}"
             f"QComboBox QAbstractItemView{{"
-            f"background:rgba(0,0,0,0.9);"
+            f"background:rgba(0,0,0,{dropdown_opacity_rgba:.2f});"
             f"border:1px solid rgba(255,255,255,0.1);"
             f"border-radius:{border_radius}px;"
-            f"selection-background-color:rgba(64,128,255,0.8);"
+            f"selection-background-color:rgba(255,255,255,0.15);"
             f"selection-color:white;"
             f"outline:none;"
             f"padding:{self._scale_size(2)}px;"
@@ -869,10 +881,10 @@ class UIBuilder:
             f"border-radius:{border_radius - 1}px;"
             f"}}"
             f"QComboBox QAbstractItemView::item:hover{{"
-            f"background:rgba(255,255,255,0.08);"
+            f"background:rgba(255,255,255,0.1);"
             f"}}"
             f"QComboBox QAbstractItemView::item:selected{{"
-            f"background:rgba(64,128,255,0.9);"
+            f"background:rgba(255,255,255,0.15);"
             f"color:white;"
             f"}}"
             f"QComboBox QScrollBar:vertical{{"
@@ -1217,16 +1229,16 @@ class UIBuilder:
             f"width:28px;"
             f"background:transparent;"
             f"}}"
-            f"QComboBox::down-arrow{{"
-            f"image:url(svg/x-diamond.svg);"
-            f"width:12px;"
-            f"height:12px;"
-            f"}}"
+            # f"QComboBox::down-arrow{{"
+            # f"image:url(svg/x-diamond.svg);"
+            # f"width:12px;"
+            # f"height:12px;"
+            # f"}}"
             f"QComboBox QAbstractItemView{{"
-            f"background:rgba(0,0,0,0.9);"
+            f"background:rgba(0,0,0,0.5);"
             f"border:1px solid rgba(255,255,255,0.1);"
             f"border-radius:{border_radius}px;"
-            f"selection-background-color:rgba(64,128,255,0.8);"
+            f"selection-background-color:rgba(255,255,255,0.15);"
             f"selection-color:white;"
             f"outline:none;"
             f"padding:{self._scale_size(2)}px;"
@@ -1240,10 +1252,10 @@ class UIBuilder:
             f"font-family:{font_family_quoted};"
             f"}}"
             f"QComboBox QAbstractItemView::item:hover{{"
-            f"background:rgba(255,255,255,0.08);"
+            f"background:rgba(255,255,255,0.1);"
             f"}}"
             f"QComboBox QAbstractItemView::item:selected{{"
-            f"background:rgba(64,128,255,0.9);"
+            f"background:rgba(255,255,255,0.15);"
             f"color:white;"
             f"}}"
             f"QComboBox QScrollBar:vertical{{"
@@ -1330,3 +1342,104 @@ class UIBuilder:
                     title.setText(self.window.language_manager.translate(title_key))
                 if desc and hasattr(desc, 'setText'):
                     desc.setText(self.window.language_manager.translate(desc_key))
+
+    def update_combobox_opacity(self, opacity_rgba):
+        """更新下拉框的透明度"""
+        # 更新字体选择下拉框
+        if hasattr(self.window, 'font_combo'):
+            self._update_single_combobox_opacity(self.window.font_combo, opacity_rgba)
+        # 更新语言选择下拉框
+        if hasattr(self.window, 'language_combo'):
+            self._update_single_combobox_opacity(self.window.language_combo, opacity_rgba)
+
+    def _update_single_combobox_opacity(self, combo, opacity_rgba):
+        """更新单个下拉框的透明度"""
+        # 获取当前字体
+        font_family = self._get_font_family()
+        # 转义字体名称中的特殊字符
+        escaped_font = font_family.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"')
+        font_family_quoted = f'"{escaped_font}"'
+
+        padding = self._scale_size(6)
+        border_radius = self._scale_size(4)
+
+        combo.setStyleSheet(
+            f"QComboBox{{"
+            f"background:rgba(0,0,0,0.3);"
+            f"border:1px solid rgba(255,255,255,0.15);"
+            f"border-radius:{border_radius}px;"
+            f"padding:{padding}px;"
+            f"color:rgba(255,255,255,0.95);"
+            f"font-size:{self._scale_size(13)}px;"
+            f"font-family:{font_family_quoted};"
+            f"}}"
+            f"QComboBox:hover{{"
+            f"background:rgba(0,0,0,0.4);"
+            f"border:1px solid rgba(255,255,255,0.25);"
+            f"}}"
+            f"QComboBox:focus{{"
+            f"background:rgba(0,0,0,0.5);"
+            f"border:1px solid rgba(100,150,255,0.6);"
+            f"}}"
+            f"QComboBox:on{{"
+            f"padding-top:{padding - 1}px;"
+            f"padding-bottom:{padding - 1}px;"
+            f"}}"
+            f"QComboBox::drop-down{{"
+            f"border:none;"
+            f"width:28px;"
+            f"background:transparent;"
+            f"}}"
+            # f"QComboBox::down-arrow{{"
+            # f"image:url(svg/x-diamond.svg);"
+            # f"width:12px;"
+            # f"height:12px;"
+            # f"}}"
+            f"QComboBox QAbstractItemView{{"
+            f"background:rgba(0,0,0,{opacity_rgba:.2f});"
+            f"border:1px solid rgba(255,255,255,0.1);"
+            f"border-radius:{border_radius}px;"
+            f"selection-background-color:rgba(255,255,255,0.15);"
+            f"selection-color:white;"
+            f"outline:none;"
+            f"padding:{self._scale_size(2)}px;"
+            f"font-family:{font_family_quoted};"
+            f"}}"
+            f"QComboBox QAbstractItemView::item{{"
+            f"height:{self._scale_size(28)}px;"
+            f"padding:{self._scale_size(6)}px {self._scale_size(8)}px;"
+            f"color:rgba(255,255,255,0.85);"
+            f"border-radius:{border_radius - 1}px;"
+            f"font-family:{font_family_quoted};"
+            f"}}"
+            f"QComboBox QAbstractItemView::item:hover{{"
+            f"background:rgba(255,255,255,0.1);"
+            f"}}"
+            f"QComboBox QAbstractItemView::item:selected{{"
+            f"background:rgba(255,255,255,0.15);"
+            f"color:white;"
+            f"}}"
+            f"QComboBox QScrollBar:vertical{{"
+            f"background:rgba(255,255,255,0.05);"
+            f"width:8px;"
+            f"margin:0px;"
+            f"border-radius:4px;"
+            f"}}"
+            f"QComboBox QScrollBar::handle:vertical{{"
+            f"background:rgba(255,255,255,0.3);"
+            f"min-height:20px;"
+            f"border-radius:4px;"
+            f"}}"
+            f"QComboBox QScrollBar::handle:vertical:hover{{"
+            f"background:rgba(255,255,255,0.5);"
+            f"}}"
+            f"QComboBox QScrollBar::add-line:vertical,"
+            f"QComboBox QScrollBar::sub-line:vertical{{"
+            f"border:none;"
+            f"background:none;"
+            f"}}"
+            f"QComboBox QScrollBar::add-page:vertical,"
+            f"QComboBox QScrollBar::sub-page:vertical{{"
+            f"background:none;"
+            f"}}"
+        )
