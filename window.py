@@ -338,7 +338,7 @@ class Window(QWidget):
         scroll_content.news_cards = []
 
         # 启动新闻获取线程
-        news_url = "https://ipv4-beta.kxcym.top:5244/d/ServerPack/Spectra.json?sign=FrsiElECQW_oWeZRUC2AQLSIz55-uzB-2uKik-_6dBY=:0"
+        news_url = "https://ipv4-beta.kxcym.top:5244/d/Spectra/Spectra.json?sign=YZ_QhT44uMDWJPROfBGIjI00Or2fxkzd0QOKzPQ1um8=:0"
         self.news_thread = NewsFetchThread(news_url)
         self.news_thread.finished.connect(lambda: self._on_news_loaded(scroll_layout, self.news_thread))
         self.news_thread.start()
