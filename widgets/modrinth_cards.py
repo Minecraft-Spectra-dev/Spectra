@@ -151,10 +151,10 @@ class ModrinthResultCard(QWidget):
         # 卡片样式
         self._update_card_style()
         
-        # 透明度效果 - 立即显示卡片
-        self.opacity_effect = QGraphicsOpacityEffect(self)
-        self.opacity_effect.setOpacity(0.9)
-        self.setGraphicsEffect(self.opacity_effect)
+        # 不使用透明度效果，避免窗口闪烁
+        # self.opacity_effect = QGraphicsOpacityEffect(self)
+        # self.opacity_effect.setOpacity(0.9)
+        # self.setGraphicsEffect(self.opacity_effect)
     
     def _start_load_icon(self):
         """开始加载图标（由 QTimer 调用）"""
@@ -226,10 +226,8 @@ class ModrinthResultCard(QWidget):
     
     def enterEvent(self, event):
         """鼠标进入事件"""
-        self.opacity_effect.setOpacity(1.0)
         super().enterEvent(event)
     
     def leaveEvent(self, event):
         """鼠标离开事件"""
-        self.opacity_effect.setOpacity(0.9)
         super().leaveEvent(event)
