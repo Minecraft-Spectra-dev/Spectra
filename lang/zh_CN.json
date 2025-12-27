@@ -44,6 +44,9 @@
     "instance_version_label": "版本",
     "instance_version_root": "根目录",
     "instance_show_root_resourcepacks": "显示根目录资源包",
-    "instance_show_version_resourcepacks": "显示版本资源包"
+    "instance_show_version_resourcepacks": "显示版本资源包",
+    "edit_version_name_title": "请输入新的版本名称:",
+    "cancel": "取消",
+    "confirm": "确认"
   }
 }

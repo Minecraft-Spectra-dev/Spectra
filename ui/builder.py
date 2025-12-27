@@ -26,6 +26,7 @@ class VersionCardWidget(QWidget):
         self._is_version = False
         self._is_favorited = False
         self._bookmark_btn = None
+        self._edit_btn = None
         self._normal_style = ""
         self._hover_style = ""
     
@@ -33,6 +34,10 @@ class VersionCardWidget(QWidget):
         """设置收藏按钮和收藏状态"""
         self._bookmark_btn = bookmark_btn
         self._is_favorited = is_favorited
+    
+    def set_edit_button(self, edit_btn):
+        """设置编辑按钮"""
+        self._edit_btn = edit_btn
     
     def set_styles(self, normal_style, hover_style):
         """设置悬停样式"""
@@ -47,6 +52,9 @@ class VersionCardWidget(QWidget):
             bookmark_pixmap = load_svg_icon("svg/bookmarks.svg", self._get_dpi_scale())
             if bookmark_pixmap:
                 self._bookmark_btn.setIcon(QIcon(scale_icon_for_display(bookmark_pixmap, 16, self._get_dpi_scale())))
+        if self._edit_btn:
+            # 悬停时显示编辑按钮
+            self._edit_btn.show()
         if self._on_hover_change:
             self._on_hover_change(True)
         super().enterEvent(event)
@@ -57,6 +65,9 @@ class VersionCardWidget(QWidget):
         if self._bookmark_btn and not self._is_favorited:
             # 未收藏的版本离开时隐藏收藏图标
             self._bookmark_btn.setIcon(QIcon())
+        if self._edit_btn:
+            # 离开时隐藏编辑按钮
+            self._edit_btn.hide()
         if self._on_hover_change:
             self._on_hover_change(False)
         super().leaveEvent(event)
@@ -178,7 +189,7 @@ class UIBuilder:
         # 计算透明度
         if opacity_rgba is None:
             blur_opacity = self.window.config.get("blur_opacity", 150)
-            opacity_value = min(255, blur_opacity + 20)
+            opacity_value = min(255, blur_opacity + 50)
             opacity_rgba = opacity_value / 255.0
         else:
             opacity_rgba = opacity_rgba
@@ -1149,9 +1160,9 @@ class UIBuilder:
         padding = self._scale_size(6)
         border_radius = self._scale_size(4)
 
-        # 获取当前下拉框透明度（主页透明度 + 20）
+        # 获取当前下拉框透明度（主页透明度 + 50）
         blur_opacity = self.window.config.get("blur_opacity", 150)
-        dropdown_opacity_value = min(255, blur_opacity + 20)
+        dropdown_opacity_value = min(255, blur_opacity + 50)
         dropdown_opacity_rgba = dropdown_opacity_value / 255.0
 
         self.window.font_combo.setStyleSheet(
@@ -1336,11 +1347,6 @@ class UIBuilder:
             logger.info(f"Adding {len(non_favorites)} non-favorite versions")
             for version in non_favorites:
                 self._add_version_item(minecraft_path, version, is_version=True, is_favorited=False)
-
-            # 最后添加根目录（resourcepacks）选项
-            root_name = self.window.language_manager.translate("instance_version_root")
-            logger.info(f"Adding root directory: {root_name}")
-            self._add_version_item(minecraft_path, root_name, is_version=False, is_favorited=False)
         except Exception as e:
             # 静默处理错误，避免崩溃
             import traceback
@@ -1382,10 +1388,12 @@ class UIBuilder:
         version_card.setStyleSheet(normal_style)
         version_card.setCursor(Qt.CursorShape.PointingHandCursor)
 
-        # 确定资源包路径
+        # 确定资源包路径和显示名称
         if is_version:
             resourcepacks_path = os.path.join(minecraft_path, "versions", version_name, "resourcepacks")
-            display_name = version_name
+            # 检查是否有自定义别名
+            version_aliases = self.window.config.get("version_aliases", {})
+            display_name = version_aliases.get(version_name, version_name)
         else:
             resourcepacks_path = os.path.join(minecraft_path, "resourcepacks")
             display_name = self.window.language_manager.translate("instance_version_root")
@@ -1408,9 +1416,35 @@ class UIBuilder:
         icon_label.setFixedSize(self._scale_size(32), self._scale_size(32))
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_label.setStyleSheet("background:transparent;")
-        icon_pixmap = load_svg_icon("svg/box-fill.svg", self.dpi_scale)
-        if icon_pixmap:
-            icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20, self.dpi_scale))
+        
+        # 判断版本类型并选择图标
+        if is_version:
+            version_type = self._detect_version_type(minecraft_path, version_name)
+            if version_type == "fabric":
+                icon_path = "png/fabric.png"
+            elif version_type == "forge":
+                icon_path = "png/forge.png"
+            elif version_type == "neoforge":
+                icon_path = "png/neoforged.png"
+            else:  # vanilla or unknown
+                icon_path = "png/block.png"
+            
+            # 加载PNG图标
+            from PyQt6.QtGui import QPixmap
+            icon_pixmap = QPixmap(icon_path)
+            if not icon_pixmap.isNull():
+                scaled_pixmap = icon_pixmap.scaled(
+                    int(20 * self.dpi_scale),
+                    int(20 * self.dpi_scale),
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation
+                )
+                icon_label.setPixmap(scaled_pixmap)
+        else:
+            # 根目录使用默认图标
+            icon_pixmap = load_svg_icon("svg/box-fill.svg", self.dpi_scale)
+            if icon_pixmap:
+                icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20, self.dpi_scale))
         click_area_layout.addWidget(icon_label)
 
         # 版本名称
@@ -1432,9 +1466,39 @@ class UIBuilder:
         card_layout.addWidget(click_area)
 
         bookmark_btn = None
+        edit_btn = None
 
-        # 收藏按钮（仅对版本显示）
+        # 收藏按钮和编辑按钮（仅对版本显示）
         if is_version:
+            # 编辑按钮
+            edit_btn = QPushButton()
+            edit_btn.setFixedSize(self._scale_size(20), self._scale_size(20))
+            edit_btn.hide()  # 默认隐藏
+            edit_btn.setStyleSheet("""
+                QPushButton {
+                    background: transparent;
+                    border: none;
+                    padding: 0;
+                }
+                QPushButton:hover {
+                    background: rgba(255, 255, 255, 0.1);
+                    border-radius: 4px;
+                }
+            """)
+            edit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            edit_btn.clicked.connect(lambda: self._edit_version_name(version_name, name_label))
+            
+            # 设置编辑图标
+            edit_pixmap = load_svg_icon("svg/pencil-square.svg", self.dpi_scale)
+            if edit_pixmap:
+                edit_btn.setIcon(QIcon(scale_icon_for_display(edit_pixmap, 16, self.dpi_scale)))
+            
+            # 将编辑按钮设置到卡片中，以便悬停时显示
+            version_card.set_edit_button(edit_btn)
+            
+            card_layout.addWidget(edit_btn)
+            
+            # 收藏按钮
             bookmark_btn = QPushButton()
             bookmark_btn.setFixedSize(self._scale_size(20), self._scale_size(20))
             bookmark_btn.setStyleSheet("""
@@ -1495,6 +1559,275 @@ class UIBuilder:
         if current_widget:
             self.window.instance_stack.removeWidget(current_widget)
             current_widget.deleteLater()
+
+    def _detect_version_type(self, minecraft_path, version_name):
+        """检测Minecraft版本类型（fabric/forge/neoforge/vanilla）"""
+        import json
+        import zipfile
+        
+        try:
+            version_path = os.path.join(minecraft_path, "versions", version_name)
+            if not os.path.exists(version_path):
+                return "vanilla"
+            
+            # 查找版本jar文件或目录
+            version_jar = os.path.join(version_path, version_name + ".jar")
+            if not os.path.exists(version_jar):
+                version_jar = os.path.join(version_path, version_name)
+                if os.path.isdir(version_jar):
+                    # 如果是目录，查找其中的jar文件
+                    for item in os.listdir(version_jar):
+                        if item.endswith(".jar"):
+                            version_jar = os.path.join(version_jar, item)
+                            break
+            
+            if not os.path.exists(version_jar) or not os.path.isfile(version_jar):
+                return "vanilla"
+            
+            # 检查json文件
+            version_json = os.path.join(version_path, version_name + ".json")
+            if os.path.exists(version_json):
+                with open(version_json, 'r', encoding='utf-8') as f:
+                    json_data = json.load(f)
+                    
+                    # 检查inheritsFrom字段（有此字段说明是子版本，如forge）
+                    if "inheritsFrom" in json_data:
+                        parent_version = json_data["inheritsFrom"]
+                        # 检查父版本的名称
+                        if "forge" in version_name.lower():
+                            return "forge"
+                        elif "neoforge" in version_name.lower():
+                            return "neoforge"
+                        elif "fabric" in version_name.lower():
+                            return "fabric"
+                    
+                    # 检查id字段
+                    if "id" in json_data:
+                        version_id = json_data["id"].lower()
+                        if "forge" in version_id and "neoforge" not in version_id:
+                            return "forge"
+                        elif "neoforge" in version_id:
+                            return "neoforge"
+                        elif "fabric" in version_id:
+                            return "fabric"
+                    
+                    # 检查version字段
+                    if "version" in json_data:
+                        version_val = json_data["version"].lower()
+                        if "forge" in version_val and "neoforge" not in version_val:
+                            return "forge"
+                        elif "neoforge" in version_val:
+                            return "neoforge"
+                        elif "fabric" in version_val:
+                            return "fabric"
+            
+            # 检查jar文件中的fabric.mod.json
+            try:
+                with zipfile.ZipFile(version_jar, 'r') as jar_file:
+                    # 检查fabric.mod.json
+                    mod_json_files = [f for f in jar_file.namelist() if 'fabric.mod.json' in f]
+                    if mod_json_files:
+                        return "fabric"
+                    
+                    # 检查forge的mods.toml
+                    mods_toml_files = [f for f in jar_file.namelist() if 'mods.toml' in f]
+                    if mods_toml_files:
+                        # 检查是否是neoforge
+                        for f in jar_file.namelist():
+                            if 'neoforge' in f.lower():
+                                return "neoforge"
+                        return "forge"
+            except:
+                pass
+            
+            # 根据版本名称判断
+            version_lower = version_name.lower()
+            if "neoforge" in version_lower:
+                return "neoforge"
+            elif "forge" in version_lower:
+                return "forge"
+            elif "fabric" in version_lower:
+                return "fabric"
+            
+            return "vanilla"
+        except Exception as e:
+            logger.error(f"Error detecting version type for {version_name}: {e}")
+            return "vanilla"
+
+    def _edit_version_name(self, original_name, name_label):
+        """编辑版本名称"""
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit
+        from PyQt6.QtCore import Qt
+        
+        # 获取当前显示的名称（可能是修改过的）
+        current_name = name_label.text()
+        
+        # 获取主窗口背景模式，使用相同的背景设置
+        background_mode = self.window.config.get("background_mode", "blur")
+        
+        # 设置对话框样式（与主页外观一致）
+        if background_mode == "blur":
+            # 模糊模式：使用透明度+50
+            blur_opacity = self.window.config.get("blur_opacity", 150)
+            dialog_opacity = min(255, blur_opacity + 50)
+            opacity_alpha = dialog_opacity / 255.0
+            dialog_style = f"""
+                QDialog {{
+                    background: rgba(0, 0, 0, {opacity_alpha});
+                    border-radius: {self._scale_size(12)}px;
+                }}
+            """
+        elif background_mode == "solid":
+            # 纯色模式：使用纯色背景
+            bg_color = self.window.config.get("background_color", "#00000000")
+            dialog_style = f"""
+                QDialog {{
+                    background: {bg_color};
+                    border-radius: {self._scale_size(12)}px;
+                }}
+            """
+        else:  # image 或其他模式
+            # 图片模式：使用透明度+50
+            blur_opacity = self.window.config.get("blur_opacity", 150)
+            dialog_opacity = min(255, blur_opacity + 50)
+            opacity_alpha = dialog_opacity / 255.0
+            dialog_style = f"""
+                QDialog {{
+                    background: rgba(0, 0, 0, {opacity_alpha});
+                    border-radius: {self._scale_size(12)}px;
+                }}
+            """
+        
+        # 创建自定义对话框（无标题栏）
+        dialog = QDialog(self.window)
+        dialog.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+        dialog.setFixedSize(self._scale_size(400), self._scale_size(180))
+        dialog.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        
+        dialog.setStyleSheet(dialog_style)
+        
+        # 对话框布局
+        dialog_layout = QVBoxLayout(dialog)
+        dialog_layout.setContentsMargins(self._scale_size(24), self._scale_size(24), self._scale_size(24), self._scale_size(24))
+        dialog_layout.setSpacing(self._scale_size(16))
+        
+        # 标题标签（使用本地化）
+        title_label = QLabel(self.window.language_manager.translate("edit_version_name_title"))
+        title_label.setStyleSheet(f"""
+            QLabel {{
+                color: rgba(255, 255, 255, 0.9);
+                background: transparent;
+                font-size: {self._scale_size(14)}px;
+                font-family: '{self._get_font_family()}';
+            }}
+        """)
+        dialog_layout.addWidget(title_label)
+        
+        # 输入框
+        input_field = QLineEdit(current_name)
+        input_field.setFixedHeight(self._scale_size(36))
+        input_field.setStyleSheet(f"""
+            QLineEdit {{
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: {self._scale_size(6)}px;
+                padding: 0 {self._scale_size(12)}px;
+                color: rgba(255, 255, 255, 0.9);
+                font-size: {self._scale_size(14)}px;
+                font-family: '{self._get_font_family()}';
+            }}
+            QLineEdit:focus {{
+                background: rgba(255, 255, 255, 0.15);
+                border: 1px solid rgba(100, 150, 255, 0.6);
+            }}
+        """)
+        input_field.selectAll()  # 全选文本方便修改
+        dialog_layout.addWidget(input_field)
+        
+        dialog_layout.addStretch()
+        
+        # 按钮布局
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(self._scale_size(10))
+        
+        # 取消按钮（使用本地化）
+        cancel_btn = QPushButton(self.window.language_manager.translate("cancel"))
+        cancel_btn.setFixedHeight(self._scale_size(36))
+        cancel_btn.setFixedWidth(self._scale_size(100))
+        cancel_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: {self._scale_size(6)}px;
+                color: rgba(255, 255, 255, 0.9);
+                font-size: {self._scale_size(13)}px;
+                font-family: '{self._get_font_family()}';
+                padding: 0;
+            }}
+            QPushButton:hover {{
+                background: rgba(255, 255, 255, 0.12);
+            }}
+            QPushButton:pressed {{
+                background: rgba(255, 255, 255, 0.08);
+            }}
+        """)
+        cancel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        cancel_btn.clicked.connect(dialog.reject)
+        button_layout.addWidget(cancel_btn)
+        
+        # 确认按钮（使用本地化）
+        confirm_btn = QPushButton(self.window.language_manager.translate("confirm"))
+        confirm_btn.setFixedHeight(self._scale_size(36))
+        confirm_btn.setFixedWidth(self._scale_size(100))
+        confirm_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: rgba(100, 150, 255, 0.8);
+                border: none;
+                border-radius: {self._scale_size(6)}px;
+                color: white;
+                font-size: {self._scale_size(13)}px;
+                font-family: '{self._get_font_family()}';
+                padding: 0;
+            }}
+            QPushButton:hover {{
+                background: rgba(100, 150, 255, 1.0);
+            }}
+            QPushButton:pressed {{
+                background: rgba(100, 150, 255, 0.7);
+            }}
+        """)
+        confirm_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        confirm_btn.clicked.connect(dialog.accept)
+        button_layout.addWidget(confirm_btn)
+        
+        button_layout.addStretch()
+        dialog_layout.addLayout(button_layout)
+        
+        # 设置对话框为模态并显示
+        dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+        input_field.setFocus()
+        
+        result = dialog.exec()
+        
+        if result == QDialog.DialogCode.Accepted:
+            new_name = input_field.text().strip()
+            if new_name:
+                # 获取版本别名映射
+                version_aliases = self.window.config.get("version_aliases", {})
+                
+                if new_name == original_name:
+                    # 如果新名字和原始名字相同，移除别名
+                    if original_name in version_aliases:
+                        del version_aliases[original_name]
+                        self.window.config_manager.set("version_aliases", version_aliases)
+                        name_label.setText(original_name)
+                        logger.info(f"Removed alias for version: {original_name}")
+                else:
+                    # 保存新的别名
+                    version_aliases[original_name] = new_name
+                    self.window.config_manager.set("version_aliases", version_aliases)
+                    name_label.setText(new_name)
+                    logger.info(f"Updated version name: {original_name} -> {new_name}")
 
     def _toggle_favorite_version(self, version_name):
         """切换版本的收藏状态"""
@@ -1594,21 +1927,25 @@ class UIBuilder:
     def _update_page_titles(self):
         """更新页面标题"""
         # 主页没有标题，跳过
-        
+
         # 更新实例页面标题
         instance_page = self.window.stack.widget(1)
         if instance_page and instance_page.layout():
             title = instance_page.layout().itemAt(0).widget()
             if title and hasattr(title, 'setText'):
                 title.setText(self.window.language_manager.translate("page_instances"))
-        
+
+            # 更新实例页面的占位符文本
+            if hasattr(self.window, 'instance_path_input'):
+                self.window.instance_path_input.setPlaceholderText(self.window.language_manager.translate("instance_path_placeholder"))
+
         # 更新下载页面标题
         download_page = self.window.stack.widget(2)
         if download_page and download_page.layout():
             title = download_page.layout().itemAt(0).widget()
             if title and hasattr(title, 'setText'):
                 title.setText(self.window.language_manager.translate("page_downloads"))
-        
+
         # 更新设置页面标题
         settings_page = self.window.stack.widget(3)
         if settings_page and settings_page.layout():
@@ -1856,4 +2193,81 @@ class UIBuilder:
                     # 更新语言 QComboBox 字体（直接从 window 属性获取）
                     if hasattr(self.window, 'language_combo'):
                         self._update_combobox_font(self.window.language_combo, font_family_quoted)
+
+    def _update_bg_card(self, card, title_key, desc_key):
+        """更新卡片的标题和描述文本"""
+        if not card or not card.layout():
+            return
+        
+        layout = card.layout()
+        # 查找文本布局（通常在中间的 QVBoxLayout）
+        for i in range(layout.count()):
+            item = layout.itemAt(i)
+            if item and isinstance(item.layout(), QHBoxLayout):
+                inner_layout = item.layout()
+                for j in range(inner_layout.count()):
+                    inner_item = inner_layout.itemAt(j)
+                    if inner_item and isinstance(inner_item.layout(), QVBoxLayout):
+                        text_layout = inner_item.layout()
+                        # 第一个是标题，第二个是描述
+                        if text_layout.count() >= 2:
+                            title = text_layout.itemAt(0).widget()
+                            desc = text_layout.itemAt(1).widget()
+                            if title and hasattr(title, 'setText'):
+                                title.setText(self.window.language_manager.translate(title_key))
+                            if desc and hasattr(desc, 'setText'):
+                                desc.setText(self.window.language_manager.translate(desc_key))
+                            break
+                        break
+
+    def _update_bg_card_font(self, card, font_family):
+        """更新卡片的字体"""
+        if not card or not card.layout():
+            return
+        
+        layout = card.layout()
+        # 查找文本布局（通常在中间的 QVBoxLayout）
+        for i in range(layout.count()):
+            item = layout.itemAt(i)
+            if item and isinstance(item.layout(), QHBoxLayout):
+                inner_layout = item.layout()
+                for j in range(inner_layout.count()):
+                    inner_item = inner_item.layout()
+                    if inner_item and isinstance(inner_item.layout(), QVBoxLayout):
+                        text_layout = inner_item.layout()
+                        # 第一个是标题，第二个是描述
+                        if text_layout.count() >= 2:
+                            title = text_layout.itemAt(0).widget()
+                            desc = text_layout.itemAt(1).widget()
+                            if title:
+                                title.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:{font_family};background:transparent;")
+                            if desc:
+                                desc.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:{font_family};background:transparent;")
+                            break
+                        break
+
+    def _update_expandable_menu_font(self, container, font_family):
+        """更新可展开菜单的字体"""
+        if not container or not container.layout():
+            return
+        
+        header = container.layout().itemAt(0).widget()
+        if not header or not header.layout():
+            return
+        
+        header_layout = header.layout()
+        # 查找文本布局
+        for i in range(header_layout.count()):
+            item = header_layout.itemAt(i)
+            if item and isinstance(item.layout(), QVBoxLayout):
+                text_layout = item.layout()
+                # 第一个是标题，第二个是描述
+                if text_layout.count() >= 2:
+                    title = text_layout.itemAt(0).widget()
+                    desc = text_layout.itemAt(1).widget()
+                    if title:
+                        title.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:{font_family};background:transparent;")
+                    if desc:
+                        desc.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:{font_family};background:transparent;")
+                    break
 

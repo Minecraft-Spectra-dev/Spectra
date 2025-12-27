@@ -41,7 +41,8 @@ class ConfigManager:
                     "language": config.get("language", "zh_CN"),
                     "minecraft_path": config.get("minecraft_path", ""),
                     "favorited_versions": config.get("favorited_versions", []),
-                    "favorited_resourcepacks": config.get("favorited_resourcepacks", [])
+                    "favorited_resourcepacks": config.get("favorited_resourcepacks", []),
+                    "version_aliases": config.get("version_aliases", {})
                 }
         except:
             logger.warning(f"配置文件加载失败，使用默认配置: {self.config_file}")
@@ -58,7 +59,8 @@ class ConfigManager:
                 "language": "zh_CN",
                 "minecraft_path": "",
                 "favorited_versions": [],
-                "favorited_resourcepacks": []
+                "favorited_resourcepacks": [],
+                "version_aliases": {}
             }
 
     def save_config(self):

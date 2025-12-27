@@ -44,6 +44,9 @@
     "instance_version_label": "Version",
     "instance_version_root": "Root Directory",
     "instance_show_root_resourcepacks": "Show Root Resource Packs",
-    "instance_show_version_resourcepacks": "Show Version Resource Packs"
+    "instance_show_version_resourcepacks": "Show Version Resource Packs",
+    "edit_version_name_title": "Enter new version name:",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
   }
 }
