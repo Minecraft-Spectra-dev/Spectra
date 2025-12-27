@@ -45,6 +45,14 @@ def show_main_window(window, splash):
 if __name__ == "__main__":
     logger.info("Spectra starting...")
 
+    # 设置全局异常处理器
+    def handle_exception(exc_type, exc_value, exc_traceback):
+        import traceback
+        logger.critical(f"Uncaught exception: {exc_type.__name__}: {exc_value}")
+        logger.critical("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+
+    sys.excepthook = handle_exception
+
     # 禁用 Qt 的高 DPI 自动缩放，使屏幕显示的物理像素与配置一致，但需要手动处理控件的 DPI 缩放
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough

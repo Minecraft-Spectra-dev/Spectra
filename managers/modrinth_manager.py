@@ -126,3 +126,71 @@ class ModrinthManager:
             dict: 版本详细信息
         """
         return self._make_request(f"/version/{version_id}")
+    
+    def get_project_files(self, project_id: str) -> List[str]:
+        """获取项目的所有文件名
+        
+        Args:
+            project_id: 项目 ID
+            
+        Returns:
+            list: 文件名列表
+        """
+        versions = self.get_project_versions(project_id)
+        filenames = []
+        for version in versions:
+            files = version.get('files', [])
+            for file_info in files:
+                filename = file_info.get('filename', '')
+                if filename:
+                    filenames.append(filename)
+        return filenames
+    
+    def get_latest_version_filename(self, project_id: str) -> Optional[str]:
+        """获取项目最新版本的文件名
+
+        Args:
+            project_id: 项目 ID
+
+        Returns:
+            str or None: 文件名，如果获取失败则返回 None
+        """
+        try:
+            versions = self.get_project_versions(project_id)
+            if versions:
+                latest_version = versions[0]
+                files = latest_version.get('files', [])
+                if files:
+                    return files[0].get('filename', '')
+        except Exception as e:
+            logger.error(f"Failed to get latest version filename: {e}")
+        return None
+
+    def get_project_file_hashes(self, project_id: str) -> List[Dict[str, str]]:
+        """获取项目的所有文件哈希值（SHA1 和 SHA512）
+
+        Args:
+            project_id: 项目 ID
+
+        Returns:
+            list: 文件哈希列表，格式：[{"sha1": "...", "sha512": "...", "filename": "..."}]
+        """
+        try:
+            versions = self.get_project_versions(project_id)
+            hashes = []
+            for version in versions:
+                files = version.get('files', [])
+                for file_info in files:
+                    hash_obj = {
+                        'sha1': file_info.get('hashes', {}).get('sha1'),
+                        'sha512': file_info.get('hashes', {}).get('sha512'),
+                        'filename': file_info.get('filename', '')
+                    }
+                    # 只要有一个哈希值不为空就添加
+                    if hash_obj['sha1'] or hash_obj['sha512']:
+                        hashes.append(hash_obj)
+            logger.debug(f"Got {len(hashes)} file hashes for project {project_id}")
+            return hashes
+        except Exception as e:
+            logger.error(f"Failed to get project file hashes: {e}")
+            return []

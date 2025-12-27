@@ -1071,6 +1071,8 @@ class UIBuilder:
         self._setup_combobox(self.window.download_version_combo, width=230)
         # 根据版本隔离设置显示/隐藏
         self.window.download_version_combo.setVisible(self.window.config.get("version_isolation", True))
+        # 连接版本切换事件，刷新卡片的下载状态
+        self.window.download_version_combo.currentIndexChanged.connect(self._on_download_version_changed)
         search_layout.addWidget(self.window.download_version_combo, 2)
 
         pl.addWidget(search_container)
@@ -1365,21 +1367,40 @@ class UIBuilder:
         try:
             minecraft_path = self.window.config.get("minecraft_path", "")
             if not minecraft_path or not os.path.exists(minecraft_path):
+                logger.warning(f"Invalid minecraft_path: {minecraft_path}")
                 return None
 
             # 如果版本隔离关闭，直接返回根目录的resourcepacks路径
             if not self.window.config.get("version_isolation", True):
-                return os.path.join(minecraft_path, "resourcepacks")
+                root_resourcepacks_path = os.path.join(minecraft_path, "resourcepacks")
+                logger.info(f"Version isolation OFF, target path: {root_resourcepacks_path}")
+                return root_resourcepacks_path
 
             # 版本隔离开启时，根据下拉框选择返回对应路径
             selected_version = self.window.download_version_combo.currentText()
+            logger.info(f"Version isolation ON, selected version: {selected_version}")
+            
             if selected_version:
-                # 返回对应版本的resourcepacks路径
-                return os.path.join(minecraft_path, "versions", selected_version, "resourcepacks")
+                # 检查是否是"根目录"选项（翻译后的文本）
+                root_text = self.window.language_manager.translate("instance_version_root")
+                if selected_version == root_text:
+                    root_resourcepacks_path = os.path.join(minecraft_path, "resourcepacks")
+                    logger.info(f"Root directory selected, target path: {root_resourcepacks_path}")
+                    return root_resourcepacks_path
+                else:
+                    # 返回对应版本的resourcepacks路径
+                    version_resourcepacks_path = os.path.join(minecraft_path, "versions", selected_version, "resourcepacks")
+                    logger.info(f"Version selected, target path: {version_resourcepacks_path}")
+                    return version_resourcepacks_path
+            
             # 如果没有选择版本，返回根目录
-            return os.path.join(minecraft_path, "resourcepacks")
+            root_resourcepacks_path = os.path.join(minecraft_path, "resourcepacks")
+            logger.info(f"No version selected, default to root, target path: {root_resourcepacks_path}")
+            return root_resourcepacks_path
         except Exception as e:
             logger.error(f"Error getting download target path: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
 
     def _setup_platform_button(self, button, is_selected, index):
@@ -1428,6 +1449,33 @@ class UIBuilder:
         # 更新按钮样式
         for i, button in enumerate(self.window.download_platform_buttons):
             self._setup_platform_button(button, i == index, i)
+
+    def _on_download_version_changed(self, index):
+        """下载页面版本切换事件处理"""
+        # 刷新所有已显示卡片的下载状态
+        self._refresh_all_card_download_status()
+
+    def _refresh_all_card_download_status(self):
+        """刷新所有已显示卡片的下载状态"""
+        if not hasattr(self.window, 'download_scroll_layout'):
+            return
+
+        # 获取新的下载目标路径
+        new_target_path = self.get_download_target_path()
+        logger.info(f"Version changed, new target path: {new_target_path}")
+
+        # 遍历滚动布局中的所有卡片
+        layout = self.window.download_scroll_layout
+        card_count = 0
+        for i in range(layout.count()):
+            widget = layout.itemAt(i).widget()
+            # 检查是否是 ModrinthResultCard
+            if widget and hasattr(widget, 'refresh_download_status'):
+                # 调用卡片的刷新方法
+                card_count += 1
+                widget.refresh_download_status(new_target_path)
+        
+        logger.info(f"Refreshed download status for {card_count} cards")
 
     def _update_platform_button_texts(self):
         """更新平台按钮的文本"""
@@ -1651,12 +1699,16 @@ class UIBuilder:
                 # 使用函数包装避免 lambda 闭包问题
                 def make_download_handler(data):
                     return lambda checked=False: self._on_download_modrinth_project(data)
-                
+
+                # 获取下载目标路径
+                download_target_path = self.get_download_target_path()
+
                 # 创建结果卡片
                 result_card = ModrinthResultCard(
                     project_data,
                     dpi_scale=self.dpi_scale,
-                    on_download=make_download_handler(project_data)
+                    on_download=make_download_handler(project_data),
+                    download_target_path=download_target_path
                 )
                 
                 # 添加到滚动区域（不立即显示，避免窗口闪烁）
