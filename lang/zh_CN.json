@@ -47,6 +47,15 @@
     "instance_show_version_resourcepacks": "显示版本资源包",
     "edit_version_name_title": "请输入新的版本名称:",
     "cancel": "取消",
-    "confirm": "确认"
+    "confirm": "确认",
+    "file_explorer_no_path": "未选择路径",
+    "file_explorer_back_to_root": "返回根目录",
+    "file_explorer_select_path": "请选择 Minecraft 安装路径",
+    "file_explorer_path_not_found": "路径不存在: {path}",
+    "file_explorer_version_not_found": "版本不存在: {version_name}",
+    "file_explorer_no_resourcepacks": "版本 {version_name} 没有resourcepacks文件夹",
+    "file_explorer_not_directory": "不是目录: {path}",
+    "file_explorer_no_permission": "无权限访问此目录",
+    "file_explorer_load_failed": "加载目录失败: {error}"
   }
 }

@@ -90,16 +90,47 @@ class FileExplorer(QWidget):
 
     file_selected = pyqtSignal(str)  # 文件选择信号
 
-    def __init__(self, parent=None, dpi_scale=1.0, config_manager=None):
+    def __init__(self, parent=None, dpi_scale=1.0, config_manager=None, language_manager=None):
         super().__init__(parent)
         self.dpi_scale = dpi_scale
         self.config_manager = config_manager
+        self.language_manager = language_manager
         self.current_path = None
         self.root_path = None  # 保存minecraft路径
         self.base_path = None  # 保存当前resourcepacks路径作为返回的根目录
         self.resourcepack_mode = False  # 是否为资源包浏览模式
         self._item_widgets = {}  # 存储资源包项目部件：{full_path: widget}
         self._init_ui()
+
+    def translate(self, key, **kwargs):
+        """翻译辅助方法"""
+        if self.language_manager:
+            text = self.language_manager.translate(key)
+            # 支持字符串格式化
+            if kwargs:
+                try:
+                    text = text.format(**kwargs)
+                except:
+                    pass
+            return text
+        # 如果没有 language_manager，返回键本身或默认值
+        return key
+
+    def update_language(self):
+        """更新界面语言"""
+        # 更新路径标签
+        if self.current_path:
+            self.path_label.setText(self._format_path_display(self.current_path))
+        else:
+            self.path_label.setText(self.translate("file_explorer_no_path"))
+
+        # 更新返回按钮
+        self.back_btn.setText(self.translate("file_explorer_back_to_root"))
+
+        # 如果正在显示错误信息，重新设置错误消息（如果需要）
+        if self.empty_label.isVisible():
+            # 这里可以根据需要重新显示错误消息
+            pass
     
     def _init_ui(self):
         """初始化UI"""
@@ -116,7 +147,7 @@ class FileExplorer(QWidget):
         toolbar_layout.setSpacing(int(8 * self.dpi_scale))
 
         # 当前路径标签（默认隐藏）
-        self.path_label = QLabel("未选择路径")
+        self.path_label = QLabel(self.translate("file_explorer_no_path"))
         self.path_label.setStyleSheet(f"""
             QLabel {{
                 color: rgba(255,255,255, 0.7);
@@ -129,7 +160,7 @@ class FileExplorer(QWidget):
         toolbar_layout.addStretch()
 
         # 返回按钮
-        self.back_btn = QPushButton("返回根目录")
+        self.back_btn = QPushButton(self.translate("file_explorer_back_to_root"))
         self.back_btn.setFixedHeight(int(24 * self.dpi_scale))
         self.back_btn.setStyleSheet(f"""
             QPushButton {{
@@ -208,7 +239,7 @@ class FileExplorer(QWidget):
         layout.addWidget(self.file_tree)
         
         # 空状态提示
-        self.empty_label = QLabel("请选择 Minecraft 安装路径")
+        self.empty_label = QLabel(self.translate("file_explorer_select_path"))
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty_label.setStyleSheet(f"""
             QLabel {{
@@ -238,7 +269,7 @@ class FileExplorer(QWidget):
             self.file_tree.show()
             self._load_directory(self.current_path)
         else:
-            self.empty_label.setText(f"路径不存在: {self.current_path}")
+            self.empty_label.setText(self.translate("file_explorer_path_not_found", path=self.current_path))
             self.empty_label.show()
             self.file_tree.hide()
 
@@ -271,7 +302,7 @@ class FileExplorer(QWidget):
     def navigate_to_directory(self, path):
         """导航到指定目录"""
         if not os.path.exists(path):
-            self.empty_label.setText(f"路径不存在: {path}")
+            self.empty_label.setText(self.translate("file_explorer_path_not_found", path=path))
             self.empty_label.show()
             self.file_tree.hide()
             return
@@ -298,7 +329,7 @@ class FileExplorer(QWidget):
             self.file_tree.show()
             self._load_directory(self.current_path)
         else:
-            self.empty_label.setText(f"路径不存在: {self.current_path}")
+            self.empty_label.setText(self.translate("file_explorer_path_not_found", path=self.current_path))
             self.empty_label.show()
             self.file_tree.hide()
     
@@ -309,7 +340,7 @@ class FileExplorer(QWidget):
 
         version_path = os.path.join(self.root_path, "versions", version_name)
         if not os.path.exists(version_path):
-            self.empty_label.setText(f"版本不存在: {version_name}")
+            self.empty_label.setText(self.translate("file_explorer_version_not_found", version_name=version_name))
             self.empty_label.show()
             self.file_tree.hide()
             return
@@ -332,7 +363,7 @@ class FileExplorer(QWidget):
             self.file_tree.show()
             self._load_directory(resourcepacks_path)
         else:
-            self.empty_label.setText(f"版本 {version_name} 没有resourcepacks文件夹")
+            self.empty_label.setText(self.translate("file_explorer_no_resourcepacks", version_name=version_name))
             self.empty_label.show()
             self.file_tree.hide()
     
@@ -346,13 +377,13 @@ class FileExplorer(QWidget):
         self.file_tree.show()
 
         if not os.path.exists(path):
-            self.empty_label.setText(f"路径不存在: {path}")
+            self.empty_label.setText(self.translate("file_explorer_path_not_found", path=path))
             self.empty_label.show()
             self.file_tree.hide()
             return
 
         if not os.path.isdir(path):
-            self.empty_label.setText(f"不是目录: {path}")
+            self.empty_label.setText(self.translate("file_explorer_not_directory", path=path))
             self.empty_label.show()
             self.file_tree.hide()
             return
@@ -410,11 +441,11 @@ class FileExplorer(QWidget):
                     self._add_item(name, is_dir, full_path)
 
         except PermissionError:
-            self.empty_label.setText("无权限访问此目录")
+            self.empty_label.setText(self.translate("file_explorer_no_permission"))
             self.empty_label.show()
             self.file_tree.hide()
         except Exception as e:
-            self.empty_label.setText(f"加载目录失败: {str(e)}")
+            self.empty_label.setText(self.translate("file_explorer_load_failed", error=str(e)))
             self.empty_label.show()
             self.file_tree.hide()
     

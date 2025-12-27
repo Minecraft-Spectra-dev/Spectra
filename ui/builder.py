@@ -741,12 +741,14 @@ class UIBuilder:
         path_title = QtLabel(self.window.language_manager.translate("instance_path_title"))
         path_title.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-weight:bold;font-family:'{self._get_font_family()}';background:transparent;")
         path_layout.addWidget(path_title)
+        self.window.instance_path_title = path_title  # 保存引用
 
         # 路径描述
         path_desc = QtLabel(self.window.language_manager.translate("instance_path_desc"))
         path_desc.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:'{self._get_font_family()}';background:transparent;")
         path_desc.setWordWrap(True)
         path_layout.addWidget(path_desc)
+        self.window.instance_path_desc = path_desc  # 保存引用
 
         # 路径输入和选择按钮
         path_input_layout = QHBoxLayout()
@@ -793,6 +795,7 @@ class UIBuilder:
         version_title = QtLabel(self.window.language_manager.translate("instance_version_label"))
         version_title.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-weight:bold;font-family:'{self._get_font_family()}';background:transparent;")
         version_container_layout.addWidget(version_title)
+        self.window.instance_version_title = version_title  # 保存引用
 
         # 版本列表（滚动区域）
         from PyQt6.QtWidgets import QWidget as QtWidget
@@ -872,7 +875,11 @@ class UIBuilder:
         pl.addWidget(nav_bar)
 
         # 文件浏览器
-        self.window.file_explorer = FileExplorer(dpi_scale=self.dpi_scale, config_manager=self.window.config_manager)
+        self.window.file_explorer = FileExplorer(
+            dpi_scale=self.dpi_scale,
+            config_manager=self.window.config_manager,
+            language_manager=self.window.language_manager
+        )
 
         # 设置资源包路径
         if resourcepacks_path and os.path.exists(resourcepacks_path):
@@ -969,7 +976,11 @@ class UIBuilder:
         scroll_layout.addWidget(path_container)
 
         # 文件浏览器
-        self.window.file_explorer = FileExplorer(dpi_scale=self.dpi_scale, config_manager=self.window.config_manager)
+        self.window.file_explorer = FileExplorer(
+            dpi_scale=self.dpi_scale,
+            config_manager=self.window.config_manager,
+            language_manager=self.window.language_manager
+        )
         self.window.file_explorer.setFixedHeight(self._scale_size(400))
         scroll_layout.addWidget(self.window.file_explorer)
 
@@ -1935,6 +1946,9 @@ class UIBuilder:
             if title and hasattr(title, 'setText'):
                 title.setText(self.window.language_manager.translate("page_instances"))
 
+            # 更新实例页面的其他文本
+            self._update_instance_page()
+
             # 更新实例页面的占位符文本
             if hasattr(self.window, 'instance_path_input'):
                 self.window.instance_path_input.setPlaceholderText(self.window.language_manager.translate("instance_path_placeholder"))
@@ -2270,4 +2284,18 @@ class UIBuilder:
                     if desc:
                         desc.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:{font_family};background:transparent;")
                     break
+
+    def _update_instance_page(self):
+        """更新实例页面的文本"""
+        # 更新路径标题
+        if hasattr(self.window, 'instance_path_title'):
+            self.window.instance_path_title.setText(self.window.language_manager.translate("instance_path_title"))
+
+        # 更新路径描述
+        if hasattr(self.window, 'instance_path_desc'):
+            self.window.instance_path_desc.setText(self.window.language_manager.translate("instance_path_desc"))
+
+        # 更新版本标题
+        if hasattr(self.window, 'instance_version_title'):
+            self.window.instance_version_title.setText(self.window.language_manager.translate("instance_version_label"))
 

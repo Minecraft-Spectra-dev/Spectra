@@ -47,6 +47,15 @@
     "instance_show_version_resourcepacks": "Show Version Resource Packs",
     "edit_version_name_title": "Enter new version name:",
     "cancel": "Cancel",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "file_explorer_no_path": "No path selected",
+    "file_explorer_back_to_root": "Back to Root",
+    "file_explorer_select_path": "Please select Minecraft installation path",
+    "file_explorer_path_not_found": "Path not found: {path}",
+    "file_explorer_version_not_found": "Version not found: {version_name}",
+    "file_explorer_no_resourcepacks": "Version {version_name} has no resourcepacks folder",
+    "file_explorer_not_directory": "Not a directory: {path}",
+    "file_explorer_no_permission": "No permission to access this directory",
+    "file_explorer_load_failed": "Failed to load directory: {error}"
   }
 }

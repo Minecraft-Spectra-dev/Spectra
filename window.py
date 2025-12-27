@@ -553,6 +553,10 @@ class Window(QWidget):
         # 更新设置页面内容
         self.ui_builder._update_settings_page()
 
+        # 更新文件浏览器文本
+        if hasattr(self, 'file_explorer') and self.file_explorer:
+            self.file_explorer.update_language()
+
     def set_background(self, mode):
         self.config["background_mode"] = mode
         self.config_manager.save_config()
