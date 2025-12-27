@@ -3,6 +3,9 @@
 import json
 import os
 import locale
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class LanguageManager:
@@ -11,6 +14,7 @@ class LanguageManager:
         self.lang_dir = lang_dir
         self.languages = self._load_languages()
         self.current_language = self._get_current_language()
+        logger.info(f"语言管理器初始化完成，当前语言: {self.current_language}")
 
     def _get_system_language(self):
         """获取系统默认语言"""
@@ -43,6 +47,7 @@ class LanguageManager:
         languages = {}
         
         if not os.path.exists(self.lang_dir):
+            logger.warning(f"语言目录不存在: {self.lang_dir}")
             return languages
         
         try:
@@ -64,11 +69,14 @@ class LanguageManager:
                                     'translations': lang_data['translations'],
                                     'filename': filename
                                 }
+                                logger.debug(f"加载语言文件: {filename} ({lang_code})")
                     except json.JSONDecodeError:
+                        logger.error(f"语言文件格式错误: {filename}")
                         continue
         except Exception as e:
-            pass
+            logger.error(f"加载语言文件失败: {e}")
         
+        logger.info(f"成功加载 {len(languages)} 种语言")
         return languages
     
     def _get_current_language(self):

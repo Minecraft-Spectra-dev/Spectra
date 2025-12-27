@@ -1,8 +1,11 @@
 """背景管理器"""
 
 import os
+import logging
 
 from PyQt6.QtCore import QUrl, QSizeF, Qt
+
+logger = logging.getLogger(__name__)
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PyQt6.QtMultimediaWidgets import QGraphicsVideoItem
@@ -16,6 +19,7 @@ class BackgroundManager:
         self.current_video_path = None
         self.bg_label_widget = None
         self.solid_bg_widget = None
+        logger.debug("背景管理器初始化完成")
 
         # 初始化视频组件
         self.video_scene = QGraphicsScene()

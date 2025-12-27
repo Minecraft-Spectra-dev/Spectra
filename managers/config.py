@@ -2,6 +2,9 @@
 
 import json
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigManager:
@@ -13,6 +16,7 @@ class ConfigManager:
         try:
             with open(self.config_file, "r", encoding="utf-8") as f:
                 config = json.load(f)
+                logger.info(f"配置文件加载成功: {self.config_file}")
                 return {
                     "background_mode": config.get("background_mode", "blur"),
                     "background_image_path": config.get("background_image_path", ""),
@@ -29,6 +33,7 @@ class ConfigManager:
                     "favorited_resourcepacks": config.get("favorited_resourcepacks", [])
                 }
         except:
+            logger.warning(f"配置文件加载失败，使用默认配置: {self.config_file}")
             return {
                 "background_mode": "blur",
                 "background_image_path": "",
@@ -62,8 +67,10 @@ class ConfigManager:
             # 保存合并后的配置
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(existing_config, f, ensure_ascii=False, indent=2)
+            logger.info(f"配置保存成功: {self.config_file}")
         except:
             # 如果读取失败，使用原始保存方式
+            logger.error(f"配置保存失败，使用原始保存方式: {self.config_file}")
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, ensure_ascii=False, indent=2)
 

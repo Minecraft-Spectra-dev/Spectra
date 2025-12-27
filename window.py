@@ -17,6 +17,10 @@ from PyQt6.QtWidgets import (QApplication, QColorDialog, QFileDialog,
 from BlurWindow.blurWindow import blur
 
 from managers import BackgroundManager, ConfigManager, LanguageManager
+from managers.log_manager import get_logger
+
+logger = get_logger(__name__)
+
 from styles import STYLE_BTN, STYLE_BTN_ACTIVE
 from ui import UIBuilder
 from utils import load_svg_icon, scale_icon_for_display
@@ -63,12 +67,14 @@ class Window(QWidget):
 
     def __init__(self):
         super().__init__()
+        logger.info("正在初始化主窗口...")
         self.config_manager = ConfigManager()
         self.config = self.config_manager.config
         self.bg_manager = BackgroundManager(self)
         self.language_manager = LanguageManager(self.config_manager)
 
         self.dpi_scale = self._get_system_dpi_scale()
+        logger.info(f"系统DPI缩放比例: {self.dpi_scale:.2f}")
 
         self.ui_builder = UIBuilder(self)
         self.edge_size = self.ui_builder._scale_size(8)
@@ -92,6 +98,7 @@ class Window(QWidget):
         self.resize_edge = None
         self.current_bg_path = None
         self.switch_page(0)
+        logger.info("主窗口初始化完成")
 
         # 应用初始字体设置（在所有 UI 初始化完成后立即应用）
         self.apply_font()

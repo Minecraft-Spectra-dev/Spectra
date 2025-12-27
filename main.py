@@ -2,34 +2,12 @@
 
 import os
 import sys
-import logging
-from datetime import datetime
 from pathlib import Path
 
-# 设置日志输出
-log_dir = Path("logs")
-log_dir.mkdir(exist_ok=True)
-log_file = log_dir / "latest.log"
-
-# 配置日志
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(log_file, encoding='utf-8'),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logger = logging.getLogger(__name__)
-
-# 重定向所有异常到日志
-def handle_exception(exc_type, exc_value, exc_traceback):
-    if issubclass(exc_type, KeyboardInterrupt):
-        sys.__excepthook__(exc_type, exc_value, exc_traceback)
-        return
-    logger.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
-
-sys.excepthook = handle_exception
+# 初始化日志系统（在其他导入之前）
+from managers.log_manager import LogManager
+log_manager = LogManager(log_dir="logs", level="INFO")
+logger = log_manager.get_logger(__name__)
 
 # 禁用 FFmpeg 日志输出
 if sys.platform == 'win32':
@@ -58,6 +36,7 @@ if __name__ == "__main__":
     os.environ["QT_SCALE_FACTOR"] = "1"
 
     app = QApplication(sys.argv)
+    logger.info("QApplication created")
 
     # 创建并显示启动画面
     splash = SplashScreen()
