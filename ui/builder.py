@@ -1026,7 +1026,7 @@ class UIBuilder:
 
         # 版本选择（固定长度的长条，用于选择下载目标）
         self.window.download_version_combo = QComboBox()
-        self._setup_combobox(self.window.download_version_combo, width=150)
+        self._setup_combobox(self.window.download_version_combo, width=230)
         self.window.download_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))  # 根目录
         search_layout.addWidget(self.window.download_version_combo, 2)
 
