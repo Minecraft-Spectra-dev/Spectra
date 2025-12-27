@@ -74,6 +74,7 @@ class ModrinthResultCard(QWidget):
         # 信息区域
         info_layout = QVBoxLayout()
         info_layout.setSpacing(int(4 * dpi_scale))
+        info_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         
         # 标题
         self.title_label = QLabel(project_data.get('title', 'Unknown'))
@@ -103,29 +104,23 @@ class ModrinthResultCard(QWidget):
         
         # 统计信息（下载量、关注数等）
         stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(int(16 * dpi_scale))
+        stats_layout.setSpacing(0)  # 移除间距
+        stats_layout.setContentsMargins(0, 0, 0, 0)
         
         downloads = project_data.get('downloads', 0)
         follows = project_data.get('follows', 0)
         
-        downloads_label = QLabel(f"↓ {self._format_number(downloads)}")
+        # 使用单个标签显示下载量和喜欢数
+        stats_text = f"↓ {self._format_number(downloads)}  ♥ {self._format_number(follows)}"
+        stats_label = QLabel(stats_text)
         stats_font = QFont()
         stats_font.setFamily("Microsoft YaHei UI")
         stats_font.setPointSize(int(8 * dpi_scale))
-        downloads_label.setFont(stats_font)
-        downloads_label.setStyleSheet("color: rgba(255, 255, 255, 0.6); background: transparent;")
-        downloads_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        stats_layout.addWidget(downloads_label)
+        stats_label.setFont(stats_font)
+        stats_label.setStyleSheet("color: rgba(255, 255, 255, 0.6); background: transparent;")
+        stats_layout.addWidget(stats_label)
         
-        follows_label = QLabel(f"♥ {self._format_number(follows)}")
-        follows_label.setFont(stats_font)
-        follows_label.setStyleSheet("color: rgba(255, 255, 255, 0.6); background: transparent;")
-        follows_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        stats_layout.addWidget(follows_label)
-        
-        info_layout.addLayout(stats_layout)
-        # 添加 stretch 让内容顶部对齐
-        info_layout.addStretch()
+        info_layout.addLayout(stats_layout, 0)
         card_layout.addLayout(info_layout, 1)
         
         # 下载按钮
