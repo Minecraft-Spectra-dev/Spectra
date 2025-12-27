@@ -1109,6 +1109,12 @@ class UIBuilder:
         ]
         # 当前选中的平台索引
         self.window.current_download_platform = 0
+        # 分页状态
+        self.window.download_current_page = 1
+        self.window.download_total_pages = 1
+        self.window.download_total_hits = 0
+        self.window.download_per_page = 20
+        self.window.download_last_query = ""
 
         # 平台选择按钮靠左
         controls_layout.addWidget(platform_container, 0, Qt.AlignmentFlag.AlignLeft)
@@ -1168,6 +1174,13 @@ class UIBuilder:
         # 使用统一的滚动区域创建方法
         scroll_area = self._create_scroll_area()
         scroll_content, scroll_layout = self._create_scroll_content()
+        
+        # 顶部翻页控件（在滚动内容内部）
+        top_pagination = self._create_pagination_control()
+        self.window.download_top_pagination = top_pagination
+        top_pagination.setVisible(False)  # 初始隐藏
+        scroll_layout.addWidget(top_pagination)
+        
         scroll_layout.addStretch()
         
         # 保存滚动内容区域的引用，用于显示搜索结果
@@ -1181,6 +1194,121 @@ class UIBuilder:
         self._load_versions_to_download_combo()
 
         return page
+
+    def _create_pagination_control(self):
+        """创建翻页控件"""
+        from PyQt6.QtCore import QSize
+        
+        pagination_container = QWidget()
+        pagination_container.setStyleSheet("background: rgba(255, 255, 255, 0.05); border-radius: 8px;")
+        pagination_layout = QHBoxLayout(pagination_container)
+        pagination_layout.setContentsMargins(self._scale_size(12), self._scale_size(6), self._scale_size(12), self._scale_size(6))
+        pagination_layout.setSpacing(self._scale_size(8))
+        
+        # 上一页按钮
+        prev_btn = QPushButton()
+        prev_btn.setFixedSize(self._scale_size(28), self._scale_size(28))
+        prev_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        prev_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 0.1);
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.2);
+            }
+            QPushButton:disabled {
+                background: rgba(255, 255, 255, 0.05);
+            }
+        """)
+        prev_pixmap = load_svg_icon("svg/caret-left.svg", self.dpi_scale)
+        if prev_pixmap:
+            prev_btn.setIcon(QIcon(scale_icon_for_display(prev_pixmap, 14, self.dpi_scale)))
+            prev_btn.setIconSize(QSize(self._scale_size(14), self._scale_size(14)))
+        prev_btn.setEnabled(False)
+        prev_btn.clicked.connect(self._on_prev_page)
+        pagination_layout.addWidget(prev_btn)
+        
+        # 页面信息标签
+        page_info_label = QLabel("Page 1 of 1")
+        page_info_label.setStyleSheet("color: rgba(255, 255, 255, 0.8); font-size: 12px; background: transparent;")
+        page_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pagination_layout.addWidget(page_info_label)
+        
+        # 下一页按钮
+        next_btn = QPushButton()
+        next_btn.setFixedSize(self._scale_size(28), self._scale_size(28))
+        next_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        next_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 0.1);
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.2);
+            }
+            QPushButton:disabled {
+                background: rgba(255, 255, 255, 0.05);
+            }
+        """)
+        next_pixmap = load_svg_icon("svg/caret-right.svg", self.dpi_scale)
+        if next_pixmap:
+            next_btn.setIcon(QIcon(scale_icon_for_display(next_pixmap, 14, self.dpi_scale)))
+            next_btn.setIconSize(QSize(self._scale_size(14), self._scale_size(14)))
+        next_btn.setEnabled(False)
+        next_btn.clicked.connect(self._on_next_page)
+        pagination_layout.addWidget(next_btn)
+        
+        # 添加弹性空间
+        pagination_layout.addStretch()
+        
+        # 页码选择框
+        page_combo = QComboBox()
+        page_combo.setFixedHeight(self._scale_size(24))
+        page_combo.setMaximumWidth(self._scale_size(80))
+        page_combo.setStyleSheet(f"""
+            QComboBox {{
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: {self._scale_size(4)}px;
+                padding: {self._scale_size(2)}px {self._scale_size(6)}px;
+                color: white;
+                font-size: 11px;
+            }}
+            QComboBox:hover {{
+                background: rgba(255, 255, 255, 0.15);
+            }}
+            QComboBox::drop-down {{
+                border: none;
+                width: 16px;
+            }}
+            QComboBox::down-arrow {{
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 5px solid rgba(255, 255, 255, 0.6);
+            }}
+            QComboBox QAbstractItemView {{
+                background: rgba(0, 0, 0, 0.9);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 4px;
+                selection-background-color: rgba(255, 255, 255, 0.2);
+                color: white;
+            }}
+        """)
+        page_combo.addItems(["1"])
+        page_combo.currentIndexChanged.connect(self._on_page_selected)
+        pagination_layout.addWidget(page_combo)
+        
+        # 保存控件的引用
+        pagination_container.prev_btn = prev_btn
+        pagination_container.next_btn = next_btn
+        pagination_container.page_info_label = page_info_label
+        pagination_container.page_combo = page_combo
+        
+        return pagination_container
 
     def _load_versions_to_download_combo(self):
         """从.minecraft路径加载版本列表到下载页面的下拉框（用于选择下载目标）"""
@@ -1313,10 +1441,14 @@ class UIBuilder:
         else:  # 全部平台 - 默认搜索 Modrinth
             self._search_modrinth(query)
     
-    def _search_modrinth(self, query):
+    def _search_modrinth(self, query, page=1):
         """搜索 Modrinth 项目"""
         from managers.modrinth_manager import ModrinthManager
         from PyQt6.QtCore import QThread, pyqtSignal, QTimer
+        
+        # 保存搜索查询
+        self.window.download_last_query = query
+        self.window.download_current_page = page
         
         # 清除之前的搜索结果
         self._clear_search_results()
@@ -1330,10 +1462,13 @@ class UIBuilder:
                 manager = ModrinthManager()
                 # 添加资源包类型筛选
                 facets = [["project_type:resourcepack"]]
-                result = manager.search_projects(query, facets=facets, limit=10)
+                # 计算偏移量
+                offset = (page - 1) * self.window.download_per_page
+                result = manager.search_projects(query, facets=facets, limit=self.window.download_per_page, offset=offset)
                 hits = result.get('hits', [])
+                total_hits = result.get('total_hits', 0)
                 # 使用 QTimer 再次延迟，确保在主线程执行
-                QTimer.singleShot(0, lambda: self._on_modrinth_search_finished(hits))
+                QTimer.singleShot(0, lambda: self._on_modrinth_search_finished(hits, total_hits))
             except Exception as e:
                 logger.error(f"Modrinth search failed: {e}")
                 QTimer.singleShot(0, lambda: self._on_search_error(str(e)))
@@ -1347,12 +1482,19 @@ class UIBuilder:
     def _clear_search_results(self):
         """清除搜索结果"""
         if hasattr(self.window, 'download_scroll_layout'):
-            # 清除搜索结果，保留最后一个 stretch
+            # 清除搜索结果，保留最后一个 stretch 和顶部翻页控件
             layout = self.window.download_scroll_layout
-            # 从后向前删除，保留最后一个 stretch
+            # 从后向前删除，保留最后一个 stretch 和顶部翻页控件
             for i in range(layout.count() - 2, -1, -1):
                 item = layout.itemAt(i)
                 if item and item.widget():
+                    # 跳过顶部翻页控件
+                    if hasattr(self.window, 'download_top_pagination') and item.widget() == self.window.download_top_pagination:
+                        continue
+                    # 隐藏底部翻页控件（但不删除）
+                    if hasattr(self.window, 'download_bottom_pagination') and item.widget() == self.window.download_bottom_pagination:
+                        self.window.download_bottom_pagination.hide()
+                        continue
                     widget = item.widget()
                     widget.setParent(None)
                     widget.deleteLater()
@@ -1367,7 +1509,7 @@ class UIBuilder:
             layout = self.window.download_scroll_layout
             layout.insertWidget(layout.count() - 1, loading_label)
     
-    def _on_modrinth_search_finished(self, hits):
+    def _on_modrinth_search_finished(self, hits, total_hits):
         """Modrinth 搜索完成"""
         # 清除加载消息
         self._clear_search_results()
@@ -1377,9 +1519,19 @@ class UIBuilder:
             self._show_no_results_message()
             return
         
+        # 更新分页信息
+        self.window.download_total_hits = total_hits
+        self.window.download_total_pages = (total_hits + self.window.download_per_page - 1) // self.window.download_per_page
+        self._update_pagination_controls()
+        
         # 显示搜索结果
         layout = self.window.download_scroll_layout
-        start_index = layout.count() - 1  # 在 stretch 之前插入
+        
+        # 如果有分页，在顶部翻页控件之后插入卡片；否则在布局开头插入
+        if self.window.download_total_pages > 1:
+            start_index = 1  # 顶部翻页控件在第0位
+        else:
+            start_index = 0  # 没有翻页控件，从0开始
         
         # 使用 QTimer 延迟创建和添加卡片，分批渲染
         def create_and_add_cards(current_hit_index=0):
@@ -1387,6 +1539,7 @@ class UIBuilder:
             batch_size = 2
             end_hit_index = min(current_hit_index + batch_size, len(hits))
             
+            # 计算插入位置：start_index + 已添加的卡片数
             insert_index = start_index + current_hit_index
             
             for i in range(current_hit_index, end_hit_index):
@@ -1412,23 +1565,90 @@ class UIBuilder:
                     on_download=make_download_handler(project_data)
                 )
                 
-                # 立即显示卡片
-                result_card.show()
-                result_card.update()
-                
-                # 添加到滚动区域
+                # 添加到滚动区域（不立即显示，避免窗口闪烁）
                 layout.insertWidget(insert_index, result_card)
                 insert_index += 1
             
             # 如果还有卡片要添加，继续下一批
             if end_hit_index < len(hits):
                 QTimer.singleShot(10, lambda idx=end_hit_index: create_and_add_cards(idx))
+            else:
+                # 所有卡片添加完成后，显示或更新底部翻页控件
+                if self.window.download_total_pages > 1:
+                    if not hasattr(self.window, 'download_bottom_pagination') or self.window.download_bottom_pagination is None:
+                        # 首次创建底部翻页控件
+                        bottom_pagination = self._create_pagination_control()
+                        self.window.download_bottom_pagination = bottom_pagination
+                    # 显示并更新底部翻页控件
+                    self.window.download_bottom_pagination.setVisible(True)
+                    # 在 stretch 之前插入
+                    layout.insertWidget(layout.count() - 1, self.window.download_bottom_pagination)
+                    # 更新底部翻页控件状态
+                    self._update_bottom_pagination_control()
         
         # 开始分批创建卡片
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(50, create_and_add_cards)
         
         logger.info(f"Modrinth search completed: {len(hits)} results found")
+    
+    def _update_pagination_controls(self):
+        """更新顶部翻页控件状态"""
+        if self.window.download_total_pages > 1:
+            # 显示顶部翻页控件
+            self.window.download_top_pagination.setVisible(True)
+            
+            # 更新页面信息
+            self.window.download_top_pagination.page_info_label.setText(f"Page {self.window.download_current_page} of {self.window.download_total_pages}")
+            
+            # 更新上一页/下一页按钮状态
+            self.window.download_top_pagination.prev_btn.setEnabled(self.window.download_current_page > 1)
+            self.window.download_top_pagination.next_btn.setEnabled(self.window.download_current_page < self.window.download_total_pages)
+            
+            # 更新页码下拉框
+            self.window.download_top_pagination.page_combo.blockSignals(True)
+            self.window.download_top_pagination.page_combo.clear()
+            for i in range(1, self.window.download_total_pages + 1):
+                self.window.download_top_pagination.page_combo.addItem(str(i))
+            self.window.download_top_pagination.page_combo.setCurrentIndex(self.window.download_current_page - 1)
+            self.window.download_top_pagination.page_combo.blockSignals(False)
+        else:
+            # 隐藏顶部翻页控件
+            self.window.download_top_pagination.setVisible(False)
+    
+    def _update_bottom_pagination_control(self):
+        """更新底部翻页控件状态"""
+        if hasattr(self.window, 'download_bottom_pagination') and self.window.download_bottom_pagination:
+            # 更新页面信息
+            self.window.download_bottom_pagination.page_info_label.setText(f"Page {self.window.download_current_page} of {self.window.download_total_pages}")
+            
+            # 更新上一页/下一页按钮状态
+            self.window.download_bottom_pagination.prev_btn.setEnabled(self.window.download_current_page > 1)
+            self.window.download_bottom_pagination.next_btn.setEnabled(self.window.download_current_page < self.window.download_total_pages)
+            
+            # 更新页码下拉框
+            self.window.download_bottom_pagination.page_combo.blockSignals(True)
+            self.window.download_bottom_pagination.page_combo.clear()
+            for i in range(1, self.window.download_total_pages + 1):
+                self.window.download_bottom_pagination.page_combo.addItem(str(i))
+            self.window.download_bottom_pagination.page_combo.setCurrentIndex(self.window.download_current_page - 1)
+            self.window.download_bottom_pagination.page_combo.blockSignals(False)
+    
+    def _on_prev_page(self):
+        """上一页"""
+        if self.window.download_current_page > 1:
+            self._search_modrinth(self.window.download_last_query, self.window.download_current_page - 1)
+    
+    def _on_next_page(self):
+        """下一页"""
+        if self.window.download_current_page < self.window.download_total_pages:
+            self._search_modrinth(self.window.download_last_query, self.window.download_current_page + 1)
+    
+    def _on_page_selected(self, index):
+        """选择特定页码"""
+        page = index + 1
+        if page != self.window.download_current_page:
+            self._search_modrinth(self.window.download_last_query, page)
     
     def _on_search_error(self, error):
         """搜索错误处理"""
