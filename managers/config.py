@@ -29,9 +29,9 @@ class ConfigManager:
                 config = json.load(f)
                 logger.info(f"配置文件加载成功: {self.config_file}")
                 return {
-                    "background_mode": config.get("background_mode", "blur"),
+                    "background_mode": config.get("background_mode", "solid"),
                     "background_image_path": config.get("background_image_path", ""),
-                    "background_color": config.get("background_color", "#00000000"),
+                    "background_color": config.get("background_color", "#000000"),
                     "window_width": config.get("window_width", 900),
                     "window_height": config.get("window_height", 600),
                     "blur_opacity": config.get("blur_opacity", 80),
@@ -50,9 +50,9 @@ class ConfigManager:
         except:
             logger.warning(f"配置文件加载失败，使用默认配置: {self.config_file}")
             return {
-                "background_mode": "blur",
+                "background_mode": "solid",
                 "background_image_path": "",
-                "background_color": "#00000000",
+                "background_color": "#000000",
                 "window_width": 900,
                 "window_height": 600,
                 "blur_opacity": 80,

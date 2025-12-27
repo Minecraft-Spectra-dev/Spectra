@@ -118,9 +118,16 @@ class Window(QWidget):
 
         # 根据配置加载背景
         background_mode = self.config.get("background_mode", "image")
-        if background_mode == "solid":
-            color = self.config.get("background_color", "#00000000")
-            self.bg_manager.set_solid_color(color)
+        if background_mode == "solid" or background_mode == "blur":
+            # 合并 solid 和 blur 模式，都使用纯色背景
+            color = self.config.get("background_color", "#000000")
+            opacity_value = self.config.get("blur_opacity", 150)
+            # 纯色背景直接使用 opacity_value（不反转）
+            self.bg_manager.set_solid_color(color, opacity_value)
+            # 如果是原来的 blur 模式，更新配置为 solid
+            if background_mode == "blur":
+                self.config["background_mode"] = "solid"
+                self.config_manager.save_config()
         elif background_mode == "image" and self.config.get("background_image_path"):
             if os.path.exists(self.config.get("background_image_path")):
                 self.set_background_image(self.config.get("background_image_path"))
@@ -604,6 +611,17 @@ class Window(QWidget):
             blur(self.winId())
         ctypes.windll.dwmapi.DwmSetWindowAttribute(int(self.winId()), 33, ctypes.byref(ctypes.c_int(2)), 4)
         self.apply_opacity()
+        # 确保背景控件在所有控件的最底层
+        self._ensure_background_at_bottom()
+
+    def _ensure_background_at_bottom(self):
+        """确保背景控件在所有控件的最底层"""
+        # 使用 QTimer 延迟执行，确保所有 UI 控件都已经布局完成
+        QTimer.singleShot(0, self._do_ensure_background_at_bottom)
+
+    def _do_ensure_background_at_bottom(self):
+        """实际执行确保背景控件在最底层的操作"""
+        self.bg_manager._ensure_widgets_at_bottom()
 
     def switch_page(self, index):
         self.stack.setCurrentIndex(index)
@@ -813,45 +831,91 @@ class Window(QWidget):
             else:
                 card.check_label.clear()
 
-        if mode == "blur":
-            set_card_selected(self.blur_card, True)
-            if hasattr(self, 'solid_card'):
-                set_card_selected(self.solid_card, False)
-                self.color_widget.setVisible(False)
-            set_card_selected(self.image_card, False)
-            self.path_widget.setVisible(False)
-            self.opacity_widget.setVisible(True)
-            self.apply_opacity()
-            # 根据模糊开关决定是否应用模糊效果
-            if self.config.get("background_blur_enabled", True):
-                blur(self.winId())
-            self.bg_manager.hide()
-
-        elif mode == "solid":
-            set_card_selected(self.blur_card, False)
+        if mode == "solid":
+            # 合并后的纯色背景（包括原来的黑色背景）
             if hasattr(self, 'solid_card'):
                 set_card_selected(self.solid_card, True)
             set_card_selected(self.image_card, False)
             if hasattr(self, 'solid_card'):
                 self.path_widget.setVisible(False)
-            self.opacity_widget.setVisible(False)
             self.color_widget.setVisible(True)
-            color = self.config.get("background_color", "#00000000")
-            self.bg_manager.set_solid_color(color)
+            # 显示不透明度滑块
+            if hasattr(self, 'opacity_widget'):
+                self.opacity_widget.setVisible(True)
+            # 显示模糊开关
+            if hasattr(self, 'blur_toggle_widget'):
+                self.blur_toggle_widget.setVisible(True)
+            # 使用 RGB 颜色 + 不透明度
+            color = self.config.get("background_color", "#000000")
+            opacity_value = self.config.get("blur_opacity", 150)
+            # 纯色背景直接使用 opacity_value（不反转）
+            self.bg_manager.set_solid_color(color, opacity_value)
+            # 刷新侧边栏和右侧面板的透明度
+            self.apply_opacity(opacity_value=opacity_value)
+            # 根据模糊开关决定是否应用模糊效果
+            if self.config.get("background_blur_enabled", True):
+                blur(self.winId())
+            else:
+                # 清除模糊效果
+                try:
+                    from BlurWindow.blurWindow import (
+                        ACCENTPOLICY,
+                        WINDOWCOMPOSITIONATTRIBDATA
+                    )
+                    accent = ACCENTPOLICY()
+                    accent.AccentState = 0  # ACCENT_DISABLED
+                    accent.AccentFlags = 0
+                    accent.GradientColor = 0
+                    accent.AnimationId = 0
+                    data = WINDOWCOMPOSITIONATTRIBDATA()
+                    data.Attribute = 19  # WCA_ACCENT_POLICY
+                    data.SizeOfData = ctypes.sizeof(accent)
+                    data.Data = ctypes.cast(ctypes.pointer(accent), ctypes.POINTER(ctypes.c_int))
+                    user32 = ctypes.windll.user32
+                    user32.SetWindowCompositionAttribute(int(self.winId()), data)
+                except Exception as e:
+                    logger.error(f"Failed to disable blur: {e}")
+                self.update()
+                self.repaint()
 
         elif mode == "image":
-            set_card_selected(self.blur_card, False)
             if hasattr(self, 'solid_card'):
                 set_card_selected(self.solid_card, False)
                 self.color_widget.setVisible(False)
             set_card_selected(self.image_card, True)
             if hasattr(self, 'solid_card'):
                 self.path_widget.setVisible(True)
-            self.opacity_widget.setVisible(False)
             if hasattr(self, 'solid_card'):
                 self.color_widget.setVisible(False)
+            # 隐藏不透明度滑块
+            if hasattr(self, 'opacity_widget'):
+                self.opacity_widget.setVisible(False)
+            # 隐藏模糊开关
+            if hasattr(self, 'blur_toggle_widget'):
+                self.blur_toggle_widget.setVisible(False)
             if self.config.get("background_image_path") and os.path.exists(self.config.get("background_image_path")):
                 self.set_background_image(self.config.get("background_image_path"))
+            # 清除模糊效果
+            try:
+                from BlurWindow.blurWindow import (
+                    ACCENTPOLICY,
+                    WINDOWCOMPOSITIONATTRIBDATA
+                )
+                accent = ACCENTPOLICY()
+                accent.AccentState = 0  # ACCENT_DISABLED
+                accent.AccentFlags = 0
+                accent.GradientColor = 0
+                accent.AnimationId = 0
+                data = WINDOWCOMPOSITIONATTRIBDATA()
+                data.Attribute = 19  # WCA_ACCENT_POLICY
+                data.SizeOfData = ctypes.sizeof(accent)
+                data.Data = ctypes.cast(ctypes.pointer(accent), ctypes.POINTER(ctypes.c_int))
+                user32 = ctypes.windll.user32
+                user32.SetWindowCompositionAttribute(int(self.winId()), data)
+            except Exception as e:
+                logger.error(f"Failed to disable blur: {e}")
+            self.update()
+            self.repaint()
 
     def set_background_image(self, path):
         self.bg_manager.set_background_image(path)
@@ -867,17 +931,51 @@ class Window(QWidget):
             self.config["background_image_path"] = ""
             self.config_manager.save_config()
 
-    def on_opacity_changed(self, value):
-        self.config["blur_opacity"] = value
-        self.config_manager.save_config()
+    def on_opacity_preview(self, value):
+        """预览不透明度变化，不保存配置"""
+        # 统一的百分比计算：10-255 映射到 0%-100%
         opacity_percent = int((value - 10) / (255 - 10) * 100)
         self.opacity_value_label.setText(str(opacity_percent) + "%")
-        self.apply_opacity()
+        # 直接传入 value 参数，而不是从配置读取
+        self.apply_opacity(opacity_value=value)
 
-    def apply_opacity(self):
-        opacity_value = self.config.get("blur_opacity", 150)
-        self.right_panel.setStyleSheet(f"background:rgba(0,0,0,{opacity_value});")
-        self.sidebar.setStyleSheet(f"background:rgba(0,0,0,{opacity_value});")
+        # 只在纯色背景下应用不透明度
+        background_mode = self.config.get("background_mode", "solid")
+        if background_mode == "solid":
+            color = self.config.get("background_color", "#000000")
+            # 纯色背景直接使用 value（不反转）
+            self.bg_manager.set_solid_color(color, value)
+
+    def on_opacity_released(self):
+        """滑块松开时保存配置"""
+        value = self.opacity_slider.value()
+        self.config["blur_opacity"] = value
+        self.config_manager.save_config()
+
+    def apply_opacity(self, opacity_value=None):
+        """应用不透明度，opacity_value 为 None 时从配置读取"""
+        if opacity_value is None:
+            opacity_value = self.config.get("blur_opacity", 150)
+        # 使用配置的背景颜色，而不是固定黑色
+        background_mode = self.config.get("background_mode", "solid")
+        
+        if background_mode == "solid":
+            # 纯色背景模式：不透明度滑块直接控制纯色背景的透明度
+            # value=255 (100%) -> alpha=255 (不透明，显示纯色)
+            # value=10 (0%) -> alpha=10 (透明，看不到纯色)
+            color_str = self.config.get("background_color", "#000000")
+            from PyQt6.QtGui import QColor
+            qcolor = QColor(color_str)
+            r, g, b = qcolor.red(), qcolor.green(), qcolor.blue()
+            self.right_panel.setStyleSheet(f"background:rgba({r},{g},{b},{opacity_value});")
+            self.sidebar.setStyleSheet(f"background:rgba({r},{g},{b},{opacity_value});")
+        else:
+            # 图像背景模式：侧边栏和右侧面板使用黑色背景，不透明度控制透明度
+            # 图像/视频本身不变化，始终完整显示在窗口下方
+            # value=255 (100%) -> alpha=255 (不透明，显示黑色，看不到窗口后面的东西)
+            # value=10 (0%) -> alpha=10 (透明，能看到窗口后面的东西)
+            self.right_panel.setStyleSheet(f"background:rgba(0,0,0,{opacity_value});")
+            self.sidebar.setStyleSheet(f"background:rgba(0,0,0,{opacity_value});")
         # 更新下拉框的透明度（主页透明度 + 20）
         # dropdown_opacity_value = min(255, opacity_value + 20)
         # dropdown_opacity_rgba = dropdown_opacity_value / 255.0
@@ -896,23 +994,24 @@ class Window(QWidget):
             self.set_background_image(file)
 
     def choose_background_color(self):
-        color_str = self.config.get("background_color", "#00000000")
+        color_str = self.config.get("background_color", "#000000")
         try:
             current_color = QColor(color_str)
             if not current_color.isValid():
-                current_color = QColor(0, 0, 0, 0)
+                current_color = QColor(0, 0, 0)
         except:
-            current_color = QColor(0, 0, 0, 0)
+            current_color = QColor(0, 0, 0)
 
         color = QColorDialog.getColor(
             current_color,
             self,
-            "选择背景颜色",
-            QColorDialog.ColorDialogOption.ShowAlphaChannel
+            "选择背景颜色"
         )
 
         if color.isValid():
-            color_str = color.name(QColor.NameFormat.HexArgb)
+            # 只保存 RGB 部分（不包含 alpha）
+            r, g, b = color.red(), color.green(), color.blue()
+            color_str = QColor(r, g, b, 255).name(QColor.NameFormat.HexRgb)
             self.color_input.setText(color_str)
             self.on_color_changed()
 
@@ -925,12 +1024,17 @@ class Window(QWidget):
                 self.config_manager.save_config()
 
                 if hasattr(self, 'color_btn'):
+                    # 预览按钮使用当前不透明度
+                    opacity_value = self.config.get("blur_opacity", 150)
+                    preview_color = QColor(color.red(), color.green(), color.blue(), opacity_value)
                     self.color_btn.setStyleSheet(
-                        f"QPushButton{{background:{color_str};border:1px solid rgba(255,255,255,0.3);border-radius:4px;}}QPushButton:hover{{background:{color_str};border:1px solid rgba(255,255,255,0.5);}}"
+                        f"QPushButton{{background:{preview_color.name(QColor.NameFormat.HexArgb)};border:1px solid rgba(255,255,255,0.3);border-radius:4px;}}QPushButton:hover{{background:{preview_color.name(QColor.NameFormat.HexArgb)};border:1px solid rgba(255,255,255,0.5);}}"
                     )
 
                 if self.config.get("background_mode") == "solid":
-                    self.bg_manager.set_solid_color(color_str)
+                    # 使用不透明度选项控制透明度
+                    opacity_value = self.config.get("blur_opacity", 150)
+                    self.bg_manager.set_solid_color(color_str, opacity_value)
         except:
             pass
 

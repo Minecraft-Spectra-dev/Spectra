@@ -556,24 +556,11 @@ class UIBuilder:
 
         self.window.appearance_content = self.window.appearance_container.layout().itemAt(1).widget()
 
-        # 模糊背景卡片
-        self.window.blur_card = self.create_bg_card(
-            self.window.language_manager.translate("background_blur"),
-            self.window.language_manager.translate("background_blur_desc"),
-            self.window.config.get("background_mode") == "blur",
-            lambda: self.window.set_background("blur")
-        )
-        self.window.appearance_content_layout.addWidget(self.window.blur_card)
-
-        # 透明度滑块
-        self._create_opacity_slider()
-        self.window.appearance_content_layout.addWidget(self.window.opacity_widget)
-
-        # 纯色背景卡片
+        # 纯色背景卡片（合并原来的黑色背景和纯色背景）- 放在最前面
         self.window.solid_card = self.create_bg_card(
             self.window.language_manager.translate("background_solid"),
             self.window.language_manager.translate("background_solid_desc"),
-            self.window.config.get("background_mode") == "solid",
+            self.window.config.get("background_mode") == "blur" or self.window.config.get("background_mode") == "solid",
             lambda: self.window.set_background("solid")
         )
         self.window.appearance_content_layout.addWidget(self.window.solid_card)
@@ -581,6 +568,10 @@ class UIBuilder:
         # 颜色选择区域
         self._create_color_picker()
         self.window.appearance_content_layout.addWidget(self.window.color_widget)
+
+        # 不透明度滑块（纯色背景子选项）- 紧跟在颜色选择之后
+        self._create_opacity_slider()
+        self.window.appearance_content_layout.addWidget(self.window.opacity_widget)
 
         # 图片背景卡片
         self.window.image_card = self.create_bg_card(
@@ -2029,14 +2020,17 @@ Spectra Information:
         border_radius = self._scale_size(8)
         self.window.opacity_widget.setStyleSheet(f"background:rgba(255,255,255,0);border-bottom-left-radius:{border_radius}px;border-bottom-right-radius:{border_radius}px;")
         opacity_layout = QVBoxLayout(self.window.opacity_widget)
-        opacity_layout.setContentsMargins(self._scale_size(35), self._scale_size(8), self._scale_size(15), self._scale_size(8))
+        # 作为纯色背景的子选项，增加左边距
+        opacity_layout.setContentsMargins(self._scale_size(50), self._scale_size(8), self._scale_size(15), self._scale_size(8))
         opacity_layout.setSpacing(self._scale_size(4))
 
         opacity_header_layout = QHBoxLayout()
-        opacity_label = QLabel(self.window.language_manager.translate("blur_opacity"))
+        opacity_label = QLabel(self.window.language_manager.translate("opacity"))
         opacity_label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'{self._get_font_family()}';")
         opacity_value = QLabel()
-        opacity_value.setText(str(int((self.window.config.get("blur_opacity", 150) - 10) / (255 - 10) * 100)) + "%")
+        # 统一的百分比计算：10-255 映射到 0%-100%
+        opacity_percent = int((self.window.config.get("blur_opacity", 150) - 10) / (255 - 10) * 100)
+        opacity_value.setText(str(opacity_percent) + "%")
         opacity_value.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'{self._get_font_family()}';")
         self.window.opacity_value_label = opacity_value
         opacity_header_layout.addWidget(opacity_label)
@@ -2044,16 +2038,19 @@ Spectra Information:
         opacity_header_layout.addWidget(opacity_value)
         opacity_layout.addLayout(opacity_header_layout)
         # 注册到 TextRenderer
-        self.text_renderer.register_widget(opacity_label, "blur_opacity", group="settings_page")
+        self.text_renderer.register_widget(opacity_label, "opacity", group="settings_page")
 
         self.window.opacity_slider = QSlider(Qt.Orientation.Horizontal)
         self.window.opacity_slider.setRange(10, 255)
         self.window.opacity_slider.setValue(self.window.config.get("blur_opacity", 150))
         self.window.opacity_slider.setStyleSheet(SLIDER_STYLE)
-        self.window.opacity_slider.valueChanged.connect(self.window.on_opacity_changed)
+        # 使用 sliderReleased 而不是 valueChanged，只在松开滑块时保存配置
+        self.window.opacity_slider.valueChanged.connect(self.window.on_opacity_preview)
+        self.window.opacity_slider.sliderReleased.connect(self.window.on_opacity_released)
         opacity_layout.addWidget(self.window.opacity_slider)
 
-        self.window.opacity_widget.setVisible(self.window.config.get("background_mode") == "blur")
+        # 不透明度滑块只在纯色背景模式下显示
+        self.window.opacity_widget.setVisible(self.window.config.get("background_mode") == "solid")
 
     def _create_path_input(self):
         self.window.path_widget = QWidget()
@@ -2104,7 +2101,8 @@ Spectra Information:
         border_radius = self._scale_size(8)
         self.window.color_widget.setStyleSheet(f"background:rgba(255,255,255,0);border-bottom-left-radius:{border_radius}px;border-bottom-right-radius:{border_radius}px;")
         color_layout = QHBoxLayout(self.window.color_widget)
-        color_layout.setContentsMargins(self._scale_size(35), self._scale_size(12), self._scale_size(15), self._scale_size(12))
+        # 作为纯色背景的子选项，增加左边距
+        color_layout.setContentsMargins(self._scale_size(50), self._scale_size(12), self._scale_size(15), self._scale_size(12))
         color_layout.setSpacing(self._scale_size(10))
 
         color_label = self._create_label_with_style(self.window.language_manager.translate("bg_color"))
@@ -3084,6 +3082,9 @@ Spectra Information:
         self.window.blur_toggle.setCallback(lambda checked: self.window.toggle_blur_enabled(checked))
         blur_toggle_layout.addWidget(self.window.blur_toggle)
 
+        # 模糊开关只在纯色背景模式下显示
+        self.window.blur_toggle_widget.setVisible(self.window.config.get("background_mode") == "solid")
+
     def _create_version_isolation_option(self):
         """创建版本隔离选项"""
         version_isolation_enabled = self.window.config.get("version_isolation", True)
@@ -3325,7 +3326,7 @@ Spectra Information:
                 header_layout = opacity_layout.itemAt(0)
                 if header_layout and isinstance(header_layout, QHBoxLayout):
                     label = header_layout.itemAt(0).widget()
-                    label.setText(self.window.language_manager.translate("blur_opacity"))
+                    label.setText(self.window.language_manager.translate("opacity"))
         
         # 更新路径标签
         if hasattr(self.window, 'path_widget'):
