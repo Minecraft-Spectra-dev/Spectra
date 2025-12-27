@@ -1173,9 +1173,11 @@ class UIBuilder:
         # 保存排序按钮引用
         self.window.download_sort_btn = sort_btn
         # 当前排序方式
-        self.window.current_sort_type = "downloads"
+        self.window.current_sort_type = "relevance"
         # 当前排序方式显示文本
-        self.window.current_sort_text = self.window.language_manager.translate("download_sort_downloads")
+        self.window.current_sort_text = self.window.language_manager.translate("download_sort_relevance")
+        # 下载页面是否已初始化（用于控制首次打开时自动搜索）
+        self.window.download_page_initialized = False
 
         pl.addWidget(controls_container)
 
@@ -1200,10 +1202,6 @@ class UIBuilder:
 
         # 加载 Minecraft 版本列表到下拉框
         self._load_versions_to_download_combo()
-        
-        # 页面创建完成后自动执行搜索（以下载量排序）
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(100, lambda: self._search_modrinth("", page=1, sort_by="downloads"))
 
         return page
 
@@ -1477,10 +1475,10 @@ class UIBuilder:
             }
         """)
         
-        # 定义排序选项
+        # 定义排序选项（按要求的顺序）
         sort_options = [
-            ("downloads", self.window.language_manager.translate("download_sort_downloads")),
             ("relevance", self.window.language_manager.translate("download_sort_relevance")),
+            ("downloads", self.window.language_manager.translate("download_sort_downloads")),
             ("follows", self.window.language_manager.translate("download_sort_follows")),
             ("newest", self.window.language_manager.translate("download_sort_newest")),
             ("updated", self.window.language_manager.translate("download_sort_updated")),

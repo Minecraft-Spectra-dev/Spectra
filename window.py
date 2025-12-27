@@ -632,6 +632,12 @@ class Window(QWidget):
                         icon_lbl = container.findChild(QLabel, "nav_icon")
                         if icon_lbl:
                             icon_lbl.setPixmap(scale_icon_for_display(icon_pixmap, 20, self.dpi_scale))
+        
+        # 下载页面首次打开时执行自动搜索
+        if index == 2 and hasattr(self, 'download_page_initialized') and not self.download_page_initialized:
+            self.download_page_initialized = True
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(100, lambda: self.ui_builder._search_modrinth("", page=1, sort_by=self.current_sort_type))
 
     def toggle_sidebar(self):
         self.anim = QPropertyAnimation(self.sidebar, b"minimumWidth")
