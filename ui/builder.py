@@ -16,7 +16,7 @@ from styles import SLIDER_STYLE, STYLE_BTN, STYLE_ICON
 from utils import load_svg_icon, scale_icon_for_display
 from widgets import (CardButton, ClickableLabel, JellyButton,
                       get_current_font, make_transparent, set_current_font,
-                      TextRenderer)
+                      TextRenderer, ModrinthResultCard)
 
 
 class VersionCardWidget(QWidget):
@@ -1053,6 +1053,7 @@ class UIBuilder:
             from PyQt6.QtCore import QSize
             search_btn.setIcon(QIcon(scale_icon_for_display(search_pixmap, 16, self.dpi_scale)))
             search_btn.setIconSize(QSize(self._scale_size(16), self._scale_size(16)))
+        search_btn.clicked.connect(self._on_search_clicked)
         search_layout.addWidget(search_btn)
 
         # 版本选择（固定长度的长条，用于选择下载目标）
@@ -1166,6 +1167,10 @@ class UIBuilder:
         scroll_area = self._create_scroll_area()
         scroll_content, scroll_layout = self._create_scroll_content()
         scroll_layout.addStretch()
+        
+        # 保存滚动内容区域的引用，用于显示搜索结果
+        self.window.download_scroll_content = scroll_content
+        self.window.download_scroll_layout = scroll_layout
 
         scroll_area.setWidget(scroll_content)
         pl.addWidget(scroll_area, 1)
@@ -1290,6 +1295,174 @@ class UIBuilder:
                     button.setText(self.window.language_manager.translate("download_platform_curseforge"))
                 # 重新应用样式以确保选中状态正确
                 self._setup_platform_button(button, i == current_index, i)
+
+    def _on_search_clicked(self):
+        """搜索按钮点击事件处理"""
+        query = self.window.download_search.text().strip()
+        if not query:
+            return
+        
+        # 根据选中的平台执行搜索
+        platform = self.window.current_download_platform
+        if platform == 1:  # Modrinth
+            self._search_modrinth(query)
+        elif platform == 2:  # CurseForge
+            self._search_curseforge(query)
+        else:  # 全部平台 - 默认搜索 Modrinth
+            self._search_modrinth(query)
+    
+    def _search_modrinth(self, query):
+        """搜索 Modrinth 项目"""
+        from managers.modrinth_manager import ModrinthManager
+        from PyQt6.QtCore import QThread, pyqtSignal, QTimer
+        
+        # 清除之前的搜索结果
+        self._clear_search_results()
+        
+        # 显示加载提示
+        self._show_loading_message()
+        
+        # 使用 QTimer 延迟执行搜索，给 UI 时间更新
+        def do_search():
+            try:
+                manager = ModrinthManager()
+                # 添加资源包类型筛选
+                facets = [["project_type:resourcepack"]]
+                result = manager.search_projects(query, facets=facets, limit=10)
+                hits = result.get('hits', [])
+                # 使用 QTimer 再次延迟，确保在主线程执行
+                QTimer.singleShot(0, lambda: self._on_modrinth_search_finished(hits))
+            except Exception as e:
+                logger.error(f"Modrinth search failed: {e}")
+                QTimer.singleShot(0, lambda: self._on_search_error(str(e)))
+        
+        QTimer.singleShot(50, do_search)
+    
+    def _search_curseforge(self, query):
+        """搜索 CurseForge 项目（暂未实现）"""
+        logger.info(f"CurseForge search not implemented yet: {query}")
+    
+    def _clear_search_results(self):
+        """清除搜索结果"""
+        if hasattr(self.window, 'download_scroll_layout'):
+            # 清除搜索结果，保留最后一个 stretch
+            layout = self.window.download_scroll_layout
+            # 从后向前删除，保留最后一个 stretch
+            for i in range(layout.count() - 2, -1, -1):
+                item = layout.itemAt(i)
+                if item and item.widget():
+                    widget = item.widget()
+                    widget.setParent(None)
+                    widget.deleteLater()
+    
+    def _show_loading_message(self):
+        """显示加载消息"""
+        if hasattr(self.window, 'download_scroll_layout'):
+            from PyQt6.QtWidgets import QLabel
+            loading_label = QLabel("Searching...")
+            loading_label.setStyleSheet("color: rgba(255, 255, 255, 0.7); font-size: 14px;")
+            loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout = self.window.download_scroll_layout
+            layout.insertWidget(layout.count() - 1, loading_label)
+    
+    def _on_modrinth_search_finished(self, hits):
+        """Modrinth 搜索完成"""
+        # 清除加载消息
+        self._clear_search_results()
+        
+        if not hits:
+            # 显示无结果消息
+            self._show_no_results_message()
+            return
+        
+        # 显示搜索结果
+        layout = self.window.download_scroll_layout
+        start_index = layout.count() - 1  # 在 stretch 之前插入
+        
+        # 使用 QTimer 延迟创建和添加卡片，分批渲染
+        def create_and_add_cards(current_hit_index=0):
+            # 每次添加 2 个卡片，避免阻塞 UI
+            batch_size = 2
+            end_hit_index = min(current_hit_index + batch_size, len(hits))
+            
+            insert_index = start_index + current_hit_index
+            
+            for i in range(current_hit_index, end_hit_index):
+                hit = hits[i]
+                project_data = {
+                    'title': hit.get('title', 'Unknown'),
+                    'description': hit.get('description', ''),
+                    'icon_url': hit.get('icon_url', ''),
+                    'downloads': hit.get('downloads', 0),
+                    'follows': hit.get('follows', 0),
+                    'project_id': hit.get('project_id', ''),
+                    'slug': hit.get('slug', '')
+                }
+                
+                # 使用函数包装避免 lambda 闭包问题
+                def make_download_handler(data):
+                    return lambda checked=False: self._on_download_modrinth_project(data)
+                
+                # 创建结果卡片
+                result_card = ModrinthResultCard(
+                    project_data,
+                    dpi_scale=self.dpi_scale,
+                    on_download=make_download_handler(project_data)
+                )
+                
+                # 立即显示卡片
+                result_card.show()
+                result_card.update()
+                
+                # 添加到滚动区域
+                layout.insertWidget(insert_index, result_card)
+                insert_index += 1
+            
+            # 如果还有卡片要添加，继续下一批
+            if end_hit_index < len(hits):
+                QTimer.singleShot(10, lambda idx=end_hit_index: create_and_add_cards(idx))
+        
+        # 开始分批创建卡片
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(50, create_and_add_cards)
+        
+        logger.info(f"Modrinth search completed: {len(hits)} results found")
+    
+    def _on_search_error(self, error):
+        """搜索错误处理"""
+        self._clear_search_results()
+        self._show_error_message(error)
+        logger.error(f"Search error: {error}")
+    
+    def _show_no_results_message(self):
+        """显示无结果消息"""
+        if hasattr(self.window, 'download_scroll_layout'):
+            from PyQt6.QtWidgets import QLabel
+            no_results_label = QLabel("No results found")
+            no_results_label.setStyleSheet("color: rgba(255, 255, 255, 0.7); font-size: 14px;")
+            no_results_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout = self.window.download_scroll_layout
+            layout.insertWidget(layout.count() - 1, no_results_label)
+    
+    def _show_error_message(self, error):
+        """显示错误消息"""
+        if hasattr(self.window, 'download_scroll_layout'):
+            from PyQt6.QtWidgets import QLabel
+            error_label = QLabel(f"Search failed: {error}")
+            error_label.setStyleSheet("color: rgba(255, 100, 100, 0.9); font-size: 14px;")
+            error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            layout = self.window.download_scroll_layout
+            layout.insertWidget(layout.count() - 1, error_label)
+    
+    def _on_download_modrinth_project(self, project_data, checked=False):
+        """下载 Modrinth 项目"""
+        logger.info(f"Downloading project: {project_data.get('title', 'Unknown')}")
+        # TODO: 实现下载逻辑
+        # 这里需要：
+        # 1. 获取项目的最新版本
+        # 2. 下载文件到指定目录
+        # 3. 更新文件浏览器显示
+        pass
 
     def create_console_page(self):
         """创建控制台/日志页面"""
