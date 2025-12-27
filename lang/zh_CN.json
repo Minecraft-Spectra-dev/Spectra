@@ -9,11 +9,13 @@
     "nav_home": "主页",
     "nav_instances": "实例",
     "nav_downloads": "下载",
+    "nav_console": "控制台",
     "nav_settings": "设置",
     "nav_collapse": "收起",
     "page_home": "主页",
     "page_instances": "实例",
     "page_downloads": "下载",
+    "page_console": "控制台",
     "page_settings": "设置",
     "settings_appearance": "外观设置",
     "settings_appearance_desc": "背景、主题等外观选项",
@@ -56,6 +58,7 @@
     "file_explorer_no_resourcepacks": "版本 {version_name} 没有resourcepacks文件夹",
     "file_explorer_not_directory": "不是目录: {path}",
     "file_explorer_no_permission": "无权限访问此目录",
-    "file_explorer_load_failed": "加载目录失败: {error}"
+    "file_explorer_load_failed": "加载目录失败: {error}",
+    "export_logs": "导出日志"
   }
 }

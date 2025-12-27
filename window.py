@@ -248,13 +248,20 @@ class Window(QWidget):
             lambda: self.switch_page(2), 2, "svg/arrow-down-circle.svg", "svg/arrow-down-circle-fill.svg"
         ))
 
+        console_icon = load_svg_icon("svg/terminal.svg", self.dpi_scale)
+        console_icon_active = load_svg_icon("svg/terminal-fill.svg", self.dpi_scale)
+        sb.addWidget(self.ui_builder.create_nav_btn(
+            console_icon if console_icon else "\uE75B", self.language_manager.translate("nav_console"),
+            lambda: self.switch_page(3), 3, "svg/terminal.svg", "svg/terminal-fill.svg"
+        ))
+
         sb.addStretch()
 
         settings_icon = load_svg_icon("svg/gear.svg", self.dpi_scale)
         settings_icon_active = load_svg_icon("svg/gear-fill.svg", self.dpi_scale)
         sb.addWidget(self.ui_builder.create_nav_btn(
             settings_icon if settings_icon else "\uE713", self.language_manager.translate("nav_settings"),
-            lambda: self.switch_page(3), 3, "svg/gear.svg", "svg/gear-fill.svg"
+            lambda: self.switch_page(4), 4, "svg/gear.svg", "svg/gear-fill.svg"
         ))
 
         self.layout().addWidget(self.sidebar)
@@ -284,6 +291,7 @@ class Window(QWidget):
         self.stack.addWidget(self._create_home_page())
         self.stack.addWidget(self.ui_builder.create_instance_page())
         self.stack.addWidget(self.ui_builder.create_download_page())
+        self.stack.addWidget(self.ui_builder.create_console_page())
         self.stack.addWidget(self.ui_builder.create_config_page())
         rl.addWidget(self.stack, 1)
 
@@ -353,7 +361,151 @@ class Window(QWidget):
         self.news_thread.start()
 
         return home_widget
-    
+
+    def _create_console_page(self):
+        """创建控制台/日志页面"""
+        from PyQt6.QtWidgets import QTextEdit, QFileDialog
+
+        console_widget = QWidget()
+        console_layout = QVBoxLayout(console_widget)
+        console_layout.setContentsMargins(self.ui_builder._scale_size(20), self.ui_builder._scale_size(10), self.ui_builder._scale_size(20), self.ui_builder._scale_size(20))
+        console_layout.setSpacing(self.ui_builder._scale_size(15))
+
+        title = QLabel(self.language_manager.translate("page_console"))
+        title.setStyleSheet(f"color:white;font-size:{self.ui_builder._scale_size(20)}px;font-family:'{self.ui_builder._get_font_family()}';font-weight:bold;")
+        console_layout.addWidget(title)
+
+        # 创建工具栏
+        toolbar = QWidget()
+        toolbar.setStyleSheet("background:rgba(255,255,255,0.05);border-radius:8px;")
+        toolbar_layout = QHBoxLayout(toolbar)
+        toolbar_layout.setContentsMargins(self.ui_builder._scale_size(10), self.ui_builder._scale_size(8), self.ui_builder._scale_size(10), self.ui_builder._scale_size(8))
+        toolbar_layout.setSpacing(self.ui_builder._scale_size(10))
+
+        # 刷新按钮
+        from widgets import ClickableLabel
+        refresh_btn = ClickableLabel()
+        refresh_btn.setFixedSize(self.ui_builder._scale_size(28), self.ui_builder._scale_size(28))
+        refresh_btn.setHoverStyle(
+            f"background:rgba(255,255,255,0.1);border:none;border-radius:{self.ui_builder._scale_size(14)}px;",
+            f"background:rgba(255,255,255,0.15);border:none;border-radius:{self.ui_builder._scale_size(14)}px;"
+        )
+        refresh_btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        from utils import load_svg_icon, scale_icon_for_display
+        refresh_pixmap = load_svg_icon("svg/arrow-clockwise.svg", self.dpi_scale)
+        if refresh_pixmap:
+            refresh_btn.setPixmap(scale_icon_for_display(refresh_pixmap, 16, self.dpi_scale))
+        refresh_btn.setCallback(self._load_console_logs)
+        toolbar_layout.addWidget(refresh_btn)
+
+        # 清空按钮
+        clear_btn = ClickableLabel()
+        clear_btn.setFixedSize(self.ui_builder._scale_size(28), self.ui_builder._scale_size(28))
+        clear_btn.setHoverStyle(
+            f"background:rgba(255,255,255,0.1);border:none;border-radius:{self.ui_builder._scale_size(14)}px;",
+            f"background:rgba(255,255,255,0.15);border:none;border-radius:{self.ui_builder._scale_size(14)}px;"
+        )
+        clear_btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        clear_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        clear_pixmap = load_svg_icon("svg/trash.svg", self.dpi_scale)
+        if clear_pixmap:
+            clear_btn.setPixmap(scale_icon_for_display(clear_pixmap, 16, self.dpi_scale))
+        clear_btn.setCallback(self._clear_console_logs)
+        toolbar_layout.addWidget(clear_btn)
+
+        # 导出按钮
+        export_btn = ClickableLabel()
+        export_btn.setFixedSize(self.ui_builder._scale_size(28), self.ui_builder._scale_size(28))
+        export_btn.setHoverStyle(
+            f"background:rgba(255,255,255,0.1);border:none;border-radius:{self.ui_builder._scale_size(14)}px;",
+            f"background:rgba(255,255,255,0.15);border:none;border-radius:{self.ui_builder._scale_size(14)}px;"
+        )
+        export_btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        export_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        export_pixmap = load_svg_icon("svg/download.svg", self.dpi_scale)
+        if export_pixmap:
+            export_btn.setPixmap(scale_icon_for_display(export_pixmap, 16, self.dpi_scale))
+        export_btn.setCallback(self._export_console_logs)
+        toolbar_layout.addWidget(export_btn)
+
+        toolbar_layout.addStretch()
+
+        # 文件路径标签
+        self.console_log_path_label = QLabel()
+        self.console_log_path_label.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self.ui_builder._scale_size(12)}px;font-family:'{self.ui_builder._get_font_family()}';")
+        toolbar_layout.addWidget(self.console_log_path_label)
+
+        console_layout.addWidget(toolbar)
+
+        # 创建日志文本框
+        from PyQt6.QtGui import QTextCharFormat, QColor
+        self.console_text = QTextEdit()
+        self.console_text.setReadOnly(True)
+        self.console_text.setStyleSheet(f"""
+            QTextEdit {{
+                background: rgba(0, 0, 0, 0.5);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: {self.ui_builder._scale_size(8)}px;
+                color: rgba(255, 255, 255, 0.9);
+                font-family: 'Consolas', 'Monaco', monospace;
+                font-size: {self.ui_builder._scale_size(12)}px;
+                padding: {self.ui_builder._scale_size(10)}px;
+            }}
+        """)
+        console_layout.addWidget(self.console_text, 1)
+
+        # 加载日志
+        self._load_console_logs()
+
+        return console_widget
+
+    def _load_console_logs(self):
+        """加载日志到控制台"""
+        import glob
+        from managers.log_manager import get_logger
+
+        # 查找最新的日志文件
+        log_dir = "logs"
+        log_files = glob.glob(os.path.join(log_dir, "*.log"))
+
+        if not log_files:
+            self.console_text.setText("No log files found.")
+            return
+
+        # 按修改时间排序，获取最新的日志文件
+        log_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+        latest_log = log_files[0]
+
+        try:
+            with open(latest_log, 'r', encoding='utf-8') as f:
+                content = f.read()
+                self.console_text.setText(content)
+        except Exception as e:
+            logger.error(f"Failed to load log file: {e}")
+            self.console_text.setText(f"Failed to load log file: {e}")
+
+    def _clear_console_logs(self):
+        """清空控制台日志显示"""
+        self.console_text.clear()
+
+    def _export_console_logs(self):
+        """导出控制台日志到文件"""
+        from PyQt6.QtWidgets import QFileDialog
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            self.language_manager.translate("export_logs"),
+            "spectra_log.txt",
+            "Text Files (*.txt);;All Files (*.*)"
+        )
+
+        if file_path:
+            try:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(self.console_text.toPlainText())
+            except Exception as e:
+                logger.error(f"Failed to export logs: {e}")
+
     def _on_news_loaded(self, layout, thread):
         """新闻加载完成回调"""
         if thread.error:
@@ -540,6 +692,7 @@ class Window(QWidget):
             self.language_manager.translate("nav_home"),
             self.language_manager.translate("nav_instances"),
             self.language_manager.translate("nav_downloads"),
+            self.language_manager.translate("nav_console"),
             self.language_manager.translate("nav_settings")
         ]
         

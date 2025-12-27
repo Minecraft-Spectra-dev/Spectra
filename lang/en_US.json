@@ -9,11 +9,13 @@
     "nav_home": "Home",
     "nav_instances": "Instances",
     "nav_downloads": "Downloads",
+    "nav_console": "Console",
     "nav_settings": "Settings",
     "nav_collapse": "Collapse",
     "page_home": "Home",
     "page_instances": "Instances",
     "page_downloads": "Downloads",
+    "page_console": "Console",
     "page_settings": "Settings",
     "settings_appearance": "Appearance",
     "settings_appearance_desc": "Background, theme and other appearance options",
@@ -56,6 +58,7 @@
     "file_explorer_no_resourcepacks": "Version {version_name} has no resourcepacks folder",
     "file_explorer_not_directory": "Not a directory: {path}",
     "file_explorer_no_permission": "No permission to access this directory",
-    "file_explorer_load_failed": "Failed to load directory: {error}"
+    "file_explorer_load_failed": "Failed to load directory: {error}",
+    "export_logs": "Export Logs"
   }
 }
