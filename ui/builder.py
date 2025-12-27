@@ -1027,6 +1027,22 @@ class UIBuilder:
         title = self._create_page_title(self.window.language_manager.translate("page_downloads"))
         pl.addWidget(title)
 
+        # 搜索框
+        search_container = QWidget()
+        search_container.setStyleSheet(f"background:rgba(255,255,255,0.08);border-radius:{self._scale_size(8)}px;")
+        search_layout = QHBoxLayout(search_container)
+        search_layout.setContentsMargins(self._scale_size(12), self._scale_size(8), self._scale_size(12), self._scale_size(8))
+        search_layout.setSpacing(self._scale_size(10))
+
+        # 搜索输入框
+        self.window.download_search = QLineEdit()
+        self.window.download_search.setPlaceholderText("Search downloads...")
+        self.window.download_search.setStyleSheet(self._get_lineedit_stylesheet())
+        self.window.download_search.setClearButtonEnabled(True)
+        search_layout.addWidget(self.window.download_search, 1)
+
+        pl.addWidget(search_container)
+
         # 使用统一的滚动区域创建方法
         scroll_area = self._create_scroll_area()
         scroll_content, scroll_layout = self._create_scroll_content()
