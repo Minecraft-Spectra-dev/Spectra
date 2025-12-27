@@ -850,16 +850,16 @@ class UIBuilder:
         root_resourcepacks_layout.setContentsMargins(0, 0, 0, 0)
         root_resourcepacks_layout.setSpacing(0)
 
-        # 创建文件浏览器用于显示根目录材质包
+        # 创建文件浏览器用于显示根目录材质包（无滚动模式）
         from widgets import FileExplorer
         self.window.root_resourcepacks_explorer = FileExplorer(
             dpi_scale=self.dpi_scale,
             config_manager=self.window.config_manager,
             language_manager=self.window.language_manager,
-            text_renderer=self.text_renderer
+            text_renderer=self.text_renderer,
+            no_scroll=True  # 无滚动模式，让file_tree根据内容自动调整大小
         )
-        root_resourcepacks_layout.addWidget(self.window.root_resourcepacks_explorer, 1)
-        self.window.root_resourcepacks_explorer.setMinimumHeight(self._scale_size(400))
+        root_resourcepacks_layout.addWidget(self.window.root_resourcepacks_explorer)
 
         scroll_layout.addWidget(root_resourcepacks_container)
         self.window.root_resourcepacks_container = root_resourcepacks_container  # 保存根目录材质包容器引用

@@ -90,12 +90,13 @@ class FileExplorer(QWidget):
 
     file_selected = pyqtSignal(str)  # 文件选择信号
 
-    def __init__(self, parent=None, dpi_scale=1.0, config_manager=None, language_manager=None, text_renderer=None):
+    def __init__(self, parent=None, dpi_scale=1.0, config_manager=None, language_manager=None, text_renderer=None, no_scroll=False):
         super().__init__(parent)
         self.dpi_scale = dpi_scale
         self.config_manager = config_manager
         self.language_manager = language_manager
         self.text_renderer = text_renderer  # 新增 text_renderer 参数
+        self.no_scroll = no_scroll  # 无滚动模式：让file_tree根据内容自动调整大小
         self.current_path = None
         self.root_path = None  # 保存minecraft路径
         self.base_path = None  # 保存当前resourcepacks路径作为返回的根目录
@@ -130,11 +131,23 @@ class FileExplorer(QWidget):
         # 更新返回按钮
         self.back_btn.setText(self.translate("file_explorer_back_to_root"))
 
-        # 如果正在显示错误信息，重新设置错误消息（如果需要）
-        if self.empty_label.isVisible():
-            # 这里可以根据需要重新显示错误消息
-            pass
-    
+    def eventFilter(self, obj, event):
+        """事件过滤器：在无滚动模式下拦截滚动事件并传递给父级"""
+        if self.no_scroll and obj == self.file_tree.viewport():
+            from PyQt6.QtCore import QEvent
+            if event.type() == QEvent.Type.Wheel:
+                # 拦截滚轮事件并传递给父级滚动区域
+                # 找到父级滚动区域
+                scroll_area = self.parent()
+                while scroll_area and not hasattr(scroll_area, 'widgetResizable'):
+                    scroll_area = scroll_area.parent()
+                
+                # 如果找到滚动区域，传递事件
+                if scroll_area:
+                    scroll_area.wheelEvent(event)
+                return True
+        return super().eventFilter(obj, event)
+
     def _init_ui(self):
         """初始化UI"""
         layout = QVBoxLayout(self)
@@ -192,6 +205,17 @@ class FileExplorer(QWidget):
         self.file_tree = QTreeWidget()
         self.file_tree.setHeaderHidden(True)  # 隐藏表头（包含名称和大小列）
         self.file_tree.setColumnCount(1)  # 只显示一列（名称）
+
+        # 禁用内部滚动条（由外部容器处理）
+        self.file_tree.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.file_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        # 在无滚动模式下，禁用视口滚动
+        if self.no_scroll:
+            self.file_tree.viewport().installEventFilter(self)
+            self.file_tree.setHorizontalScrollMode(self.file_tree.ScrollMode.ScrollPerPixel)
+            self.file_tree.setVerticalScrollMode(self.file_tree.ScrollMode.ScrollPerPixel)
+
         # 设置图标大小（88px，适配卡片高度96px）
         self.file_tree.setIconSize(QSize(int(88 * self.dpi_scale), int(88 * self.dpi_scale)))
         # 设置资源包项目的高度（DPI缩放前的96px）
@@ -240,20 +264,6 @@ class FileExplorer(QWidget):
 
         self.file_tree.itemDoubleClicked.connect(self.on_item_double_clicked)
         layout.addWidget(self.file_tree, 1)
-
-        # 空状态提示
-        self.empty_label = QLabel(self.translate("file_explorer_select_path"))
-        self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.empty_label.setStyleSheet(f"""
-            QLabel {{
-                color: rgba(255,255,255, 0.5);
-                background: transparent;
-                font-size: {int(13 * self.dpi_scale)}px;
-                padding: {int(40 * self.dpi_scale)}px;
-            }}
-        """)
-        self.empty_label.hide()
-        layout.addWidget(self.empty_label)
     
     def set_minecraft_path(self, path):
         """设置Minecraft路径（根目录使用resourcepacks文件夹）"""
@@ -268,12 +278,9 @@ class FileExplorer(QWidget):
         self.back_btn.setEnabled(False)
         self.resourcepack_mode = True  # 启用资源包模式
         if os.path.exists(self.current_path):
-            self.empty_label.hide()
             self.file_tree.show()
             self._load_directory(self.current_path)
         else:
-            self.empty_label.setText(self.translate("file_explorer_path_not_found", path=self.current_path))
-            self.empty_label.show()
             self.file_tree.hide()
 
     def _format_path_display(self, path):
@@ -305,8 +312,6 @@ class FileExplorer(QWidget):
     def navigate_to_directory(self, path):
         """导航到指定目录"""
         if not os.path.exists(path):
-            self.empty_label.setText(self.translate("file_explorer_path_not_found", path=path))
-            self.empty_label.show()
             self.file_tree.hide()
             return
 
@@ -314,7 +319,6 @@ class FileExplorer(QWidget):
         display_path = self._format_path_display(path)
         self.path_label.setText(display_path)
         self.back_btn.setEnabled(True)
-        self.empty_label.hide()
         self.file_tree.show()
         self._load_directory(path)
 
@@ -328,12 +332,9 @@ class FileExplorer(QWidget):
             display_path = self._format_path_display(self.current_path)
             self.path_label.setText(display_path)
             self.back_btn.setEnabled(False)
-            self.empty_label.hide()
             self.file_tree.show()
             self._load_directory(self.current_path)
         else:
-            self.empty_label.setText(self.translate("file_explorer_path_not_found", path=self.current_path))
-            self.empty_label.show()
             self.file_tree.hide()
     
     def navigate_to_version_resourcepacks(self, version_name):
@@ -343,8 +344,6 @@ class FileExplorer(QWidget):
 
         version_path = os.path.join(self.root_path, "versions", version_name)
         if not os.path.exists(version_path):
-            self.empty_label.setText(self.translate("file_explorer_version_not_found", version_name=version_name))
-            self.empty_label.show()
             self.file_tree.hide()
             return
 
@@ -362,12 +361,9 @@ class FileExplorer(QWidget):
             display_path = "...\\versions\\" + version_name + "\\resourcepacks"
             self.path_label.setText(display_path)
             self.back_btn.setEnabled(True)
-            self.empty_label.hide()
             self.file_tree.show()
             self._load_directory(resourcepacks_path)
         else:
-            self.empty_label.setText(self.translate("file_explorer_no_resourcepacks", version_name=version_name))
-            self.empty_label.show()
             self.file_tree.hide()
     
     def _load_directory(self, path):
@@ -375,19 +371,13 @@ class FileExplorer(QWidget):
         self.file_tree.clear()
         self._item_widgets = {}  # 清空项目部件缓存
 
-        # 隐藏空状态提示
-        self.empty_label.hide()
         self.file_tree.show()
 
         if not os.path.exists(path):
-            self.empty_label.setText(self.translate("file_explorer_path_not_found", path=path))
-            self.empty_label.show()
             self.file_tree.hide()
             return
 
         if not os.path.isdir(path):
-            self.empty_label.setText(self.translate("file_explorer_not_directory", path=path))
-            self.empty_label.show()
             self.file_tree.hide()
             return
 
@@ -443,13 +433,16 @@ class FileExplorer(QWidget):
                 for name, is_dir, full_path in items:
                     self._add_item(name, is_dir, full_path)
 
+            # 在无滚动模式下，根据内容更新file_tree的高度
+            if self.no_scroll:
+                item_count = self.file_tree.topLevelItemCount()
+                item_height = int(96 * self.dpi_scale)  # 单个项目的固定高度
+                total_height = item_count * item_height + int(8 * self.dpi_scale)  # 加上一些间距
+                self.file_tree.setFixedHeight(total_height)
+
         except PermissionError:
-            self.empty_label.setText(self.translate("file_explorer_no_permission"))
-            self.empty_label.show()
             self.file_tree.hide()
         except Exception as e:
-            self.empty_label.setText(self.translate("file_explorer_load_failed", error=str(e)))
-            self.empty_label.show()
             self.file_tree.hide()
     
     def _add_item(self, name, is_dir, full_path):
@@ -713,16 +706,6 @@ class FileExplorer(QWidget):
                 border-right: 1px solid rgba(255, 255, 255, 0.1);
                 font-size: {int(11 * self.dpi_scale)}px;
                 font-weight: bold;
-                font-family: {font_family_quoted};
-            }}
-        """)
-        
-        self.empty_label.setStyleSheet(f"""
-            QLabel {{
-                color: rgba(255,255,255, 0.5);
-                background: transparent;
-                font-size: {int(13 * self.dpi_scale)}px;
-                padding: {int(40 * self.dpi_scale)}px;
                 font-family: {font_family_quoted};
             }}
         """)
