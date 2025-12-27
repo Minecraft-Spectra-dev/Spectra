@@ -675,7 +675,7 @@ class UIBuilder:
         # 创建堆叠窗口用于多层级页面导航
         self.window.instance_stack = QStackedWidget()
         self.window.instance_stack.setStyleSheet("background:transparent;")
-        self.window.instance_pages = []  # 存储页面历史
+        self.window.instance_pages = []  # 存储页面历史（不再使用，保留以避免兼容性问题）
 
         # 第一层：主页面（路径选择和版本列表）
         main_page = self._create_instance_main_page()
@@ -955,91 +955,6 @@ class UIBuilder:
             self.window.file_explorer.file_tree.hide()
 
         pl.addWidget(self.window.file_explorer, 1)
-
-        return page
-        self.window.instance_version_combo.setFixedWidth(self._scale_size(200))
-        self.window.instance_version_combo.setMaxVisibleItems(8)
-        blur_opacity = self.window.config.get("blur_opacity", 150)
-        dropdown_opacity_value = min(255, blur_opacity + 20)
-        dropdown_opacity_rgba = dropdown_opacity_value / 255.0
-        self.window.instance_version_combo.setStyleSheet(
-            f"QComboBox{{"
-            f"background:rgba(0,0,0,0.3);"
-            f"border:1px solid rgba(255,255,255,0.15);"
-            f"border-radius:{border_radius_input}px;"
-            f"padding:{padding}px;"
-            f"color:rgba(255,255,255,0.95);"
-            f"font-size:{self._scale_size(13)}px;"
-            f"font-family:'{self._get_font_family()}';"
-            f"}}"
-            f"QComboBox:hover{{"
-            f"background:rgba(0,0,0,0.4);"
-            f"border:1px solid rgba(255,255,255,0.25);"
-            f"}}"
-            f"QComboBox:focus{{"
-            f"background:rgba(0,0,0,0.5);"
-            f"border:1px solid rgba(100,150,255,0.6);"
-            f"}}"
-            f"QComboBox QAbstractItemView{{"
-            f"background:rgba(0,0,0,{dropdown_opacity_rgba:.2f});"
-            f"border:1px solid rgba(255,255,255,0.1);"
-            f"border-radius:{border_radius_input}px;"
-            f"selection-background-color:rgba(255,255,255,0.15);"
-            f"selection-color:white;"
-            f"outline:none;"
-            f"padding:{self._scale_size(2)}px;"
-            f"}}"
-            f"QComboBox QAbstractItemView::item{{"
-            f"height:{self._scale_size(28)}px;"
-            f"padding:{self._scale_size(6)}px {self._scale_size(8)}px;"
-            f"color:rgba(255,255,255,0.85);"
-            f"border-radius:{border_radius_input - 1}px;"
-            f"}}"
-            f"QComboBox QAbstractItemView::item:hover{{"
-            f"background:rgba(255,255,255,0.1);"
-            f"}}"
-            f"QComboBox QAbstractItemView::item:selected{{"
-            f"background:rgba(255,255,255,0.15);"
-            f"color:white;"
-            f"}}"
-        )
-        self.window.instance_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))
-        self.window.instance_version_combo.currentTextChanged.connect(self._on_version_changed)
-        version_layout.addWidget(self.window.instance_version_combo)
-        version_layout.addStretch()
-
-        path_layout.addLayout(version_layout)
-
-        scroll_layout.addWidget(path_container)
-
-        # 文件浏览器
-        self.window.file_explorer = FileExplorer(
-            dpi_scale=self.dpi_scale,
-            config_manager=self.window.config_manager,
-            language_manager=self.window.language_manager,
-            text_renderer=self.text_renderer
-        )
-        self.window.file_explorer.setFixedHeight(self._scale_size(400))
-        scroll_layout.addWidget(self.window.file_explorer)
-
-        scroll_layout.addStretch()
-
-        scroll_area.setWidget(scroll_content)
-        pl.addWidget(scroll_area, 1)
-
-        # 加载保存的Minecraft路径（使用QTimer延迟执行，确保UI完全初始化）
-        saved_path = self.window.config.get("minecraft_path", "")
-        if saved_path and os.path.exists(saved_path):
-            self.window.instance_path_input.setText(saved_path)
-            # 使用QTimer延迟加载版本列表，确保UI完全初始化
-            from PyQt6.QtCore import QTimer
-            def delayed_load():
-                try:
-                    self._load_versions(saved_path)
-                except Exception as e:
-                    # 静默处理错误，避免崩溃
-                    pass
-            QTimer.singleShot(300, delayed_load)
 
         return page
 
@@ -1816,16 +1731,51 @@ Spectra Information:
 
     def _navigate_to_resourcepack_page(self, title, resourcepacks_path):
         """导航到资源包页面（第二层）"""
+        logger.info(f"Navigating to resourcepack page: {title}, path: {resourcepacks_path}")
+        logger.info(f"Stack widgets: {self.window.instance_stack.count()}")
+        
+        # 检查是否已经存在相同路径的资源包页面
+        for i in range(self.window.instance_stack.count()):
+            widget = self.window.instance_stack.widget(i)
+            if hasattr(widget, '_resourcepacks_path') and widget._resourcepacks_path == resourcepacks_path:
+                # 如果已存在，直接切换到该页面
+                logger.info(f"Found existing page for path: {resourcepacks_path}")
+                self.window.instance_stack.setCurrentIndex(i)
+                return
+        
+        # 创建新的资源包页面
         resourcepack_page = self._create_instance_resourcepack_page(title, resourcepacks_path)
+        resourcepack_page._resourcepacks_path = resourcepacks_path  # 标记页面路径
         self.window.instance_stack.addWidget(resourcepack_page)
         self.window.instance_stack.setCurrentWidget(resourcepack_page)
+        
+        logger.info(f"Stack widgets after adding: {self.window.instance_stack.count()}")
 
     def _navigate_instance_back(self):
         """返回上一页"""
-        current_widget = self.window.instance_stack.currentWidget()
-        if current_widget:
-            self.window.instance_stack.removeWidget(current_widget)
-            current_widget.deleteLater()
+        logger.info(f"_navigate_instance_back called")
+        logger.info(f"Stack count: {self.window.instance_stack.count()}")
+        logger.info(f"Current index: {self.window.instance_stack.currentIndex()}")
+        
+        count = self.window.instance_stack.count()
+        if count <= 1:
+            logger.info("Only one page in stack, cannot go back")
+            return
+        
+        # 获取当前索引
+        current_index = self.window.instance_stack.currentIndex()
+        
+        # 移除当前页面（最后一个页面）
+        widget_to_remove = self.window.instance_stack.currentWidget()
+        logger.info(f"Removing widget at index {current_index}")
+        
+        self.window.instance_stack.removeWidget(widget_to_remove)
+        widget_to_remove.deleteLater()
+        
+        # 切换到前一个页面（自动切换到 count-1 位置）
+        logger.info(f"Switching to index {self.window.instance_stack.currentIndex()}")
+        
+        logger.info(f"Stack count after back: {self.window.instance_stack.count()}")
 
     def _detect_version_type(self, minecraft_path, version_name):
         """检测Minecraft版本类型（fabric/forge/neoforge/vanilla）"""
@@ -2123,13 +2073,6 @@ Spectra Information:
         if saved_path:
             self._load_version_list(saved_path)
 
-    def _navigate_instance_back(self):
-        """返回上一页"""
-        current_widget = self.window.instance_stack.currentWidget()
-        if current_widget:
-            self.window.instance_stack.removeWidget(current_widget)
-            current_widget.deleteLater()
-
     def _create_font_path_widget(self):
         self.window.font_path_widget = QWidget()
         border_radius = self._scale_size(8)
@@ -2390,9 +2333,18 @@ Spectra Information:
 
         # 更新资源包页面的标题（如果存在）
         if hasattr(self.window, 'resourcepack_page_title') and self.window.resourcepack_page_title:
-            current_title = self.window.resourcepack_page_title.text()
-            if current_title in ["Root Directory", "根目录", root_text]:
-                self.window.resourcepack_page_title.setText(root_text)
+            try:
+                # 检查 widget 是否仍然有效（未被删除）
+                if not self.window.resourcepack_page_title.isVisible():
+                    # 如果不可见，说明可能已被删除，跳过更新
+                    pass
+                else:
+                    current_title = self.window.resourcepack_page_title.text()
+                    if current_title in ["Root Directory", "根目录", root_text]:
+                        self.window.resourcepack_page_title.setText(root_text)
+            except RuntimeError:
+                # 如果 widget 已被删除，捕获异常并跳过
+                pass
     
     def _update_settings_page(self):
         """更新设置页面的文本"""
