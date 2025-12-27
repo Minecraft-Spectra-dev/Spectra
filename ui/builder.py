@@ -1,9 +1,12 @@
 """UI构建器"""
 
 import os
+import logging
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QPixmap, QFontDatabase
+logger = logging.getLogger(__name__)
+
+from PyQt6.QtCore import Qt, QEvent
+from PyQt6.QtGui import QColor, QPixmap, QIcon, QFontDatabase
 from PyQt6.QtWidgets import (QColorDialog, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QSlider, QVBoxLayout, QWidget,
                              QComboBox)
@@ -12,6 +15,58 @@ from styles import SLIDER_STYLE, STYLE_BTN, STYLE_ICON
 from utils import load_svg_icon, scale_icon_for_display
 from widgets import (CardButton, ClickableLabel, JellyButton,
                       get_current_font, make_transparent, set_current_font)
+
+
+class VersionCardWidget(QWidget):
+    """版本卡片小部件，支持悬停事件处理"""
+    
+    def __init__(self, parent=None, on_hover_change=None):
+        super().__init__(parent)
+        self._on_hover_change = on_hover_change
+        self._is_version = False
+        self._is_favorited = False
+        self._bookmark_btn = None
+        self._normal_style = ""
+        self._hover_style = ""
+    
+    def set_bookmark_info(self, bookmark_btn, is_favorited):
+        """设置收藏按钮和收藏状态"""
+        self._bookmark_btn = bookmark_btn
+        self._is_favorited = is_favorited
+    
+    def set_styles(self, normal_style, hover_style):
+        """设置悬停样式"""
+        self._normal_style = normal_style
+        self._hover_style = hover_style
+    
+    def enterEvent(self, event):
+        """鼠标进入事件"""
+        self.setStyleSheet(self._hover_style)
+        if self._bookmark_btn and not self._is_favorited:
+            # 未收藏的版本悬停时显示收藏图标
+            bookmark_pixmap = load_svg_icon("svg/bookmarks.svg", self._get_dpi_scale())
+            if bookmark_pixmap:
+                self._bookmark_btn.setIcon(QIcon(scale_icon_for_display(bookmark_pixmap, 16, self._get_dpi_scale())))
+        if self._on_hover_change:
+            self._on_hover_change(True)
+        super().enterEvent(event)
+    
+    def leaveEvent(self, event):
+        """鼠标离开事件"""
+        self.setStyleSheet(self._normal_style)
+        if self._bookmark_btn and not self._is_favorited:
+            # 未收藏的版本离开时隐藏收藏图标
+            self._bookmark_btn.setIcon(QIcon())
+        if self._on_hover_change:
+            self._on_hover_change(False)
+        super().leaveEvent(event)
+    
+    def _get_dpi_scale(self):
+        """获取DPI缩放比例"""
+        window = self.window()
+        if window:
+            return getattr(window, 'dpi_scale', 1.0)
+        return 1.0
 
 
 class UIBuilder:
@@ -806,7 +861,7 @@ class UIBuilder:
         pl.addWidget(nav_bar)
 
         # 文件浏览器
-        self.window.file_explorer = FileExplorer(dpi_scale=self.dpi_scale)
+        self.window.file_explorer = FileExplorer(dpi_scale=self.dpi_scale, config_manager=self.window.config_manager)
 
         # 设置资源包路径
         if resourcepacks_path and os.path.exists(resourcepacks_path):
@@ -903,7 +958,7 @@ class UIBuilder:
         scroll_layout.addWidget(path_container)
 
         # 文件浏览器
-        self.window.file_explorer = FileExplorer(dpi_scale=self.dpi_scale)
+        self.window.file_explorer = FileExplorer(dpi_scale=self.dpi_scale, config_manager=self.window.config_manager)
         self.window.file_explorer.setFixedHeight(self._scale_size(400))
         scroll_layout.addWidget(self.window.file_explorer)
 
@@ -1234,25 +1289,63 @@ class UIBuilder:
                 self._clear_version_list()
         except Exception as e:
             # 静默处理错误，避免崩溃
+            import traceback
+            logger.error(f"Error loading version list: {e}")
+            logger.error(traceback.format_exc())
             pass
 
     def _load_version_list(self, minecraft_path):
         """加载Minecraft版本列表（显示为可点击的卡片）"""
         import os
         try:
+            logger.info(f"Loading version list from: {minecraft_path}")
             versions_path = os.path.join(minecraft_path, "versions")
+            logger.info(f"Versions path: {versions_path}")
             self._clear_version_list()
 
-            # 添加根目录（resourcepacks）选项
-            self._add_version_item(minecraft_path, self.window.language_manager.translate("instance_version_root"))
-
+            # 获取收藏的版本列表
+            favorited_versions = self.window.config.get("favorited_versions", [])
+            logger.info(f"Favorited versions: {favorited_versions}")
+            
+            # 收集所有版本
+            all_versions = []
             if os.path.exists(versions_path) and os.path.isdir(versions_path):
                 for item in sorted(os.listdir(versions_path)):
                     item_path = os.path.join(versions_path, item)
                     if os.path.isdir(item_path):
-                        self._add_version_item(minecraft_path, item, is_version=True)
+                        all_versions.append(item)
+                logger.info(f"Found {len(all_versions)} versions: {all_versions}")
+            else:
+                logger.warning(f"Versions path does not exist or is not a directory: {versions_path}")
+            
+            # 将版本分为收藏和非收藏两组
+            favorites = []
+            non_favorites = []
+            for version in all_versions:
+                if version in favorited_versions:
+                    favorites.append(version)
+                else:
+                    non_favorites.append(version)
+            
+            # 先添加收藏的版本
+            logger.info(f"Adding {len(favorites)} favorite versions")
+            for version in favorites:
+                self._add_version_item(minecraft_path, version, is_version=True, is_favorited=True)
+            
+            # 再添加非收藏的版本
+            logger.info(f"Adding {len(non_favorites)} non-favorite versions")
+            for version in non_favorites:
+                self._add_version_item(minecraft_path, version, is_version=True, is_favorited=False)
+
+            # 最后添加根目录（resourcepacks）选项
+            root_name = self.window.language_manager.translate("instance_version_root")
+            logger.info(f"Adding root directory: {root_name}")
+            self._add_version_item(minecraft_path, root_name, is_version=False, is_favorited=False)
         except Exception as e:
             # 静默处理错误，避免崩溃
+            import traceback
+            logger.error(f"Error loading version list: {e}")
+            logger.error(traceback.format_exc())
             pass
 
     def _clear_version_list(self):
@@ -1264,26 +1357,29 @@ class UIBuilder:
                 if child.widget():
                     child.widget().deleteLater()
 
-    def _add_version_item(self, minecraft_path, version_name, is_version=False):
+    def _add_version_item(self, minecraft_path, version_name, is_version=False, is_favorited=False):
         """添加一个版本项到列表"""
         from widgets import ClickableLabel, make_transparent
         from utils import load_svg_icon, scale_icon_for_display
 
         # 创建版本卡片
-        version_card = ClickableLabel()
-        version_card.setFixedHeight(self._scale_size(48))  # 版本卡片保持原高度48
-        version_card.setStyleSheet(f"""
-            ClickableLabel {{
+        version_card = VersionCardWidget()
+        version_card.setFixedHeight(self._scale_size(48))
+        
+        normal_style = f"""
+            QWidget {{
                 background: rgba(255, 255, 255, 0.08);
                 border-radius: {self._scale_size(8)}px;
             }}
-            ClickableLabel:hover {{
+        """
+        hover_style = f"""
+            QWidget {{
                 background: rgba(255, 255, 255, 0.15);
+                border-radius: {self._scale_size(8)}px;
             }}
-            ClickableLabel:pressed {{
-                background: rgba(255, 255, 255, 0.12);
-            }}
-        """)
+        """
+        version_card.set_styles(normal_style, hover_style)
+        version_card.setStyleSheet(normal_style)
         version_card.setCursor(Qt.CursorShape.PointingHandCursor)
 
         # 确定资源包路径
@@ -1294,29 +1390,34 @@ class UIBuilder:
             resourcepacks_path = os.path.join(minecraft_path, "resourcepacks")
             display_name = self.window.language_manager.translate("instance_version_root")
 
-        # 点击事件：导航到资源包页面
-        version_card.setCallback(lambda rp=resourcepacks_path, dn=display_name: self._navigate_to_resourcepack_page(dn, rp))
-
-        # 卡片内容
+        # 卡片内容布局
         card_layout = QHBoxLayout(version_card)
         card_layout.setContentsMargins(self._scale_size(12), 0, self._scale_size(12), 0)
         card_layout.setSpacing(self._scale_size(10))
 
+        # 创建点击区域容器
+        click_area = ClickableLabel()
+        click_area.setStyleSheet("background:transparent;")
+        click_area.setCallback(lambda rp=resourcepacks_path, dn=display_name: self._navigate_to_resourcepack_page(dn, rp))
+        click_area_layout = QHBoxLayout(click_area)
+        click_area_layout.setContentsMargins(0, 0, 0, 0)
+        click_area_layout.setSpacing(self._scale_size(10))
+
         # 图标
         icon_label = QLabel()
-        icon_label.setFixedSize(self._scale_size(32), self._scale_size(32))  # 版本卡片图标保持原尺寸
+        icon_label.setFixedSize(self._scale_size(32), self._scale_size(32))
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_label.setStyleSheet("background:transparent;")
         icon_pixmap = load_svg_icon("svg/box-fill.svg", self.dpi_scale)
         if icon_pixmap:
-            icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20, self.dpi_scale))  # 版本卡片图标显示保持原尺寸
-        card_layout.addWidget(icon_label)
+            icon_label.setPixmap(scale_icon_for_display(icon_pixmap, 20, self.dpi_scale))
+        click_area_layout.addWidget(icon_label)
 
         # 版本名称
         name_label = QLabel(display_name)
         name_label.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:'{self._get_font_family()}';background:transparent;")
-        card_layout.addWidget(name_label)
-        card_layout.addStretch()
+        click_area_layout.addWidget(name_label)
+        click_area_layout.addStretch()
 
         # 箭头图标
         arrow_label = QLabel()
@@ -1326,15 +1427,98 @@ class UIBuilder:
         arrow_pixmap = load_svg_icon("svg/arrow-bar-right.svg", self.dpi_scale)
         if arrow_pixmap:
             arrow_label.setPixmap(scale_icon_for_display(arrow_pixmap, 16, self.dpi_scale))
-        card_layout.addWidget(arrow_label)
+        click_area_layout.addWidget(arrow_label)
+
+        card_layout.addWidget(click_area)
+
+        bookmark_btn = None
+
+        # 收藏按钮（仅对版本显示）
+        if is_version:
+            bookmark_btn = QPushButton()
+            bookmark_btn.setFixedSize(self._scale_size(20), self._scale_size(20))
+            bookmark_btn.setStyleSheet("""
+                QPushButton {
+                    background: transparent;
+                    border: none;
+                    padding: 0;
+                }
+                QPushButton:hover {
+                    background: rgba(255, 255, 255, 0.1);
+                    border-radius: 4px;
+                }
+            """)
+            bookmark_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            bookmark_btn.clicked.connect(lambda: self._toggle_favorite_version(version_name))
+            
+            # 设置初始图标
+            if is_favorited:
+                bookmark_pixmap = load_svg_icon("svg/bookmarks-fill.svg", self.dpi_scale)
+            else:
+                bookmark_pixmap = load_svg_icon("svg/bookmarks.svg", self.dpi_scale)
+            
+            if bookmark_pixmap:
+                bookmark_btn.setIcon(QIcon(scale_icon_for_display(bookmark_pixmap, 16, self.dpi_scale)))
+            
+            # 设置卡片按钮信息
+            version_card.set_bookmark_info(bookmark_btn, is_favorited)
+            
+            # 未收藏的版本初始时不显示图标
+            if not is_favorited:
+                bookmark_btn.setIcon(QIcon())
+            
+            card_layout.addWidget(bookmark_btn)
+
+        # 处理卡片的点击事件
+        def mouse_press_handler(e):
+            click_area.mousePressEvent(e)
+        
+        def mouse_release_handler(e):
+            click_area.mouseReleaseEvent(e)
+        
+        version_card.mousePressEvent = mouse_press_handler
+        version_card.mouseReleaseEvent = mouse_release_handler
 
         self.window.instance_version_list_container.addWidget(version_card)
+
+        return bookmark_btn
 
     def _navigate_to_resourcepack_page(self, title, resourcepacks_path):
         """导航到资源包页面（第二层）"""
         resourcepack_page = self._create_instance_resourcepack_page(title, resourcepacks_path)
         self.window.instance_stack.addWidget(resourcepack_page)
         self.window.instance_stack.setCurrentWidget(resourcepack_page)
+
+    def _navigate_instance_back(self):
+        """返回上一页"""
+        current_widget = self.window.instance_stack.currentWidget()
+        if current_widget:
+            self.window.instance_stack.removeWidget(current_widget)
+            current_widget.deleteLater()
+
+    def _toggle_favorite_version(self, version_name):
+        """切换版本的收藏状态"""
+        logger.info(f"Toggling favorite status for version: {version_name}")
+        favorited_versions = self.window.config.get("favorited_versions", [])
+        
+        if version_name in favorited_versions:
+            # 取消收藏
+            logger.info(f"Removing {version_name} from favorites")
+            favorited_versions.remove(version_name)
+        else:
+            # 添加收藏
+            logger.info(f"Adding {version_name} to favorites")
+            favorited_versions.append(version_name)
+        
+        # 更新配置
+        logger.info(f"Saving favorited versions: {favorited_versions}")
+        self.window.config_manager.set("favorited_versions", favorited_versions)
+        
+        # 重新加载版本列表，使收藏的版本置顶
+        saved_path = self.window.config.get("minecraft_path", "")
+        logger.info(f"Reloading version list from path: {saved_path}")
+        if saved_path:
+            self._load_version_list(saved_path)
 
     def _navigate_instance_back(self):
         """返回上一页"""

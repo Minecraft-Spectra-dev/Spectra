@@ -24,7 +24,9 @@ class ConfigManager:
                     "custom_font_family": config.get("custom_font_family", "Microsoft YaHei UI"),
                     "custom_font_path": config.get("custom_font_path", ""),
                     "language": config.get("language", "zh_CN"),
-                    "minecraft_path": config.get("minecraft_path", "")
+                    "minecraft_path": config.get("minecraft_path", ""),
+                    "favorited_versions": config.get("favorited_versions", []),
+                    "favorited_resourcepacks": config.get("favorited_resourcepacks", [])
                 }
         except:
             return {
@@ -38,7 +40,9 @@ class ConfigManager:
                 "custom_font_family": "Microsoft YaHei UI",
                 "custom_font_path": "",
                 "language": "zh_CN",
-                "minecraft_path": ""
+                "minecraft_path": "",
+                "favorited_versions": [],
+                "favorited_resourcepacks": []
             }
 
     def save_config(self):
