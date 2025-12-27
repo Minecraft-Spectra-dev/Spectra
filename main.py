@@ -2,12 +2,16 @@
 
 import os
 import sys
+import time
 from pathlib import Path
 
 # 初始化日志系统（在其他导入之前）
 from managers.log_manager import LogManager
 log_manager = LogManager(log_dir="logs", level="INFO")
 logger = log_manager.get_logger(__name__)
+
+# 记录开始时间
+_start_time = time.time()
 
 # 禁用 FFmpeg 日志输出
 if sys.platform == 'win32':
@@ -36,7 +40,7 @@ def show_main_window(window, splash):
 
 if __name__ == "__main__":
     logger.info("Spectra starting...")
-    
+
     # 禁用 Qt 的高 DPI 自动缩放，使屏幕显示的物理像素与配置一致，但需要手动处理控件的 DPI 缩放
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
@@ -44,20 +48,30 @@ if __name__ == "__main__":
     os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "0"
     os.environ["QT_SCALE_FACTOR"] = "1"
 
+    qapp_start_time = time.time()
     app = QApplication(sys.argv)
-    logger.info("QApplication created")
+    qapp_elapsed = (time.time() - qapp_start_time) * 1000
+    logger.info(f"QApplication created - 耗时: {qapp_elapsed:.2f}ms")
 
     # 创建并显示启动画面
+    splash_start_time = time.time()
     splash = SplashScreen()
     splash.show()
-    logger.info("Splash screen shown")
+    splash_elapsed = (time.time() - splash_start_time) * 1000
+    logger.info(f"Splash screen shown - 耗时: {splash_elapsed:.2f}ms")
 
     # 强制启动画面完成渲染
     QApplication.processEvents()
 
     # 创建主窗口但不显示
+    window_start_time = time.time()
     window = Window()
-    logger.info("Main window created")
+    window_elapsed = (time.time() - window_start_time) * 1000
+    logger.info(f"Main window created - 耗时: {window_elapsed:.2f}ms")
+
+    # 总初始化耗时
+    total_elapsed = (time.time() - _start_time) * 1000
+    logger.info(f"初始化完成 - 总耗时: {total_elapsed:.2f}ms")
 
     # 2秒后关闭启动画面并显示主窗口
     QTimer.singleShot(2000, lambda: show_main_window(window, splash))
