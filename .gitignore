@@ -2,9 +2,6 @@
 /build/
 /dist/
 
-# Spec
-/main.spec
-
 # Virtual Environment
 /.venv/
 

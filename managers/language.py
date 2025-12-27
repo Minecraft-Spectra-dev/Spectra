@@ -4,6 +4,7 @@ import json
 import os
 import locale
 import logging
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +12,18 @@ logger = logging.getLogger(__name__)
 class LanguageManager:
     def __init__(self, config_manager=None, lang_dir="lang"):
         self.config_manager = config_manager
-        self.lang_dir = lang_dir
+        # lang 目录优先从 _MEIPASS 读取（打包后），其次从当前工作目录读取
+        if hasattr(sys, '_MEIPASS'):
+            # 打包后环境，优先从 _internal 读取
+            internal_lang = os.path.join(sys._MEIPASS, lang_dir)
+            if os.path.exists(internal_lang):
+                self.lang_dir = internal_lang
+            else:
+                self.lang_dir = os.path.join(os.getcwd(), lang_dir)
+        else:
+            # 开发环境
+            self.lang_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', lang_dir)
+            self.lang_dir = os.path.abspath(self.lang_dir)
         self.languages = self._load_languages()
         self.current_language = self._get_current_language()
         logger.info(f"语言管理器初始化完成，当前语言: {self.current_language}")

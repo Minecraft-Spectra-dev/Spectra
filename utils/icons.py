@@ -1,6 +1,7 @@
 """图标工具函数"""
 
 import os
+import sys
 from PyQt6.QtGui import QPixmap, QColor, QIcon
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
@@ -15,8 +16,17 @@ def _get_device_pixel_ratio():
 
 
 def load_svg_icon(path, dpi_scale=1.0):
-    svg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", path.replace('\\', os.sep))
-    svg_path = os.path.abspath(svg_path)
+    # 获取 SVG 文件的正确路径
+    if hasattr(sys, '_MEIPASS'):
+        # 打包后环境，优先从 _internal 读取
+        svg_path = os.path.join(sys._MEIPASS, path.replace('\\', os.sep))
+        if not os.path.exists(svg_path):
+            # 如果 _internal 中不存在，尝试从当前工作目录读取
+            svg_path = os.path.join(os.getcwd(), path.replace('\\', os.sep))
+    else:
+        # 开发环境
+        svg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", path.replace('\\', os.sep))
+        svg_path = os.path.abspath(svg_path)
     if os.path.exists(svg_path):
         icon = QIcon(svg_path)
         if not icon.isNull():

@@ -3,13 +3,24 @@
 import json
 import os
 import logging
+import sys
+
+from utils import get_resource_path
 
 logger = logging.getLogger(__name__)
 
 
 class ConfigManager:
     def __init__(self, config_file="config.json"):
-        self.config_file = config_file
+        # 获取配置文件的绝对路径
+        # config.json 始终从当前工作目录读取，不从 _MEIPASS 读取
+        if hasattr(sys, '_MEIPASS'):
+            # 打包后环境，使用当前工作目录
+            self.config_file = os.path.join(os.getcwd(), config_file)
+        else:
+            # 开发环境
+            self.config_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', config_file)
+            self.config_file = os.path.abspath(self.config_file)
         self.config = self.load_config()
 
     def load_config(self):
