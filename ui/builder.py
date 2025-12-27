@@ -10,7 +10,7 @@ from PyQt6.QtCore import Qt, QEvent
 from PyQt6.QtGui import QColor, QPixmap, QIcon, QFontDatabase
 from PyQt6.QtWidgets import (QColorDialog, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QSlider, QVBoxLayout, QWidget,
-                             QComboBox)
+                             QComboBox, QMenu)
 
 from styles import SLIDER_STYLE, STYLE_BTN, STYLE_ICON
 from utils import load_svg_icon, scale_icon_for_display
@@ -1167,7 +1167,15 @@ class UIBuilder:
             from PyQt6.QtCore import QSize
             sort_btn.setIcon(QIcon(scale_icon_for_display(sort_pixmap, 16, self.dpi_scale)))
             sort_btn.setIconSize(QSize(self._scale_size(16), self._scale_size(16)))
+        sort_btn.clicked.connect(self._show_sort_menu)
         controls_layout.addWidget(sort_btn)
+        
+        # 保存排序按钮引用
+        self.window.download_sort_btn = sort_btn
+        # 当前排序方式
+        self.window.current_sort_type = "downloads"
+        # 当前排序方式显示文本
+        self.window.current_sort_text = self.window.language_manager.translate("download_sort_downloads")
 
         pl.addWidget(controls_container)
 
@@ -1192,6 +1200,10 @@ class UIBuilder:
 
         # 加载 Minecraft 版本列表到下拉框
         self._load_versions_to_download_combo()
+        
+        # 页面创建完成后自动执行搜索（以下载量排序）
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(100, lambda: self._search_modrinth("", page=1, sort_by="downloads"))
 
         return page
 
@@ -1435,14 +1447,89 @@ class UIBuilder:
         # 根据选中的平台执行搜索
         platform = self.window.current_download_platform
         if platform == 1:  # Modrinth
-            self._search_modrinth(query)
+            self._search_modrinth(query, sort_by="relevance")
         elif platform == 2:  # CurseForge
             self._search_curseforge(query)
         else:  # 全部平台 - 默认搜索 Modrinth
-            self._search_modrinth(query)
+            self._search_modrinth(query, sort_by="relevance")
     
-    def _search_modrinth(self, query, page=1):
-        """搜索 Modrinth 项目"""
+    def _show_sort_menu(self):
+        """显示排序菜单"""
+        menu = QMenu(self.window)
+        menu.setStyleSheet("""
+            QMenu {
+                background: rgba(30, 30, 30, 0.95);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 4px;
+                padding: 4px;
+            }
+            QMenu::item {
+                background: transparent;
+                color: white;
+                padding: 6px 24px;
+                font-size: 13px;
+            }
+            QMenu::item:selected {
+                background: rgba(255, 255, 255, 0.15);
+            }
+            QMenu::item:checked {
+                background: rgba(100, 150, 255, 0.3);
+            }
+        """)
+        
+        # 定义排序选项
+        sort_options = [
+            ("downloads", self.window.language_manager.translate("download_sort_downloads")),
+            ("relevance", self.window.language_manager.translate("download_sort_relevance")),
+            ("follows", self.window.language_manager.translate("download_sort_follows")),
+            ("newest", self.window.language_manager.translate("download_sort_newest")),
+            ("updated", self.window.language_manager.translate("download_sort_updated")),
+        ]
+        
+        # 创建菜单项
+        for sort_type, text in sort_options:
+            action = menu.addAction(text)
+            action.setCheckable(True)
+            if sort_type == self.window.current_sort_type:
+                action.setChecked(True)
+            # 使用闭包保存 sort_type
+            action.triggered.connect(lambda checked, st=sort_type: self._on_sort_selected(st))
+        
+        # 显示菜单
+        button = self.window.download_sort_btn
+        menu.exec(button.mapToGlobal(button.rect().bottomLeft()))
+    
+    def _on_sort_selected(self, sort_type):
+        """排序选项被选中"""
+        # 更新当前排序方式
+        self.window.current_sort_type = sort_type
+        
+        # 更新排序按钮显示文本
+        sort_options_map = {
+            "downloads": self.window.language_manager.translate("download_sort_downloads"),
+            "relevance": self.window.language_manager.translate("download_sort_relevance"),
+            "follows": self.window.language_manager.translate("download_sort_follows"),
+            "newest": self.window.language_manager.translate("download_sort_newest"),
+            "updated": self.window.language_manager.translate("download_sort_updated"),
+        }
+        self.window.current_sort_text = sort_options_map.get(sort_type, sort_type)
+        
+        # 重新执行搜索（使用当前查询和新排序方式）
+        query = self.window.download_last_query
+        if query:
+            self._search_modrinth(query, page=1, sort_by=sort_type)
+        else:
+            # 如果没有查询，使用空查询搜索
+            self._search_modrinth("", page=1, sort_by=sort_type)
+    
+    def _search_modrinth(self, query, page=1, sort_by="relevance"):
+        """搜索 Modrinth 项目
+        
+        Args:
+            query: 搜索关键词
+            page: 页码
+            sort_by: 排序方式，"relevance" 或 "downloads"
+        """
         from managers.modrinth_manager import ModrinthManager
         from PyQt6.QtCore import QThread, pyqtSignal, QTimer
         
@@ -1464,7 +1551,8 @@ class UIBuilder:
                 facets = [["project_type:resourcepack"]]
                 # 计算偏移量
                 offset = (page - 1) * self.window.download_per_page
-                result = manager.search_projects(query, facets=facets, limit=self.window.download_per_page, offset=offset)
+                # 使用指定的排序方式
+                result = manager.search_projects(query, facets=facets, limit=self.window.download_per_page, offset=offset, index=sort_by)
                 hits = result.get('hits', [])
                 total_hits = result.get('total_hits', 0)
                 # 使用 QTimer 再次延迟，确保在主线程执行
