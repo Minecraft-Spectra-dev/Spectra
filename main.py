@@ -25,6 +25,15 @@ from splash_screen import SplashScreen
 from window import Window
 
 
+def show_main_window(window, splash):
+    """关闭启动画面并显示主窗口"""
+    splash.close()
+    window.show()
+    window.raise_()
+    window.activateWindow()
+    logger.info("Main window shown")
+
+
 if __name__ == "__main__":
     logger.info("Spectra starting...")
     
@@ -43,19 +52,15 @@ if __name__ == "__main__":
     splash.show()
     logger.info("Splash screen shown")
 
+    # 强制启动画面完成渲染
+    QApplication.processEvents()
+
     # 创建主窗口但不显示
     window = Window()
     logger.info("Main window created")
 
     # 2秒后关闭启动画面并显示主窗口
-    def show_main_window():
-        splash.close()
-        window.show()
-        window.raise_()
-        window.activateWindow()
-        logger.info("Main window shown")
-
-    QTimer.singleShot(2000, show_main_window)
+    QTimer.singleShot(2000, lambda: show_main_window(window, splash))
 
     logger.info("Starting Qt event loop...")
     sys.exit(app.exec())
