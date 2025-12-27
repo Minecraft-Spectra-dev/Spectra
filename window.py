@@ -261,7 +261,7 @@ class Window(QWidget):
         sb.addWidget(self.console_nav_btn)
 
         # 根据配置显示/隐藏控制台按钮
-        self.console_nav_btn.setVisible(self.config.get("dev_console_enabled", True))
+        self.console_nav_btn.setVisible(self.config.get("dev_console_enabled", False))
 
         sb.addStretch()
 

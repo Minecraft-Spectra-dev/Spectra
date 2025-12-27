@@ -42,7 +42,8 @@ class ConfigManager:
                     "minecraft_path": config.get("minecraft_path", ""),
                     "favorited_versions": config.get("favorited_versions", []),
                     "favorited_resourcepacks": config.get("favorited_resourcepacks", []),
-                    "version_aliases": config.get("version_aliases", {})
+                    "version_aliases": config.get("version_aliases", {}),
+                    "dev_console_enabled": config.get("dev_console_enabled", False)
                 }
         except:
             logger.warning(f"配置文件加载失败，使用默认配置: {self.config_file}")
@@ -60,7 +61,8 @@ class ConfigManager:
                 "minecraft_path": "",
                 "favorited_versions": [],
                 "favorited_resourcepacks": [],
-                "version_aliases": {}
+                "version_aliases": {},
+                "dev_console_enabled": False
             }
 
     def save_config(self):
