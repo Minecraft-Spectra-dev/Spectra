@@ -14,10 +14,11 @@ logger = log_manager.get_logger(__name__)
 _start_time = time.time()
 
 # 禁用 FFmpeg 日志输出
-if sys.platform == 'win32':
-    import ctypes
-    kernel32 = ctypes.windll.kernel32
-    kernel32.SetStdHandle(-12, None)
+# 注释掉以允许日志输出到控制台
+# if sys.platform == 'win32':
+#     import ctypes
+#     kernel32 = ctypes.windll.kernel32
+#     kernel32.SetStdHandle(-12, None)
 
 os.environ["QT_LOGGING_RULES"] = "qt.multimedia*=false"
 os.environ["QT_MEDIA_BACKEND"] = "ffmpeg"
@@ -35,7 +36,10 @@ def show_main_window(window, splash):
     window.show()
     window.raise_()
     window.activateWindow()
-    logger.info("Main window shown")
+
+    # 计算从启动到主窗口显示的总耗时
+    total_startup_elapsed = (time.time() - _start_time) * 1000
+    logger.info(f"主窗口显示完成 - 启动总耗时: {total_startup_elapsed:.2f}ms")
 
 
 if __name__ == "__main__":
@@ -74,7 +78,7 @@ if __name__ == "__main__":
     logger.info(f"初始化完成 - 总耗时: {total_elapsed:.2f}ms")
 
     # 2秒后关闭启动画面并显示主窗口
-    QTimer.singleShot(2000, lambda: show_main_window(window, splash))
+    QTimer.singleShot(0, lambda: show_main_window(window, splash))
 
     logger.info("Starting Qt event loop...")
     sys.exit(app.exec())
