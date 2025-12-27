@@ -1,6 +1,7 @@
 """UI构建器"""
 
 import os
+import sys
 import logging
 
 logger = logging.getLogger(__name__)
@@ -1626,9 +1627,20 @@ Spectra Information:
             else:  # vanilla or unknown
                 icon_path = "png/block.png"
             
+            # 获取 PNG 文件的正确路径
+            if hasattr(sys, '_MEIPASS'):
+                # 打包后环境，优先从 _internal 读取
+                png_path = os.path.join(sys._MEIPASS, icon_path.replace('\\', os.sep))
+                if not os.path.exists(png_path):
+                    png_path = os.path.join(os.getcwd(), icon_path.replace('\\', os.sep))
+            else:
+                # 开发环境
+                png_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", icon_path.replace('\\', os.sep))
+                png_path = os.path.abspath(png_path)
+            
             # 加载PNG图标
             from PyQt6.QtGui import QPixmap
-            icon_pixmap = QPixmap(icon_path)
+            icon_pixmap = QPixmap(png_path)
             if not icon_pixmap.isNull():
                 scaled_pixmap = icon_pixmap.scaled(
                     int(20 * self.dpi_scale),
