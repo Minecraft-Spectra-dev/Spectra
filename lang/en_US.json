@@ -65,6 +65,9 @@
     "dev_console": "Developer Console",
     "dev_console_desc": "Show/Hide console page",
     "download_search_placeholder": "Search downloads...",
+    "download_platform_all": "All",
+    "download_platform_modrinth": "Modrinth",
+    "download_platform_curseforge": "CurseForge",
     "console_input_placeholder": "Enter command (restart to restart program)",
     "file_explorer_resourcepacks_folder": "Resource Packs Folder"
   }

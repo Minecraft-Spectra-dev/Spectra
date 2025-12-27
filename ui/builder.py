@@ -1036,6 +1036,42 @@ class UIBuilder:
 
         pl.addWidget(search_container)
 
+        # 平台选择按钮（三段式按钮）
+        platform_container = QWidget()
+        platform_container.setStyleSheet(f"background:rgba(255,255,255,0.05);border-radius:{self._scale_size(8)}px;")
+        platform_layout = QHBoxLayout(platform_container)
+        platform_layout.setContentsMargins(self._scale_size(4), self._scale_size(4), self._scale_size(4), self._scale_size(4))
+        platform_layout.setSpacing(0)
+
+        # 全部按钮
+        self.window.download_platform_all = QPushButton(self.window.language_manager.translate("download_platform_all"))
+        self._setup_platform_button(self.window.download_platform_all, True, 0)
+        self.window.download_platform_all.clicked.connect(lambda: self._on_platform_selected(0))
+        platform_layout.addWidget(self.window.download_platform_all)
+
+        # Modrinth 按钮
+        self.window.download_platform_modrinth = QPushButton(self.window.language_manager.translate("download_platform_modrinth"))
+        self._setup_platform_button(self.window.download_platform_modrinth, False, 1)
+        self.window.download_platform_modrinth.clicked.connect(lambda: self._on_platform_selected(1))
+        platform_layout.addWidget(self.window.download_platform_modrinth)
+
+        # CurseForge 按钮
+        self.window.download_platform_curseforge = QPushButton(self.window.language_manager.translate("download_platform_curseforge"))
+        self._setup_platform_button(self.window.download_platform_curseforge, False, 2)
+        self.window.download_platform_curseforge.clicked.connect(lambda: self._on_platform_selected(2))
+        platform_layout.addWidget(self.window.download_platform_curseforge)
+
+        # 存储平台按钮的引用，用于更新选中状态
+        self.window.download_platform_buttons = [
+            self.window.download_platform_all,
+            self.window.download_platform_modrinth,
+            self.window.download_platform_curseforge
+        ]
+        # 当前选中的平台索引
+        self.window.current_download_platform = 0
+
+        pl.addWidget(platform_container)
+
         # 使用统一的滚动区域创建方法
         scroll_area = self._create_scroll_area()
         scroll_content, scroll_layout = self._create_scroll_content()
@@ -1096,6 +1132,65 @@ class UIBuilder:
         except Exception as e:
             logger.error(f"Error getting download target path: {e}")
             return None
+
+    def _setup_platform_button(self, button, is_selected, index):
+        """设置平台按钮的样式"""
+        border_radius = self._scale_size(8)
+        # 根据位置设置不同的圆角
+        if index == 0:
+            # 左侧按钮
+            border_style = f"border-top-left-radius:{border_radius}px;border-bottom-left-radius:{border_radius}px;border-right:none;"
+        elif index == 2:
+            # 右侧按钮
+            border_style = f"border-top-right-radius:{border_radius}px;border-bottom-right-radius:{border_radius}px;border-left:none;"
+        else:
+            # 中间按钮
+            border_style = "border:none;"
+        
+        if is_selected:
+            button.setStyleSheet(f"""
+                QPushButton {{
+                    background: rgba(160, 160, 255, 0.3);
+                    {border_style}
+                    padding: {self._scale_size(8)}px {self._scale_size(16)}px;
+                    color: white;
+                    font-size: {self._scale_size(13)}px;
+                    font-family: '{self._get_font_family()}';
+                    font-weight: bold;
+                }}
+            """)
+        else:
+            button.setStyleSheet(f"""
+                QPushButton {{
+                    background: transparent;
+                    {border_style}
+                    padding: {self._scale_size(8)}px {self._scale_size(16)}px;
+                    color: rgba(255, 255, 255, 0.7);
+                    font-size: {self._scale_size(13)}px;
+                    font-family: '{self._get_font_family()}';
+                }}
+                QPushButton:hover {{
+                    background: rgba(255, 255, 255, 0.1);
+                    color: rgba(255, 255, 255, 0.9);
+                }}
+            """)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def _on_platform_selected(self, index):
+        """平台选择事件处理"""
+        self.window.current_download_platform = index
+        # 更新按钮样式
+        for i, button in enumerate(self.window.download_platform_buttons):
+            self._setup_platform_button(button, i == index, i)
+        # 更新按钮文本（用于语言切换）
+        self._update_platform_button_texts()
+
+    def _update_platform_button_texts(self):
+        """更新平台按钮的文本"""
+        if hasattr(self.window, 'download_platform_buttons'):
+            self.window.download_platform_buttons[0].setText(self.window.language_manager.translate("download_platform_all"))
+            self.window.download_platform_buttons[1].setText(self.window.language_manager.translate("download_platform_modrinth"))
+            self.window.download_platform_buttons[2].setText(self.window.language_manager.translate("download_platform_curseforge"))
 
     def create_console_page(self):
         """创建控制台/日志页面"""
@@ -2413,6 +2508,9 @@ Spectra Information:
             title = download_page.layout().itemAt(0).widget()
             if title and hasattr(title, 'setText'):
                 title.setText(self.window.language_manager.translate("page_downloads"))
+
+        # 更新下载页面平台按钮文本
+        self._update_platform_button_texts()
 
         # 更新控制台页面标题
         console_page = self.window.stack.widget(3)
