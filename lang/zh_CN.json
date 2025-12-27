@@ -59,6 +59,8 @@
     "file_explorer_not_directory": "不是目录: {path}",
     "file_explorer_no_permission": "无权限访问此目录",
     "file_explorer_load_failed": "加载目录失败: {error}",
-    "export_logs": "导出日志"
+    "export_logs": "导出日志",
+    "dev_console": "开发控制台",
+    "dev_console_desc": "显示/隐藏控制台页面"
   }
 }

@@ -59,6 +59,8 @@
     "file_explorer_not_directory": "Not a directory: {path}",
     "file_explorer_no_permission": "No permission to access this directory",
     "file_explorer_load_failed": "Failed to load directory: {error}",
-    "export_logs": "Export Logs"
+    "export_logs": "Export Logs",
+    "dev_console": "Developer Console",
+    "dev_console_desc": "Show/Hide console page"
   }
 }

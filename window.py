@@ -250,10 +250,14 @@ class Window(QWidget):
 
         console_icon = load_svg_icon("svg/terminal.svg", self.dpi_scale)
         console_icon_active = load_svg_icon("svg/terminal-fill.svg", self.dpi_scale)
-        sb.addWidget(self.ui_builder.create_nav_btn(
+        self.console_nav_btn = self.ui_builder.create_nav_btn(
             console_icon if console_icon else "\uE75B", self.language_manager.translate("nav_console"),
             lambda: self.switch_page(3), 3, "svg/terminal.svg", "svg/terminal-fill.svg"
-        ))
+        )
+        sb.addWidget(self.console_nav_btn)
+
+        # 根据配置显示/隐藏控制台按钮
+        self.console_nav_btn.setVisible(self.config.get("dev_console_enabled", False))
 
         sb.addStretch()
 
@@ -672,7 +676,19 @@ class Window(QWidget):
             content.setVisible(False)
         else:
             content.setVisible(True)
-    
+
+    def toggle_dev_console(self, checked):
+        """切换开发控制台的显示/隐藏"""
+        # 更新开关状态
+        self.dev_console_toggle.setChecked(checked)
+
+        # 更新配置
+        self.config["dev_console_enabled"] = checked
+        self.config_manager.save_config()
+
+        # 显示/隐藏控制台按钮
+        self.console_nav_btn.setVisible(checked)
+
     def change_language(self, index):
         """切换语言"""
         languages = self.language_manager.get_all_languages()

@@ -647,6 +647,10 @@ class UIBuilder:
 
         self.window.font_content.setVisible(False)
 
+        # 开发控制台选项
+        self._create_dev_console_option()
+        scroll_layout.insertWidget(scroll_layout.count() - 1, self.window.dev_console_widget)
+
         return page
 
     def create_instance_page(self):
@@ -2062,6 +2066,135 @@ Spectra Information:
 
         return self.window.font_path_widget
 
+    def _create_toggle_switch(self, checked=False):
+        """创建自定义切换开关"""
+        from PyQt6.QtWidgets import QWidget
+        from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
+        from PyQt6.QtGui import QPainter, QColor, QBrush, QPen
+        from PyQt6.QtCore import pyqtProperty
+
+        class ToggleSwitch(QWidget):
+            def __init__(self, parent=None, checked=False, dpi_scale=1.0):
+                super().__init__(parent)
+                self._checked = checked
+                self._slider_position = 0.0 if not checked else 1.0
+                self.dpi_scale = dpi_scale
+                self.setFixedSize(int(40 * dpi_scale), int(22 * dpi_scale))
+                self.setCursor(Qt.CursorShape.PointingHandCursor)
+                self._animation = None
+                self._callback = None
+
+            @pyqtProperty(float)
+            def sliderPosition(self):
+                return self._slider_position
+
+            @sliderPosition.setter
+            def sliderPosition(self, position):
+                self._slider_position = position
+                self.update()
+
+            @property
+            def checked(self):
+                return self._checked
+
+            def setChecked(self, checked):
+                if self._checked != checked:
+                    self._checked = checked
+                    target_position = 1.0 if checked else 0.0
+
+                    if self._animation:
+                        self._animation.stop()
+
+                    self._animation = QPropertyAnimation(self, b"sliderPosition")
+                    self._animation.setDuration(200)
+                    self._animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
+                    self._animation.setStartValue(self._slider_position)
+                    self._animation.setEndValue(target_position)
+                    self._animation.start()
+                    self.update()
+
+            def mousePressEvent(self, event):
+                self.setChecked(not self._checked)
+                if self._callback:
+                    self._callback(self._checked)
+
+            def setCallback(self, callback):
+                self._callback = callback
+
+            def paintEvent(self, event):
+                painter = QPainter(self)
+                painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+                # 计算尺寸
+                w = self.width()
+                h = self.height()
+                track_height = h * 0.75
+                track_width = w * 0.9
+                knob_size = h * 0.85
+                track_y = (h - track_height) / 2
+                track_x = (w - track_width) / 2
+
+                # 绘制轨道
+                track_color = QColor(102, 132, 255) if self._checked else QColor(120, 120, 120)
+                painter.setBrush(QBrush(track_color))
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.drawRoundedRect(int(track_x), int(track_y), int(track_width), int(track_height), int(track_height / 2), int(track_height / 2))
+
+                # 绘制滑块
+                knob_x = track_x + self._slider_position * (track_width - knob_size)
+                knob_y = (h - knob_size) / 2
+
+                if self._checked:
+                    painter.setBrush(QBrush(QColor(255, 255, 255)))
+                else:
+                    painter.setBrush(QBrush(QColor(200, 200, 200)))
+
+                painter.drawEllipse(int(knob_x), int(knob_y), int(knob_size), int(knob_size))
+
+        toggle = ToggleSwitch(checked=checked, dpi_scale=self.dpi_scale)
+        return toggle
+
+    def _create_dev_console_option(self):
+        """创建开发控制台选项"""
+        dev_console_enabled = self.window.config.get("dev_console_enabled", False)
+
+        # 创建可点击的容器
+        self.window.dev_console_widget = QWidget()
+        self.window.dev_console_widget.setStyleSheet(f"background:rgba(255,255,255,0.08);border-radius:{self._scale_size(8)}px;")
+        dev_console_layout = QHBoxLayout(self.window.dev_console_widget)
+        dev_console_layout.setContentsMargins(self._scale_size(15), self._scale_size(12), self._scale_size(15), self._scale_size(12))
+        dev_console_layout.setSpacing(self._scale_size(12))
+
+        # 终端图标
+        console_icon = load_svg_icon("svg/terminal.svg", self.dpi_scale)
+        icon_label = QLabel()
+        icon_label.setFixedSize(self._scale_size(20), self._scale_size(20))
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        if console_icon:
+            icon_label.setPixmap(scale_icon_for_display(console_icon, 20, self.dpi_scale))
+        dev_console_layout.addWidget(icon_label, 0, Qt.AlignmentFlag.AlignTop)
+
+        # 文本区域
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(self._scale_size(4))
+        text_layout.setContentsMargins(0, 0, 0, 0)
+
+        title_lbl = QLabel(self.window.language_manager.translate("dev_console"))
+        title_lbl.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:'{self._get_font_family()}';background:transparent;")
+        text_layout.addWidget(title_lbl)
+
+        desc_lbl = QLabel(self.window.language_manager.translate("dev_console_desc"))
+        desc_lbl.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:'{self._get_font_family()}';background:transparent;")
+        text_layout.addWidget(desc_lbl)
+
+        dev_console_layout.addLayout(text_layout)
+        dev_console_layout.addStretch()
+
+        # 切换开关
+        self.window.dev_console_toggle = self._create_toggle_switch(dev_console_enabled)
+        self.window.dev_console_toggle.setCallback(lambda checked: self.window.toggle_dev_console(checked))
+        dev_console_layout.addWidget(self.window.dev_console_toggle)
+
     def _create_language_card(self):
         from PyQt6.QtWidgets import QComboBox
 
@@ -2254,6 +2387,22 @@ Spectra Information:
                 label = font_path_layout.itemAt(0).widget()
                 if label and hasattr(label, 'setText'):
                     label.setText(self.window.language_manager.translate("font_custom_label"))
+
+        # 更新开发控制台选项
+        if hasattr(self.window, 'dev_console_widget') and self.window.dev_console_widget.layout():
+            dev_console_layout = self.window.dev_console_widget.layout()
+            for i in range(dev_console_layout.count()):
+                item = dev_console_layout.itemAt(i)
+                if item and isinstance(item.layout(), QVBoxLayout):
+                    text_layout = item.layout()
+                    if text_layout.count() >= 2:
+                        title = text_layout.itemAt(0).widget()
+                        desc = text_layout.itemAt(1).widget()
+                        if title and hasattr(title, 'setText'):
+                            title.setText(self.window.language_manager.translate("dev_console"))
+                        if desc and hasattr(desc, 'setText'):
+                            desc.setText(self.window.language_manager.translate("dev_console_desc"))
+                        break
 
     def _update_settings_font(self, font_family):
         """更新设置页面的字体"""
