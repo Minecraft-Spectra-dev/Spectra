@@ -76,6 +76,20 @@
     "console_input_placeholder": "输入命令 (restart 重启程序)",
     "file_explorer_resourcepacks_folder": "资源包文件夹",
     "version_isolation": "版本隔离",
-    "version_isolation_desc": "开启后可分别管理各版本的资源包"
+    "version_isolation_desc": "开启后可分别管理各版本的资源包",
+    "download_btn": "下载",
+    "download_btn_downloaded": "已下载",
+    "download_unknown_title": "未知",
+    "download_page_info": "第 {current} 页 / 共 {total} 页",
+    "download_searching": "搜索中...",
+    "download_no_results": "未找到结果",
+    "download_search_failed": "搜索失败: {error}",
+    "news_network_unavailable": "网络不可用",
+    "news_network_error": "无法连接到服务器获取新闻信息。请检查网络连接后重试。",
+    "news_no_title": "无标题",
+    "news_no_content": "无内容",
+    "news_no_news": "暂无新闻",
+    "news_no_news_content": "当前没有可显示的新闻内容。",
+    "console_no_logs": "未找到日志文件。"
   }
 }

@@ -1249,13 +1249,15 @@ class UIBuilder:
         prev_btn.setEnabled(False)
         prev_btn.clicked.connect(self._on_prev_page)
         pagination_layout.addWidget(prev_btn)
-        
+
         # 页面信息标签
-        page_info_label = QLabel("Page 1 of 1")
+        page_info_template = self.window.language_manager.translate("download_page_info", default="Page {current} of {total}")
+        page_info_text = page_info_template.format(current=1, total=1)
+        page_info_label = QLabel(page_info_text)
         page_info_label.setStyleSheet("color: rgba(255, 255, 255, 0.8); font-size: 12px; background: transparent;")
         page_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         pagination_layout.addWidget(page_info_label)
-        
+
         # 下一页按钮
         next_btn = QPushButton()
         next_btn.setFixedSize(self._scale_size(28), self._scale_size(28))
@@ -1645,7 +1647,8 @@ class UIBuilder:
         """显示加载消息"""
         if hasattr(self.window, 'download_scroll_layout'):
             from PyQt6.QtWidgets import QLabel
-            loading_label = QLabel("Searching...")
+            loading_text = self.window.language_manager.translate("download_searching")
+            loading_label = QLabel(loading_text)
             loading_label.setStyleSheet("color: rgba(255, 255, 255, 0.7); font-size: 14px;")
             loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout = self.window.download_scroll_layout
@@ -1687,7 +1690,7 @@ class UIBuilder:
             for i in range(current_hit_index, end_hit_index):
                 hit = hits[i]
                 project_data = {
-                    'title': hit.get('title', 'Unknown'),
+                    'title': hit.get('title', self.window.language_manager.translate("download_unknown_title")),
                     'description': hit.get('description', ''),
                     'icon_url': hit.get('icon_url', ''),
                     'downloads': hit.get('downloads', 0),
@@ -1708,7 +1711,9 @@ class UIBuilder:
                     project_data,
                     dpi_scale=self.dpi_scale,
                     on_download=make_download_handler(project_data),
-                    download_target_path=download_target_path
+                    download_target_path=download_target_path,
+                    language_manager=self.window.language_manager,
+                    text_renderer=self.text_renderer
                 )
                 
                 # 添加到滚动区域（不立即显示，避免窗口闪烁）
@@ -1743,14 +1748,18 @@ class UIBuilder:
         if self.window.download_total_pages > 1:
             # 显示顶部翻页控件
             self.window.download_top_pagination.setVisible(True)
-            
+
             # 更新页面信息
-            self.window.download_top_pagination.page_info_label.setText(f"Page {self.window.download_current_page} of {self.window.download_total_pages}")
-            
+            page_info_template = self.window.language_manager.translate("download_page_info", default="Page {current} of {total}")
+            page_info_text = page_info_template.format(
+                current=self.window.download_current_page,
+                total=self.window.download_total_pages)
+            self.window.download_top_pagination.page_info_label.setText(page_info_text)
+
             # 更新上一页/下一页按钮状态
             self.window.download_top_pagination.prev_btn.setEnabled(self.window.download_current_page > 1)
             self.window.download_top_pagination.next_btn.setEnabled(self.window.download_current_page < self.window.download_total_pages)
-            
+
             # 更新页码下拉框
             self.window.download_top_pagination.page_combo.blockSignals(True)
             self.window.download_top_pagination.page_combo.clear()
@@ -1761,17 +1770,21 @@ class UIBuilder:
         else:
             # 隐藏顶部翻页控件
             self.window.download_top_pagination.setVisible(False)
-    
+
     def _update_bottom_pagination_control(self):
         """更新底部翻页控件状态"""
         if hasattr(self.window, 'download_bottom_pagination') and self.window.download_bottom_pagination:
             # 更新页面信息
-            self.window.download_bottom_pagination.page_info_label.setText(f"Page {self.window.download_current_page} of {self.window.download_total_pages}")
-            
+            page_info_template = self.window.language_manager.translate("download_page_info", default="Page {current} of {total}")
+            page_info_text = page_info_template.format(
+                current=self.window.download_current_page,
+                total=self.window.download_total_pages)
+            self.window.download_bottom_pagination.page_info_label.setText(page_info_text)
+
             # 更新上一页/下一页按钮状态
             self.window.download_bottom_pagination.prev_btn.setEnabled(self.window.download_current_page > 1)
             self.window.download_bottom_pagination.next_btn.setEnabled(self.window.download_current_page < self.window.download_total_pages)
-            
+
             # 更新页码下拉框
             self.window.download_bottom_pagination.page_combo.blockSignals(True)
             self.window.download_bottom_pagination.page_combo.clear()
@@ -1806,7 +1819,8 @@ class UIBuilder:
         """显示无结果消息"""
         if hasattr(self.window, 'download_scroll_layout'):
             from PyQt6.QtWidgets import QLabel
-            no_results_label = QLabel("No results found")
+            no_results_text = self.window.language_manager.translate("download_no_results")
+            no_results_label = QLabel(no_results_text)
             no_results_label.setStyleSheet("color: rgba(255, 255, 255, 0.7); font-size: 14px;")
             no_results_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout = self.window.download_scroll_layout
@@ -1816,7 +1830,9 @@ class UIBuilder:
         """显示错误消息"""
         if hasattr(self.window, 'download_scroll_layout'):
             from PyQt6.QtWidgets import QLabel
-            error_label = QLabel(f"Search failed: {error}")
+            error_template = self.window.language_manager.translate("download_search_failed", default="Search failed: {error}")
+            error_text = error_template.format(error=error)
+            error_label = QLabel(error_text)
             error_label.setStyleSheet("color: rgba(255, 100, 100, 0.9); font-size: 14px;")
             error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout = self.window.download_scroll_layout

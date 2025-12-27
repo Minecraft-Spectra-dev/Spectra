@@ -76,6 +76,20 @@
     "console_input_placeholder": "Enter command (restart to restart program)",
     "file_explorer_resourcepacks_folder": "Resource Packs Folder",
     "version_isolation": "Version Isolation",
-    "version_isolation_desc": "Enable to manage resource packs for each version separately"
+    "version_isolation_desc": "Enable to manage resource packs for each version separately",
+    "download_btn": "Download",
+    "download_btn_downloaded": "Downloaded",
+    "download_unknown_title": "Unknown",
+    "download_page_info": "Page {current} of {total}",
+    "download_searching": "Searching...",
+    "download_no_results": "No results found",
+    "download_search_failed": "Search failed: {error}",
+    "news_network_unavailable": "Network unavailable",
+    "news_network_error": "Unable to connect to server to fetch news. Please check your network connection and try again.",
+    "news_no_title": "No title",
+    "news_no_content": "No content",
+    "news_no_news": "No news",
+    "news_no_news_content": "There are currently no news items to display.",
+    "console_no_logs": "No log files found."
   }
 }

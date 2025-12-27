@@ -478,7 +478,8 @@ class Window(QWidget):
         log_files = glob.glob(os.path.join(log_dir, "*.log"))
 
         if not log_files:
-            self.console_text.setText("No log files found.")
+            no_logs_text = self.language_manager.translate("console_no_logs")
+            self.console_text.setText(no_logs_text)
             return
 
         # 按修改时间排序，获取最新的日志文件
@@ -519,8 +520,8 @@ class Window(QWidget):
         if thread.error:
             # 网络错误，显示错误卡片
             error_card = NewsCard(
-                title="网络不可用",
-                content="无法连接到服务器获取新闻信息。请检查网络连接后重试。",
+                title=self.language_manager.translate("news_network_unavailable"),
+                content=self.language_manager.translate("news_network_error"),
                 dpi_scale=self.dpi_scale,
                 text_renderer=self.text_renderer
             )
@@ -535,8 +536,8 @@ class Window(QWidget):
             if news_list:
                 for i, news in enumerate(news_list):
                     news_card = NewsCard(
-                        title=news.get("title", "无标题"),
-                        content=news.get("text", "无内容"),
+                        title=news.get("title", self.language_manager.translate("news_no_title")),
+                        content=news.get("text", self.language_manager.translate("news_no_content")),
                         dpi_scale=self.dpi_scale,
                         text_renderer=self.text_renderer
                     )
@@ -549,8 +550,8 @@ class Window(QWidget):
             else:
                 # 新闻列表为空
                 empty_card = NewsCard(
-                    title="暂无新闻",
-                    content="当前没有可显示的新闻内容。",
+                    title=self.language_manager.translate("news_no_news"),
+                    content=self.language_manager.translate("news_no_news_content"),
                     dpi_scale=self.dpi_scale,
                     text_renderer=self.text_renderer
                 )

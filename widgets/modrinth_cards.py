@@ -192,7 +192,7 @@ class HashCheckThread(QThread):
 class ModrinthResultCard(QWidget):
     """Modrinth 搜索结果卡片"""
 
-    def __init__(self, project_data, dpi_scale=1.0, parent=None, on_download=None, download_target_path=None):
+    def __init__(self, project_data, dpi_scale=1.0, parent=None, on_download=None, download_target_path=None, language_manager=None, text_renderer=None):
         super().__init__(parent)
         self.project_data = project_data
         self.dpi_scale = dpi_scale
@@ -202,6 +202,8 @@ class ModrinthResultCard(QWidget):
         self.download_btn = None
         self.status_label = None
         self.hash_check_thread = None
+        self.language_manager = language_manager
+        self.text_renderer = text_renderer
 
         self.setFixedHeight(int(90 * dpi_scale))
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -241,7 +243,12 @@ class ModrinthResultCard(QWidget):
         info_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
         # 标题
-        self.title_label = QLabel(project_data.get('title', 'Unknown'))
+        title_text = project_data.get('title', '')
+        if self.language_manager:
+            title_text = title_text or self.language_manager.translate("download_unknown_title")
+        else:
+            title_text = title_text or "Unknown"
+        self.title_label = QLabel(title_text)
         title_font = QFont()
         title_font.setFamily("Microsoft YaHei UI")
         title_font.setWeight(QFont.Weight.Bold)
@@ -322,7 +329,10 @@ class ModrinthResultCard(QWidget):
         card_layout.addLayout(info_layout, 1)
 
         # 下载按钮
-        download_btn = QPushButton("Download")
+        download_btn_text = "Download"
+        if self.language_manager:
+            download_btn_text = self.language_manager.translate("download_btn")
+        download_btn = QPushButton(download_btn_text)
         download_btn.setFixedSize(int(80 * dpi_scale), int(32 * dpi_scale))
         download_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         download_btn.setStyleSheet("""
@@ -465,7 +475,10 @@ class ModrinthResultCard(QWidget):
         self.is_downloaded = is_downloaded
         if self.download_btn:
             if is_downloaded:
-                self.download_btn.setText("已下载")
+                downloaded_text = "已下载"
+                if self.language_manager:
+                    downloaded_text = self.language_manager.translate("download_btn_downloaded")
+                self.download_btn.setText(downloaded_text)
                 self.download_btn.setEnabled(False)
                 self.download_btn.setStyleSheet("""
                     QPushButton {
@@ -478,7 +491,10 @@ class ModrinthResultCard(QWidget):
                     }
                 """)
             else:
-                self.download_btn.setText("Download")
+                download_text = "Download"
+                if self.language_manager:
+                    download_text = self.language_manager.translate("download_btn")
+                self.download_btn.setText(download_text)
                 self.download_btn.setEnabled(True)
                 self.download_btn.setStyleSheet("""
                     QPushButton {
