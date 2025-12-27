@@ -7,7 +7,7 @@ import sys
 
 import json
 from PyQt6.QtCore import (QEventLoop, QPoint, QPropertyAnimation,
-                           QEasingCurve, QThread, QUrl, QRect, Qt, QTimer)
+                           QEasingCurve, QThread, QUrl, QRect, Qt, QTimer, pyqtSignal)
 from PyQt6.QtGui import QColor, QCursor, QIcon
 from PyQt6.QtNetwork import (QNetworkAccessManager, QNetworkReply,
                              QNetworkRequest)

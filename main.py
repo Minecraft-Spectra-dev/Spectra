@@ -85,7 +85,7 @@ if __name__ == "__main__":
     total_elapsed = (time.time() - _start_time) * 1000
     logger.info(f"初始化完成 - 总耗时: {total_elapsed:.2f}ms")
 
-    # 2秒后关闭启动画面并显示主窗口
+    # 在下一个事件循环中显示主窗口，确保基本 UI 完全加载完成
     QTimer.singleShot(0, lambda: show_main_window(window, splash))
 
     logger.info("Starting Qt event loop...")
