@@ -555,6 +555,18 @@ class FileExplorer(QWidget):
         """获取资源包图标（pack.png），图标大小适配卡片高度96px"""
         try:
             icon_path = None
+            is_valid_pack = False  # 标记是否是有效的材质包
+
+            # 检查是否有pack.mcmeta文件来判断是否是材质包
+            if is_dir:
+                is_valid_pack = os.path.exists(os.path.join(full_path, "pack.mcmeta"))
+            elif full_path.endswith('.zip'):
+                try:
+                    with zipfile.ZipFile(full_path, 'r') as zip_ref:
+                        pack_mcmeta_files = [f for f in zip_ref.namelist() if f.lower().endswith('pack.mcmeta')]
+                        is_valid_pack = len(pack_mcmeta_files) > 0
+                except Exception:
+                    pass
 
             if is_dir:
                 # 文件夹形式的资源包
@@ -592,6 +604,32 @@ class FileExplorer(QWidget):
                                     return QIcon(scaled_pixmap)
                 except Exception:
                     pass
+
+            # 没有找到pack.png时，根据是否是有效材质包返回默认图标
+            if is_valid_pack:
+                # 是材质包但没有图标，使用unknown_pack.png
+                default_icon_path = "png/unknown_pack.png"
+                if os.path.exists(default_icon_path):
+                    pixmap = QPixmap(default_icon_path)
+                    if not pixmap.isNull():
+                        icon_size = int(88 * self.dpi_scale)
+                        scaled_pixmap = pixmap.scaled(
+                            icon_size, icon_size,
+                            Qt.AspectRatioMode.KeepAspectRatio,
+                            Qt.TransformationMode.SmoothTransformation
+                        )
+                        return QIcon(scaled_pixmap)
+            elif is_dir:
+                # 不是材质包的文件夹，使用folder2.svg
+                folder_icon = load_svg_icon("svg/folder2.svg", self.dpi_scale)
+                if folder_icon:
+                    icon_size = int(88 * self.dpi_scale)
+                    scaled_pixmap = folder_icon.scaled(
+                        icon_size, icon_size,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation
+                    )
+                    return QIcon(scaled_pixmap)
 
             return None
         except Exception:
