@@ -44,6 +44,7 @@ class ConfigManager:
                     "favorited_versions": config.get("favorited_versions", []),
                     "favorited_resourcepacks": config.get("favorited_resourcepacks", []),
                     "version_aliases": config.get("version_aliases", {}),
+                    "version_isolation": config.get("version_isolation", True),
                     "dev_console_enabled": config.get("dev_console_enabled", False)
                 }
         except:
@@ -64,6 +65,7 @@ class ConfigManager:
                 "favorited_versions": [],
                 "favorited_resourcepacks": [],
                 "version_aliases": {},
+                "version_isolation": True,
                 "dev_console_enabled": False
             }
 

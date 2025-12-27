@@ -69,6 +69,8 @@
     "download_platform_modrinth": "Modrinth",
     "download_platform_curseforge": "CurseForge",
     "console_input_placeholder": "Enter command (restart to restart program)",
-    "file_explorer_resourcepacks_folder": "Resource Packs Folder"
+    "file_explorer_resourcepacks_folder": "Resource Packs Folder",
+    "version_isolation": "Version Isolation",
+    "version_isolation_desc": "Enable to manage resource packs for each version separately"
   }
 }

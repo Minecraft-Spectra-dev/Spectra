@@ -737,6 +737,18 @@ class Window(QWidget):
         # 显示/隐藏控制台按钮
         self.console_nav_btn.setVisible(checked)
 
+    def toggle_version_isolation(self, checked):
+        """切换版本隔离的启用/禁用"""
+        # 更新开关状态
+        self.version_isolation_toggle.setChecked(checked)
+
+        # 更新配置
+        self.config["version_isolation"] = checked
+        self.config_manager.save_config()
+
+        # 重新加载实例页面
+        self.ui_builder._refresh_instance_page()
+
     def change_language(self, index):
         """切换语言"""
         languages = self.language_manager.get_all_languages()

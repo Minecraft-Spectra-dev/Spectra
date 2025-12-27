@@ -658,6 +658,10 @@ class UIBuilder:
 
         self.window.font_content.setVisible(False)
 
+        # 版本隔离选项
+        self._create_version_isolation_option()
+        scroll_layout.insertWidget(scroll_layout.count() - 1, self.window.version_isolation_widget)
+
         # 开发控制台选项
         self._create_dev_console_option()
         scroll_layout.insertWidget(scroll_layout.count() - 1, self.window.dev_console_widget)
@@ -833,9 +837,32 @@ class UIBuilder:
 
         # 版本列表容器引用，用于动态更新
         self.window.instance_version_list_container = version_list_layout
+        self.window.instance_version_container = version_container  # 保存版本容器引用
+        self.window.instance_version_list_widget = version_list_widget  # 保存版本列表小部件引用
 
         version_container_layout.addWidget(version_list_widget)
         scroll_layout.addWidget(version_container)
+
+        # 根目录材质包容器（用于版本隔离关闭时显示）
+        root_resourcepacks_container = QWidget()
+        root_resourcepacks_container.setStyleSheet(f"background:rgba(255,255,255,0.08);border-radius:{self._scale_size(8)}px;")
+        root_resourcepacks_layout = QVBoxLayout(root_resourcepacks_container)
+        root_resourcepacks_layout.setContentsMargins(0, 0, 0, 0)
+        root_resourcepacks_layout.setSpacing(0)
+
+        # 创建文件浏览器用于显示根目录材质包
+        from widgets import FileExplorer
+        self.window.root_resourcepacks_explorer = FileExplorer(
+            dpi_scale=self.dpi_scale,
+            config_manager=self.window.config_manager,
+            language_manager=self.window.language_manager,
+            text_renderer=self.text_renderer
+        )
+        root_resourcepacks_layout.addWidget(self.window.root_resourcepacks_explorer, 1)
+        self.window.root_resourcepacks_explorer.setMinimumHeight(self._scale_size(400))
+
+        scroll_layout.addWidget(root_resourcepacks_container)
+        self.window.root_resourcepacks_container = root_resourcepacks_container  # 保存根目录材质包容器引用
 
         scroll_layout.addStretch()
 
@@ -1031,7 +1058,8 @@ class UIBuilder:
         # 版本选择（固定长度的长条，用于选择下载目标）
         self.window.download_version_combo = QComboBox()
         self._setup_combobox(self.window.download_version_combo, width=230)
-        self.window.download_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))  # 根目录
+        # 根据版本隔离设置显示/隐藏
+        self.window.download_version_combo.setVisible(self.window.config.get("version_isolation", True))
         search_layout.addWidget(self.window.download_version_combo, 2)
 
         pl.addWidget(search_container)
@@ -1151,25 +1179,29 @@ class UIBuilder:
         """从.minecraft路径加载版本列表到下载页面的下拉框（用于选择下载目标）"""
         import os
         try:
+            # 如果版本隔离关闭，不加载版本列表，也不显示"根目录"选项
+            if not self.window.config.get("version_isolation", True):
+                self.window.download_version_combo.clear()
+                return
+
             minecraft_path = self.window.config.get("minecraft_path", "")
             if minecraft_path and os.path.exists(minecraft_path):
                 versions_path = os.path.join(minecraft_path, "versions")
                 if os.path.exists(versions_path) and os.path.isdir(versions_path):
-                    # 清除现有选项（保留第一个"Root"）
+                    # 清除现有选项（不添加"Root"）
                     self.window.download_version_combo.clear()
-                    self.window.download_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))  # 根目录资源包
-                    
+
                     # 获取并添加所有版本
                     versions = []
                     for item in sorted(os.listdir(versions_path)):
                         item_path = os.path.join(versions_path, item)
                         if os.path.isdir(item_path):
                             versions.append(item)
-                    
+
                     # 添加版本到下拉框
                     for version in versions:
                         self.window.download_version_combo.addItem(version)
-                    
+
                     logger.info(f"Loaded {len(versions)} versions to download combo")
         except Exception as e:
             logger.error(f"Error loading versions to download combo: {e}")
@@ -1181,16 +1213,18 @@ class UIBuilder:
             minecraft_path = self.window.config.get("minecraft_path", "")
             if not minecraft_path or not os.path.exists(minecraft_path):
                 return None
-            
-            selected_version = self.window.download_version_combo.currentText()
-            root_text = self.window.language_manager.translate("instance_version_root")
-            
-            # 如果选择的是根目录，则返回根目录的resourcepacks路径
-            if selected_version == root_text:
+
+            # 如果版本隔离关闭，直接返回根目录的resourcepacks路径
+            if not self.window.config.get("version_isolation", True):
                 return os.path.join(minecraft_path, "resourcepacks")
-            # 否则返回对应版本的resourcepacks路径
-            else:
+
+            # 版本隔离开启时，根据下拉框选择返回对应路径
+            selected_version = self.window.download_version_combo.currentText()
+            if selected_version:
+                # 返回对应版本的resourcepacks路径
                 return os.path.join(minecraft_path, "versions", selected_version, "resourcepacks")
+            # 如果没有选择版本，返回根目录
+            return os.path.join(minecraft_path, "resourcepacks")
         except Exception as e:
             logger.error(f"Error getting download target path: {e}")
             return None
@@ -1734,6 +1768,28 @@ Spectra Information:
         import os
         try:
             logger.info(f"Loading version list from: {minecraft_path}")
+
+            # 如果版本隔离关闭，直接在版本列表位置显示根目录材质包
+            if not self.window.config.get("version_isolation", True):
+                self._clear_version_list()
+                # 隐藏版本容器
+                if hasattr(self.window, 'instance_version_container'):
+                    self.window.instance_version_container.setVisible(False)
+                # 显示根目录材质包容器
+                if hasattr(self.window, 'root_resourcepacks_container'):
+                    self.window.root_resourcepacks_container.setVisible(True)
+                    # 设置根目录材质包路径
+                    root_resourcepacks_path = os.path.join(minecraft_path, "resourcepacks")
+                    if os.path.exists(root_resourcepacks_path):
+                        self.window.root_resourcepacks_explorer.set_resourcepacks_path(root_resourcepacks_path, minecraft_path)
+                return
+
+            # 显示版本容器，隐藏根目录材质包容器
+            if hasattr(self.window, 'instance_version_container'):
+                self.window.instance_version_container.setVisible(True)
+            if hasattr(self.window, 'root_resourcepacks_container'):
+                self.window.root_resourcepacks_container.setVisible(False)
+
             versions_path = os.path.join(minecraft_path, "versions")
             logger.info(f"Versions path: {versions_path}")
             self._clear_version_list()
@@ -1741,7 +1797,7 @@ Spectra Information:
             # 获取收藏的版本列表
             favorited_versions = self.window.config.get("favorited_versions", [])
             logger.info(f"Favorited versions: {favorited_versions}")
-            
+
             # 收集所有版本
             all_versions = []
             if os.path.exists(versions_path) and os.path.isdir(versions_path):
@@ -1752,7 +1808,7 @@ Spectra Information:
                 logger.info(f"Found {len(all_versions)} versions: {all_versions}")
             else:
                 logger.warning(f"Versions path does not exist or is not a directory: {versions_path}")
-            
+
             # 将版本分为收藏和非收藏两组
             favorites = []
             non_favorites = []
@@ -1761,12 +1817,12 @@ Spectra Information:
                     favorites.append(version)
                 else:
                     non_favorites.append(version)
-            
+
             # 先添加收藏的版本
             logger.info(f"Adding {len(favorites)} favorite versions")
             for version in favorites:
                 self._add_version_item(minecraft_path, version, is_version=True, is_favorited=True)
-            
+
             # 再添加非收藏的版本
             logger.info(f"Adding {len(non_favorites)} non-favorite versions")
             for version in non_favorites:
@@ -2355,7 +2411,7 @@ Spectra Information:
         """创建自定义切换开关"""
         from PyQt6.QtWidgets import QWidget
         from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
-        from PyQt6.QtGui import QPainter, QColor, QBrush, QPen
+        from PyQt6.QtGui import QPainter, QColor, QBrush
         from PyQt6.QtCore import pyqtProperty
 
         class ToggleSwitch(QWidget):
@@ -2470,6 +2526,47 @@ Spectra Information:
         self.window.blur_toggle = self._create_toggle_switch(blur_enabled)
         self.window.blur_toggle.setCallback(lambda checked: self.window.toggle_blur_enabled(checked))
         blur_toggle_layout.addWidget(self.window.blur_toggle)
+
+    def _create_version_isolation_option(self):
+        """创建版本隔离选项"""
+        version_isolation_enabled = self.window.config.get("version_isolation", True)
+
+        # 创建可点击的容器
+        self.window.version_isolation_widget = QWidget()
+        self.window.version_isolation_widget.setStyleSheet(f"background:rgba(255,255,255,0.08);border-radius:{self._scale_size(8)}px;")
+        version_isolation_layout = QHBoxLayout(self.window.version_isolation_widget)
+        version_isolation_layout.setContentsMargins(self._scale_size(15), self._scale_size(12), self._scale_size(15), self._scale_size(12))
+        version_isolation_layout.setSpacing(self._scale_size(12))
+
+        # 盒子图标
+        box_icon = load_svg_icon("svg/box-fill.svg", self.dpi_scale)
+        icon_label = QLabel()
+        icon_label.setFixedSize(self._scale_size(20), self._scale_size(20))
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        if box_icon:
+            icon_label.setPixmap(scale_icon_for_display(box_icon, 20, self.dpi_scale))
+        version_isolation_layout.addWidget(icon_label, 0, Qt.AlignmentFlag.AlignTop)
+
+        # 文本区域
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(self._scale_size(4))
+        text_layout.setContentsMargins(0, 0, 0, 0)
+
+        title_lbl = QLabel(self.window.language_manager.translate("version_isolation"))
+        title_lbl.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:'{self._get_font_family()}';background:transparent;")
+        text_layout.addWidget(title_lbl)
+
+        desc_lbl = QLabel(self.window.language_manager.translate("version_isolation_desc"))
+        desc_lbl.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:'{self._get_font_family()}';background:transparent;")
+        text_layout.addWidget(desc_lbl)
+
+        version_isolation_layout.addLayout(text_layout)
+        version_isolation_layout.addStretch()
+
+        # 切换开关
+        self.window.version_isolation_toggle = self._create_toggle_switch(version_isolation_enabled)
+        self.window.version_isolation_toggle.setCallback(lambda checked: self.window.toggle_version_isolation(checked))
+        version_isolation_layout.addWidget(self.window.version_isolation_toggle)
 
     def _create_dev_console_option(self):
         """创建开发控制台选项"""
@@ -2768,6 +2865,22 @@ Spectra Information:
                             desc.setText(self.window.language_manager.translate("dev_console_desc"))
                         break
 
+        # 更新版本隔离选项
+        if hasattr(self.window, 'version_isolation_widget') and self.window.version_isolation_widget.layout():
+            version_isolation_layout = self.window.version_isolation_widget.layout()
+            for i in range(version_isolation_layout.count()):
+                item = version_isolation_layout.itemAt(i)
+                if item and isinstance(item.layout(), QVBoxLayout):
+                    text_layout = item.layout()
+                    if text_layout.count() >= 2:
+                        title = text_layout.itemAt(0).widget()
+                        desc = text_layout.itemAt(1).widget()
+                        if title and hasattr(title, 'setText'):
+                            title.setText(self.window.language_manager.translate("version_isolation"))
+                        if desc and hasattr(desc, 'setText'):
+                            desc.setText(self.window.language_manager.translate("version_isolation_desc"))
+                        break
+
     def _update_settings_font(self, font_family):
         """更新设置页面的字体"""
         # 转义字体名称中的特殊字符
@@ -2890,6 +3003,23 @@ Spectra Information:
                     # 更新语言 QComboBox 字体（直接从 window 属性获取）
                     if hasattr(self.window, 'language_combo'):
                         self._update_combobox_font(self.window.language_combo, font_family_quoted)
+
+    def _refresh_instance_page(self):
+        """刷新实例页面（当版本隔离设置变化时调用）"""
+        import os
+        try:
+            # 获取当前Minecraft路径
+            minecraft_path = self.window.config.get("minecraft_path", "")
+            if minecraft_path and os.path.exists(minecraft_path):
+                # 重新加载版本列表（会根据版本隔离设置显示不同内容）
+                self._load_version_list(minecraft_path)
+                # 更新下载页面的版本列表
+                self._load_versions_to_download_combo()
+                # 更新下载页面的版本选择框可见性
+                if hasattr(self.window, 'download_version_combo'):
+                    self.window.download_version_combo.setVisible(self.window.config.get("version_isolation", True))
+        except Exception as e:
+            logger.error(f"Error refreshing instance page: {e}")
 
     def _update_bg_card(self, card, title_key, desc_key):
         """更新卡片的标题和描述文本"""

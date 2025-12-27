@@ -237,10 +237,10 @@ class FileExplorer(QWidget):
         header.setStretchLastSection(True)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        
+
         self.file_tree.itemDoubleClicked.connect(self.on_item_double_clicked)
-        layout.addWidget(self.file_tree)
-        
+        layout.addWidget(self.file_tree, 1)
+
         # 空状态提示
         self.empty_label = QLabel(self.translate("file_explorer_select_path"))
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -253,7 +253,7 @@ class FileExplorer(QWidget):
             }}
         """)
         self.empty_label.hide()
-        layout.addWidget(self.empty_label, 1)
+        layout.addWidget(self.empty_label)
     
     def set_minecraft_path(self, path):
         """设置Minecraft路径（根目录使用resourcepacks文件夹）"""
