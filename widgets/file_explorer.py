@@ -90,11 +90,12 @@ class FileExplorer(QWidget):
 
     file_selected = pyqtSignal(str)  # 文件选择信号
 
-    def __init__(self, parent=None, dpi_scale=1.0, config_manager=None, language_manager=None):
+    def __init__(self, parent=None, dpi_scale=1.0, config_manager=None, language_manager=None, text_renderer=None):
         super().__init__(parent)
         self.dpi_scale = dpi_scale
         self.config_manager = config_manager
         self.language_manager = language_manager
+        self.text_renderer = text_renderer  # 新增 text_renderer 参数
         self.current_path = None
         self.root_path = None  # 保存minecraft路径
         self.base_path = None  # 保存当前resourcepacks路径作为返回的根目录
@@ -104,7 +105,9 @@ class FileExplorer(QWidget):
 
     def translate(self, key, **kwargs):
         """翻译辅助方法"""
-        if self.language_manager:
+        if self.text_renderer:
+            return self.text_renderer.translate(key, **kwargs)
+        elif self.language_manager:
             text = self.language_manager.translate(key)
             # 支持字符串格式化
             if kwargs:
@@ -282,7 +285,7 @@ class FileExplorer(QWidget):
                 sub_path = path[len(self.base_path):].lstrip(os.sep).lstrip("/")
                 # 统一使用反斜杠
                 sub_path = sub_path.replace("/", "\\")
-                return sub_path if sub_path else "资源包文件夹"
+                return sub_path if sub_path else self.translate("file_explorer_resourcepacks_folder")
 
         # 默认显示完整路径
         full_path = path.replace("/", "\\")

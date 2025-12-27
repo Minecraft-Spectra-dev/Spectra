@@ -24,7 +24,7 @@ logger = get_logger(__name__)
 from styles import STYLE_BTN, STYLE_BTN_ACTIVE
 from ui import UIBuilder
 from utils import load_svg_icon, scale_icon_for_display
-from widgets import NewsCard, make_transparent, set_current_font
+from widgets import NewsCard, make_transparent, set_current_font, TextRenderer
 
 
 class NewsFetchThread(QThread):
@@ -76,6 +76,10 @@ class Window(QWidget):
         self.dpi_scale = self._get_system_dpi_scale()
         logger.info(f"系统DPI缩放比例: {self.dpi_scale:.2f}")
 
+        # 初始化文字渲染管理器
+        self.text_renderer = TextRenderer(self.language_manager)
+        self.text_renderer.set_dpi_scale(self.dpi_scale)
+        
         self.ui_builder = UIBuilder(self)
         self.edge_size = self.ui_builder._scale_size(8)
 
@@ -517,7 +521,8 @@ class Window(QWidget):
             error_card = NewsCard(
                 title="网络不可用",
                 content="无法连接到服务器获取新闻信息。请检查网络连接后重试。",
-                dpi_scale=self.dpi_scale
+                dpi_scale=self.dpi_scale,
+                text_renderer=self.text_renderer
             )
             error_card.set_on_close(functools.partial(self._close_news_card, layout, error_card))
             # 在 stretch 前插入错误卡片
@@ -532,7 +537,8 @@ class Window(QWidget):
                     news_card = NewsCard(
                         title=news.get("title", "无标题"),
                         content=news.get("text", "无内容"),
-                        dpi_scale=self.dpi_scale
+                        dpi_scale=self.dpi_scale,
+                        text_renderer=self.text_renderer
                     )
                     news_card.set_on_close(functools.partial(self._close_news_card, layout, news_card))
                     # 在 stretch 前插入卡片
@@ -545,7 +551,8 @@ class Window(QWidget):
                 empty_card = NewsCard(
                     title="暂无新闻",
                     content="当前没有可显示的新闻内容。",
-                    dpi_scale=self.dpi_scale
+                    dpi_scale=self.dpi_scale,
+                    text_renderer=self.text_renderer
                 )
                 empty_card.set_on_close(functools.partial(self._close_news_card, layout, empty_card))
                 layout.insertWidget(layout.count() - 1, empty_card)
@@ -702,7 +709,10 @@ class Window(QWidget):
         # 更新窗口标题
         self.setWindowTitle(self.language_manager.translate("app_title"))
         
-        # 更新导航栏文本
+        # 通过 TextRenderer 更新所有已注册的控件
+        self.text_renderer.update_language()
+        
+        # 更新导航栏文本（仍保持原有逻辑，可逐步迁移到 TextRenderer）
         nav_texts = [
             self.language_manager.translate("nav_collapse"),
             self.language_manager.translate("nav_home"),
@@ -1028,6 +1038,9 @@ class Window(QWidget):
             font_id = QFontDatabase.addApplicationFont(font_path)
             if font_id != -1:
                 font_family = QFontDatabase.applicationFontFamilies(font_id)[0]
+
+        # 更新 TextRenderer 的字体
+        self.text_renderer.set_font_family(font_family)
 
         # 应用到整个应用
         self._apply_font_to_app(font_family)

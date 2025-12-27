@@ -61,6 +61,9 @@
     "file_explorer_load_failed": "Failed to load directory: {error}",
     "export_logs": "Export Logs",
     "dev_console": "Developer Console",
-    "dev_console_desc": "Show/Hide console page"
+    "dev_console_desc": "Show/Hide console page",
+    "download_search_placeholder": "Search downloads...",
+    "console_input_placeholder": "Enter command (restart to restart program)",
+    "file_explorer_resourcepacks_folder": "Resource Packs Folder"
   }
 }

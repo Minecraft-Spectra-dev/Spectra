@@ -61,6 +61,9 @@
     "file_explorer_load_failed": "加载目录失败: {error}",
     "export_logs": "导出日志",
     "dev_console": "开发控制台",
-    "dev_console_desc": "显示/隐藏控制台页面"
+    "dev_console_desc": "显示/隐藏控制台页面",
+    "download_search_placeholder": "搜索下载...",
+    "console_input_placeholder": "输入命令 (restart 重启程序)",
+    "file_explorer_resourcepacks_folder": "资源包文件夹"
   }
 }

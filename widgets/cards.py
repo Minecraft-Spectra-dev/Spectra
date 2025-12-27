@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (QGraphicsOpacityEffect, QHBoxLayout, QLabel,
                              QPushButton, QVBoxLayout, QWidget)
 
 
-# 全局字体变量
+# 全局字体变量（保留以向后兼容）
 _current_font_family = "Microsoft YaHei UI"
 
 
@@ -23,12 +23,14 @@ def set_current_font(font_family):
 
 
 class NewsCard(QWidget):
-    def __init__(self, title, content, on_close=None, dpi_scale=1.0, parent=None):
+    def __init__(self, title, content, on_close=None, dpi_scale=1.0, parent=None, text_renderer=None):
         super().__init__(parent)
         self.on_close = on_close
         self.dpi_scale = dpi_scale
         self._scale = 1.0
         self._opacity = 0.0
+        self._text_renderer = text_renderer
+        self._font_family = text_renderer.get_font_family() if text_renderer else get_current_font()
         
         self.setMouseTracking(True)
         
@@ -53,7 +55,7 @@ class NewsCard(QWidget):
         # 标题标签
         self.title_label = QLabel(title)
         title_font = QFont()
-        title_font.setFamily(get_current_font())
+        title_font.setFamily(self._font_family)
         title_font.setWeight(QFont.Weight.Bold)
         title_font.setPointSize(int(13 * dpi_scale))
         self.title_label.setFont(title_font)
@@ -91,7 +93,7 @@ class NewsCard(QWidget):
         # 内容标签
         self.content_label = QLabel(content)
         content_font = QFont()
-        content_font.setFamily(get_current_font())
+        content_font.setFamily(self._font_family)
         content_font.setPointSize(int(11 * dpi_scale))
         self.content_label.setFont(content_font)
         self.content_label.setStyleSheet("""
@@ -134,6 +136,7 @@ class NewsCard(QWidget):
 
     def update_font(self, font_family):
         """更新卡片字体"""
+        self._font_family = font_family
         # 转义字体名称中的特殊字符
         escaped_font = font_family.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"')
         # 使用双引号包裹字体名称，避免单引号问题

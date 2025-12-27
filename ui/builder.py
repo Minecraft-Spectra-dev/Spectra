@@ -15,7 +15,8 @@ from PyQt6.QtWidgets import (QColorDialog, QHBoxLayout, QLabel, QLineEdit,
 from styles import SLIDER_STYLE, STYLE_BTN, STYLE_ICON
 from utils import load_svg_icon, scale_icon_for_display
 from widgets import (CardButton, ClickableLabel, JellyButton,
-                      get_current_font, make_transparent, set_current_font)
+                      get_current_font, make_transparent, set_current_font,
+                      TextRenderer)
 
 
 class VersionCardWidget(QWidget):
@@ -85,6 +86,11 @@ class UIBuilder:
     def __init__(self, window):
         self.window = window
         self.dpi_scale = getattr(window, 'dpi_scale', 1.0)
+        # 获取 window 的 text_renderer，如果没有则创建一个新的
+        self.text_renderer = getattr(window, 'text_renderer', None)
+        if self.text_renderer is None:
+            self.text_renderer = TextRenderer(getattr(window, 'language_manager', None))
+            self.text_renderer.set_dpi_scale(self.dpi_scale)
 
     def _scale_size(self, size):
         return int(size * self.dpi_scale)
@@ -693,6 +699,8 @@ class UIBuilder:
         title = QLabel(self.window.language_manager.translate("page_instances"))
         title.setStyleSheet(f"color:white;font-size:{self._scale_size(20)}px;font-family:'{self._get_font_family()}';font-weight:bold;")
         pl.addWidget(title)
+        # 注册到 TextRenderer
+        self.text_renderer.register_widget(title, "page_instances", group="instance_page")
 
         # 创建滚动区域
         scroll_area = QScrollArea()
@@ -746,12 +754,16 @@ class UIBuilder:
         path_title = QtLabel(self.window.language_manager.translate("instance_path_title"))
         path_title.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-weight:bold;font-family:'{self._get_font_family()}';background:transparent;")
         path_layout.addWidget(path_title)
+        # 注册到 TextRenderer
+        self.text_renderer.register_widget(path_title, "instance_path_title", group="instance_page")
 
         # 路径描述
         path_desc = QtLabel(self.window.language_manager.translate("instance_path_desc"))
         path_desc.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:'{self._get_font_family()}';background:transparent;")
         path_desc.setWordWrap(True)
         path_layout.addWidget(path_desc)
+        # 注册到 TextRenderer
+        self.text_renderer.register_widget(path_desc, "instance_path_desc", group="instance_page")
 
         # 路径输入和选择按钮
         path_input_layout = QHBoxLayout()
@@ -767,6 +779,13 @@ class UIBuilder:
         )
         self.window.instance_path_input.editingFinished.connect(self._on_instance_path_changed)
         path_input_layout.addWidget(self.window.instance_path_input, 1)
+        # 注册到 TextRenderer（使用 setPlaceholderText 方法）
+        self.text_renderer.register_widget(
+            self.window.instance_path_input,
+            "instance_path_placeholder",
+            update_method="setPlaceholderText",
+            group="instance_page"
+        )
 
         # 浏览按钮
         browse_btn = ClickableLabel()
@@ -798,6 +817,8 @@ class UIBuilder:
         version_title = QtLabel(self.window.language_manager.translate("instance_version_label"))
         version_title.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-weight:bold;font-family:'{self._get_font_family()}';background:transparent;")
         version_container_layout.addWidget(version_title)
+        # 注册到 TextRenderer
+        self.text_renderer.register_widget(version_title, "instance_version_label", group="instance_page")
 
         # 版本列表（滚动区域）
         from PyQt6.QtWidgets import QWidget as QtWidget
@@ -873,6 +894,19 @@ class UIBuilder:
         title_label.setStyleSheet(f"color:white;font-size:{self._scale_size(16)}px;font-weight:bold;font-family:'{self._get_font_family()}';background:transparent;")
         nav_layout.addWidget(title_label)
         nav_layout.addStretch()
+        # 保存标题标签引用以便更新
+        self.window.resourcepack_page_title = title_label
+        # 注册到 TextRenderer（使用版本名称的翻译键）
+        # 这里需要保存原始版本名称，以便语言切换时重新获取翻译
+        if "resourcepacks_path" in resourcepacks_path:
+            # 这是版本资源包页面，标题是版本名称
+            # 语言切换时需要根据新的语言重新显示版本名称（不翻译）
+            # 暂时不注册，因为版本名称不需要翻译
+            pass
+        else:
+            # 根目录资源包页面，使用固定文本
+            # 可以注册到 TextRenderer
+            self.text_renderer.register_widget(title_label, "instance_version_root", group="instance_page")
 
         pl.addWidget(nav_bar)
 
@@ -880,7 +914,8 @@ class UIBuilder:
         self.window.file_explorer = FileExplorer(
             dpi_scale=self.dpi_scale,
             config_manager=self.window.config_manager,
-            language_manager=self.window.language_manager
+            language_manager=self.window.language_manager,
+            text_renderer=self.text_renderer
         )
 
         # 设置资源包路径
@@ -981,7 +1016,8 @@ class UIBuilder:
         self.window.file_explorer = FileExplorer(
             dpi_scale=self.dpi_scale,
             config_manager=self.window.config_manager,
-            language_manager=self.window.language_manager
+            language_manager=self.window.language_manager,
+            text_renderer=self.text_renderer
         )
         self.window.file_explorer.setFixedHeight(self._scale_size(400))
         scroll_layout.addWidget(self.window.file_explorer)
@@ -1041,6 +1077,13 @@ class UIBuilder:
         self.window.download_search.setStyleSheet(self._get_lineedit_stylesheet())
         self.window.download_search.setClearButtonEnabled(True)
         search_layout.addWidget(self.window.download_search, 1)
+        # 注册到 TextRenderer
+        self.text_renderer.register_widget(
+            self.window.download_search,
+            "download_search_placeholder",
+            update_method="setPlaceholderText",
+            group="download_page"
+        )
 
         pl.addWidget(search_container)
 
@@ -1147,6 +1190,13 @@ class UIBuilder:
         self.window.console_input = QLineEdit()
         self.window.console_input.setPlaceholderText("Enter command (restart to restart program)")
         self.window.console_input.setStyleSheet(self._get_lineedit_stylesheet())
+        # 注册到 TextRenderer
+        self.text_renderer.register_widget(
+            self.window.console_input,
+            "console_input_placeholder",
+            update_method="setPlaceholderText",
+            group="console_page"
+        )
 
         # 监听回车键
         def handle_command():
@@ -1242,6 +1292,8 @@ Spectra Information:
         opacity_header_layout.addStretch()
         opacity_header_layout.addWidget(opacity_value)
         opacity_layout.addLayout(opacity_header_layout)
+        # 注册到 TextRenderer
+        self.text_renderer.register_widget(opacity_label, "blur_opacity", group="settings_page")
 
         self.window.opacity_slider = QSlider(Qt.Orientation.Horizontal)
         self.window.opacity_slider.setRange(10, 255)
@@ -1262,6 +1314,8 @@ Spectra Information:
 
         path_label = self._create_label_with_style(self.window.language_manager.translate("bg_image_path"))
         path_layout.addWidget(path_label)
+        # 注册到 TextRenderer
+        self.text_renderer.register_widget(path_label, "bg_image_path", group="settings_page")
 
         self.window.path_input = QLineEdit()
         self.window.path_input.setText(self.window.config.get("background_image_path", ""))
@@ -1304,6 +1358,8 @@ Spectra Information:
 
         color_label = self._create_label_with_style(self.window.language_manager.translate("bg_color"))
         color_layout.addWidget(color_label)
+        # 注册到 TextRenderer
+        self.text_renderer.register_widget(color_label, "bg_color", group="settings_page")
 
         # 颜色预览和输入
         self.window.color_input = QLineEdit()
@@ -1348,6 +1404,8 @@ Spectra Information:
         font_select_label = QLabel(self.window.language_manager.translate("font_select_label"))
         font_select_label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'{self._get_font_family()}';")
         font_select_layout.addWidget(font_select_label)
+        # 注册到 TextRenderer
+        self.text_renderer.register_widget(font_select_label, "font_select_label", group="settings_page")
 
         font_select_layout.addStretch()
 
@@ -2238,6 +2296,8 @@ Spectra Information:
         language_label = QLabel(self.window.language_manager.translate("settings_language_label"))
         language_label.setStyleSheet(f"color:rgba(255,255,255,0.8);font-size:{self._scale_size(13)}px;font-family:'{self._get_font_family()}';")
         language_layout.addWidget(language_label)
+        # 注册到 TextRenderer
+        self.text_renderer.register_widget(language_label, "settings_language_label", group="settings_page")
 
         language_layout.addStretch()
 
@@ -2276,9 +2336,8 @@ Spectra Information:
             if title and hasattr(title, 'setText'):
                 title.setText(self.window.language_manager.translate("page_instances"))
 
-            # 更新实例页面的占位符文本
-            if hasattr(self.window, 'instance_path_input'):
-                self.window.instance_path_input.setPlaceholderText(self.window.language_manager.translate("instance_path_placeholder"))
+        # 更新实例页面的版本列表中的根版本名称
+        self._update_instance_version_labels()
 
         # 更新下载页面标题
         download_page = self.window.stack.widget(2)
@@ -2300,6 +2359,40 @@ Spectra Information:
             title = settings_page.layout().itemAt(0).widget()
             if title and hasattr(title, 'setText'):
                 title.setText(self.window.language_manager.translate("page_settings"))
+
+    def _update_instance_version_labels(self):
+        """更新实例页面中版本列表的标签（包括根版本名称）"""
+        if not hasattr(self.window, 'instance_version_list_container'):
+            return
+
+        root_text = self.window.language_manager.translate("instance_version_root")
+
+        # 遍历版本列表容器，更新根版本的名称标签
+        for i in range(self.window.instance_version_list_container.count()):
+            item = self.window.instance_version_list_container.itemAt(i)
+            if item and item.widget():
+                # 获取卡片中的 click_area
+                card = item.widget()
+                card_layout = card.layout()
+                if card_layout and card_layout.count() > 0:
+                    # 第一个元素应该是 click_area
+                    click_area = card_layout.itemAt(0).widget()
+                    if click_area and click_area.layout():
+                        # 查找版本名称标签（第二个子元素，第一个是图标）
+                        if click_area.layout().count() > 1:
+                            name_label = click_area.layout().itemAt(1).widget()
+                            if name_label and hasattr(name_label, 'setText'):
+                                # 检查是否是根版本（通过比较文本）
+                                current_text = name_label.text()
+                                # 如果当前文本是"根目录"或对应的英文，则更新
+                                if current_text in ["Root Directory", "根目录", root_text]:
+                                    name_label.setText(root_text)
+
+        # 更新资源包页面的标题（如果存在）
+        if hasattr(self.window, 'resourcepack_page_title') and self.window.resourcepack_page_title:
+            current_title = self.window.resourcepack_page_title.text()
+            if current_title in ["Root Directory", "根目录", root_text]:
+                self.window.resourcepack_page_title.setText(root_text)
     
     def _update_settings_page(self):
         """更新设置页面的文本"""
