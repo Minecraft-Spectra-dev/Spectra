@@ -979,19 +979,19 @@ class UIBuilder:
         title = self._create_page_title(self.window.language_manager.translate("page_downloads"))
         pl.addWidget(title)
 
-        # 搜索框
+        # 搜索框、搜索按钮和版本选择
         search_container = QWidget()
         search_container.setStyleSheet(f"background:rgba(255,255,255,0.08);border-radius:{self._scale_size(8)}px;")
         search_layout = QHBoxLayout(search_container)
         search_layout.setContentsMargins(self._scale_size(12), self._scale_size(8), self._scale_size(12), self._scale_size(8))
         search_layout.setSpacing(self._scale_size(10))
 
-        # 搜索输入框
+        # 搜索输入框（缩短）
         self.window.download_search = QLineEdit()
         self.window.download_search.setPlaceholderText("Search downloads...")
         self.window.download_search.setStyleSheet(self._get_lineedit_stylesheet())
         self.window.download_search.setClearButtonEnabled(True)
-        search_layout.addWidget(self.window.download_search, 1)
+        search_layout.addWidget(self.window.download_search, 3)
         # 注册到 TextRenderer
         self.text_renderer.register_widget(
             self.window.download_search,
@@ -999,6 +999,36 @@ class UIBuilder:
             update_method="setPlaceholderText",
             group="download_page"
         )
+
+        # 搜索按钮（正方形）
+        search_btn = QPushButton()
+        search_btn.setFixedSize(self._scale_size(32), self._scale_size(32))
+        search_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        search_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 0.1);
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.15);
+            }
+            QPushButton:pressed {
+                background: rgba(255, 255, 255, 0.05);
+            }
+        """)
+        search_pixmap = load_svg_icon("svg/search.svg", self.dpi_scale)
+        if search_pixmap:
+            from PyQt6.QtCore import QSize
+            search_btn.setIcon(QIcon(scale_icon_for_display(search_pixmap, 16, self.dpi_scale)))
+            search_btn.setIconSize(QSize(self._scale_size(16), self._scale_size(16)))
+        search_layout.addWidget(search_btn)
+
+        # 版本选择（固定长度的长条，用于选择下载目标）
+        self.window.download_version_combo = QComboBox()
+        self._setup_combobox(self.window.download_version_combo, width=150)
+        self.window.download_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))  # 根目录
+        search_layout.addWidget(self.window.download_version_combo, 2)
 
         pl.addWidget(search_container)
 
@@ -1010,7 +1040,58 @@ class UIBuilder:
         scroll_area.setWidget(scroll_content)
         pl.addWidget(scroll_area, 1)
 
+        # 加载 Minecraft 版本列表到下拉框
+        self._load_versions_to_download_combo()
+
         return page
+
+    def _load_versions_to_download_combo(self):
+        """从.minecraft路径加载版本列表到下载页面的下拉框（用于选择下载目标）"""
+        import os
+        try:
+            minecraft_path = self.window.config.get("minecraft_path", "")
+            if minecraft_path and os.path.exists(minecraft_path):
+                versions_path = os.path.join(minecraft_path, "versions")
+                if os.path.exists(versions_path) and os.path.isdir(versions_path):
+                    # 清除现有选项（保留第一个"Root"）
+                    self.window.download_version_combo.clear()
+                    self.window.download_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))  # 根目录资源包
+                    
+                    # 获取并添加所有版本
+                    versions = []
+                    for item in sorted(os.listdir(versions_path)):
+                        item_path = os.path.join(versions_path, item)
+                        if os.path.isdir(item_path):
+                            versions.append(item)
+                    
+                    # 添加版本到下拉框
+                    for version in versions:
+                        self.window.download_version_combo.addItem(version)
+                    
+                    logger.info(f"Loaded {len(versions)} versions to download combo")
+        except Exception as e:
+            logger.error(f"Error loading versions to download combo: {e}")
+
+    def get_download_target_path(self):
+        """获取下载目标路径（基于下拉框选择）"""
+        import os
+        try:
+            minecraft_path = self.window.config.get("minecraft_path", "")
+            if not minecraft_path or not os.path.exists(minecraft_path):
+                return None
+            
+            selected_version = self.window.download_version_combo.currentText()
+            root_text = self.window.language_manager.translate("instance_version_root")
+            
+            # 如果选择的是根目录，则返回根目录的resourcepacks路径
+            if selected_version == root_text:
+                return os.path.join(minecraft_path, "resourcepacks")
+            # 否则返回对应版本的resourcepacks路径
+            else:
+                return os.path.join(minecraft_path, "versions", selected_version, "resourcepacks")
+        except Exception as e:
+            logger.error(f"Error getting download target path: {e}")
+            return None
 
     def create_console_page(self):
         """创建控制台/日志页面"""
@@ -1466,9 +1547,17 @@ Spectra Information:
 
                 # 加载版本列表
                 self._load_version_list(path)
+                
+                # 更新下载页面的版本列表
+                self._load_versions_to_download_combo()
             else:
                 # 清空版本列表
                 self._clear_version_list()
+                
+                # 清空下载页面的版本列表
+                if hasattr(self.window, 'download_version_combo'):
+                    self.window.download_version_combo.clear()
+                    self.window.download_version_combo.addItem(self.window.language_manager.translate("instance_version_root"))
         except Exception as e:
             # 静默处理错误，避免崩溃
             import traceback
