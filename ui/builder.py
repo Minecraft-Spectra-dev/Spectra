@@ -595,6 +595,10 @@ class UIBuilder:
         self._create_path_input()
         self.window.appearance_content_layout.addWidget(self.window.path_widget)
 
+        # 背景模糊开关
+        self._create_blur_toggle_option()
+        self.window.appearance_content_layout.addWidget(self.window.blur_toggle_widget)
+
         self.window.appearance_content.setVisible(False)
 
         # 语言设置容器
@@ -2274,6 +2278,38 @@ Spectra Information:
 
         toggle = ToggleSwitch(checked=checked, dpi_scale=self.dpi_scale)
         return toggle
+
+    def _create_blur_toggle_option(self):
+        """创建背景模糊开关选项"""
+        blur_enabled = self.window.config.get("background_blur_enabled", True)
+
+        # 创建可点击的容器
+        self.window.blur_toggle_widget = QWidget()
+        self.window.blur_toggle_widget.setStyleSheet(f"background:rgba(255,255,255,0.08);border-radius:{self._scale_size(8)}px;")
+        blur_toggle_layout = QHBoxLayout(self.window.blur_toggle_widget)
+        blur_toggle_layout.setContentsMargins(self._scale_size(15), self._scale_size(12), self._scale_size(15), self._scale_size(12))
+        blur_toggle_layout.setSpacing(self._scale_size(12))
+
+        # 文本区域
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(self._scale_size(4))
+        text_layout.setContentsMargins(0, 0, 0, 0)
+
+        title_lbl = QLabel(self.window.language_manager.translate("background_blur_enabled"))
+        title_lbl.setStyleSheet(f"color:white;font-size:{self._scale_size(14)}px;font-family:'{self._get_font_family()}';background:transparent;")
+        text_layout.addWidget(title_lbl)
+
+        desc_lbl = QLabel(self.window.language_manager.translate("background_blur_enabled_desc"))
+        desc_lbl.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:'{self._get_font_family()}';background:transparent;")
+        text_layout.addWidget(desc_lbl)
+
+        blur_toggle_layout.addLayout(text_layout)
+        blur_toggle_layout.addStretch()
+
+        # 切换开关
+        self.window.blur_toggle = self._create_toggle_switch(blur_enabled)
+        self.window.blur_toggle.setCallback(lambda checked: self.window.toggle_blur_enabled(checked))
+        blur_toggle_layout.addWidget(self.window.blur_toggle)
 
     def _create_dev_console_option(self):
         """创建开发控制台选项"""

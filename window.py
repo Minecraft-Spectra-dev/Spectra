@@ -598,7 +598,9 @@ class Window(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
-        blur(self.winId())
+        # 根据模糊开关决定是否应用模糊效果
+        if self.config.get("background_blur_enabled", True):
+            blur(self.winId())
         ctypes.windll.dwmapi.DwmSetWindowAttribute(int(self.winId()), 33, ctypes.byref(ctypes.c_int(2)), 4)
         self.apply_opacity()
 
@@ -684,6 +686,45 @@ class Window(QWidget):
         else:
             content.setVisible(True)
 
+    def toggle_blur_enabled(self, checked):
+        """切换背景模糊效果的启用/禁用"""
+        # 更新配置
+        self.config["background_blur_enabled"] = checked
+        self.config_manager.save_config()
+
+        # 应用或清除模糊效果
+        if checked:
+            blur(self.winId())
+        else:
+            # 清除模糊效果 - 将 AccentState 设置为 0 (ACCENT_DISABLED)
+            # 直接导入并使用 BlurWindow 中定义的结构体类
+            try:
+                from BlurWindow.blurWindow import (
+                    ACCENTPOLICY,
+                    WINDOWCOMPOSITIONATTRIBDATA
+                )
+
+                # 设置 AccentState 为 0 以禁用模糊
+                accent = ACCENTPOLICY()
+                accent.AccentState = 0  # ACCENT_DISABLED
+                accent.AccentFlags = 0
+                accent.GradientColor = 0
+                accent.AnimationId = 0
+
+                data = WINDOWCOMPOSITIONATTRIBDATA()
+                data.Attribute = 19  # WCA_ACCENT_POLICY
+                data.SizeOfData = ctypes.sizeof(accent)
+                data.Data = ctypes.cast(ctypes.pointer(accent), ctypes.POINTER(ctypes.c_int))
+
+                user32 = ctypes.windll.user32
+                user32.SetWindowCompositionAttribute(int(self.winId()), data)
+            except Exception as e:
+                logger.error(f"Failed to disable blur: {e}")
+
+            # 强制重绘
+            self.update()
+            self.repaint()
+
     def toggle_dev_console(self, checked):
         """切换开发控制台的显示/隐藏"""
         # 更新开关状态
@@ -762,7 +803,9 @@ class Window(QWidget):
             self.path_widget.setVisible(False)
             self.opacity_widget.setVisible(True)
             self.apply_opacity()
-            blur(self.winId())
+            # 根据模糊开关决定是否应用模糊效果
+            if self.config.get("background_blur_enabled", True):
+                blur(self.winId())
             self.bg_manager.hide()
 
         elif mode == "solid":

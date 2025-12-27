@@ -24,6 +24,8 @@
     "settings_language_label": "界面语言",
     "background_blur": "模糊背景",
     "background_blur_desc": "使用系统窗口模糊效果",
+    "background_blur_enabled": "启用背景模糊",
+    "background_blur_enabled_desc": "开启或关闭窗口模糊效果",
     "background_solid": "纯色背景",
     "background_solid_desc": "使用纯色作为背景",
     "background_image": "图像背景",

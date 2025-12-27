@@ -24,6 +24,8 @@
     "settings_language_label": "Interface Language",
     "background_blur": "Blur Background",
     "background_blur_desc": "Use system window blur effect",
+    "background_blur_enabled": "Enable Blur",
+    "background_blur_enabled_desc": "Enable or disable window blur effect",
     "background_solid": "Solid Background",
     "background_solid_desc": "Use solid color as background",
     "background_image": "Image Background",
