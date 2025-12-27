@@ -1051,18 +1051,21 @@ class UIBuilder:
 
         # 全部按钮
         self.window.download_platform_all = QPushButton(self.window.language_manager.translate("download_platform_all"))
+        self.window.download_platform_all.setFixedSize(120, 32)
         self._setup_platform_button(self.window.download_platform_all, True, 0)
         self.window.download_platform_all.clicked.connect(lambda: self._on_platform_selected(0))
         platform_layout.addWidget(self.window.download_platform_all)
 
         # Modrinth 按钮
         self.window.download_platform_modrinth = QPushButton(self.window.language_manager.translate("download_platform_modrinth"))
+        self.window.download_platform_modrinth.setFixedSize(160, 32)
         self._setup_platform_button(self.window.download_platform_modrinth, False, 1)
         self.window.download_platform_modrinth.clicked.connect(lambda: self._on_platform_selected(1))
         platform_layout.addWidget(self.window.download_platform_modrinth)
 
         # CurseForge 按钮
         self.window.download_platform_curseforge = QPushButton(self.window.language_manager.translate("download_platform_curseforge"))
+        self.window.download_platform_curseforge.setFixedSize(160, 32)
         self._setup_platform_button(self.window.download_platform_curseforge, False, 2)
         self.window.download_platform_curseforge.clicked.connect(lambda: self._on_platform_selected(2))
         platform_layout.addWidget(self.window.download_platform_curseforge)
@@ -1209,13 +1212,11 @@ class UIBuilder:
         if is_selected:
             button.setStyleSheet(f"""
                 QPushButton {{
-                    background: rgba(160, 160, 255, 0.3);
+                    background: rgba(255, 255, 255, 0.15);
                     {border_style}
-                    padding: {self._scale_size(8)}px {self._scale_size(16)}px;
                     color: white;
                     font-size: {self._scale_size(13)}px;
                     font-family: '{self._get_font_family()}';
-                    font-weight: bold;
                 }}
             """)
         else:
@@ -1223,7 +1224,6 @@ class UIBuilder:
                 QPushButton {{
                     background: transparent;
                     {border_style}
-                    padding: {self._scale_size(8)}px {self._scale_size(16)}px;
                     color: rgba(255, 255, 255, 0.7);
                     font-size: {self._scale_size(13)}px;
                     font-family: '{self._get_font_family()}';
@@ -1241,15 +1241,21 @@ class UIBuilder:
         # 更新按钮样式
         for i, button in enumerate(self.window.download_platform_buttons):
             self._setup_platform_button(button, i == index, i)
-        # 更新按钮文本（用于语言切换）
-        self._update_platform_button_texts()
 
     def _update_platform_button_texts(self):
         """更新平台按钮的文本"""
         if hasattr(self.window, 'download_platform_buttons'):
-            self.window.download_platform_buttons[0].setText(self.window.language_manager.translate("download_platform_all"))
-            self.window.download_platform_buttons[1].setText(self.window.language_manager.translate("download_platform_modrinth"))
-            self.window.download_platform_buttons[2].setText(self.window.language_manager.translate("download_platform_curseforge"))
+            current_index = self.window.current_download_platform
+            for i, button in enumerate(self.window.download_platform_buttons):
+                # 更新文本
+                if i == 0:
+                    button.setText(self.window.language_manager.translate("download_platform_all"))
+                elif i == 1:
+                    button.setText(self.window.language_manager.translate("download_platform_modrinth"))
+                elif i == 2:
+                    button.setText(self.window.language_manager.translate("download_platform_curseforge"))
+                # 重新应用样式以确保选中状态正确
+                self._setup_platform_button(button, i == current_index, i)
 
     def create_console_page(self):
         """创建控制台/日志页面"""
