@@ -1020,7 +1020,15 @@ class UIBuilder:
         # 搜索输入框（缩短）
         self.window.download_search = QLineEdit()
         self.window.download_search.setPlaceholderText("Search downloads...")
-        self.window.download_search.setStyleSheet(self._get_lineedit_stylesheet())
+        # 自定义清空按钮图标为 x.svg
+        x_pixmap = load_svg_icon("svg/x.svg", self.dpi_scale)
+        if x_pixmap:
+            from PyQt6.QtCore import QSize
+            lineedit_stylesheet = self._get_lineedit_stylesheet()
+            lineedit_stylesheet += f"QLineEdit::clear-button {{ image: url(svg/x.svg); }} QLineEdit::clear-button:hover {{ image: url(svg/x.svg); }}"
+            self.window.download_search.setStyleSheet(lineedit_stylesheet)
+        else:
+            self.window.download_search.setStyleSheet(self._get_lineedit_stylesheet())
         self.window.download_search.setClearButtonEnabled(True)
         # 添加 Enter 键事件处理
         self.window.download_search.returnPressed.connect(self._on_search_clicked)

@@ -109,16 +109,50 @@ class ModrinthResultCard(QWidget):
         
         downloads = project_data.get('downloads', 0)
         follows = project_data.get('follows', 0)
-        
-        # 使用单个标签显示下载量和喜欢数
-        stats_text = f"↓ {self._format_number(downloads)}  ♥ {self._format_number(follows)}"
-        stats_label = QLabel(stats_text)
+
+        # 定义字体
         stats_font = QFont()
         stats_font.setFamily("Microsoft YaHei UI")
-        stats_font.setPointSize(int(8 * dpi_scale))
-        stats_label.setFont(stats_font)
-        stats_label.setStyleSheet("color: rgba(255, 255, 255, 0.6); background: transparent;")
-        stats_layout.addWidget(stats_label)
+        stats_font.setPointSize(int(8 * self.dpi_scale))
+
+        # 使用图标显示下载量和喜欢数
+        stats_layout.setSpacing(int(8 * self.dpi_scale))
+
+        # 下载量图标和标签
+        download_pixmap = load_svg_icon("svg/download.svg", self.dpi_scale)
+        if download_pixmap:
+            download_icon = QLabel()
+            download_icon.setFixedSize(int(12 * self.dpi_scale), int(12 * self.dpi_scale))
+            download_icon.setPixmap(scale_icon_for_display(download_pixmap, 12, self.dpi_scale))
+            stats_layout.addWidget(download_icon)
+        else:
+            stats_text = QLabel("↓")
+            stats_text.setFont(stats_font)
+            stats_text.setStyleSheet("color: rgba(255, 255, 255, 0.6); background: transparent;")
+            stats_layout.addWidget(stats_text)
+
+        downloads_label = QLabel(self._format_number(downloads))
+        downloads_label.setFont(stats_font)
+        downloads_label.setStyleSheet("color: rgba(255, 255, 255, 0.6); background: transparent;")
+        stats_layout.addWidget(downloads_label)
+
+        # 关注数图标和标签
+        star_pixmap = load_svg_icon("svg/star.svg", self.dpi_scale)
+        if star_pixmap:
+            star_icon = QLabel()
+            star_icon.setFixedSize(int(12 * self.dpi_scale), int(12 * self.dpi_scale))
+            star_icon.setPixmap(scale_icon_for_display(star_pixmap, 12, self.dpi_scale))
+            stats_layout.addWidget(star_icon)
+        else:
+            stats_text2 = QLabel("♥")
+            stats_text2.setFont(stats_font)
+            stats_text2.setStyleSheet("color: rgba(255, 255, 255, 0.6); background: transparent;")
+            stats_layout.addWidget(stats_text2)
+
+        follows_label = QLabel(self._format_number(follows))
+        follows_label.setFont(stats_font)
+        follows_label.setStyleSheet("color: rgba(255, 255, 255, 0.6); background: transparent;")
+        stats_layout.addWidget(follows_label)
         
         info_layout.addLayout(stats_layout, 0)
         card_layout.addLayout(info_layout, 1)
