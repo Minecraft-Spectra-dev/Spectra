@@ -1855,6 +1855,7 @@ Spectra Information:
             dialog_style = f"""
                 QDialog {{
                     background: rgba(0, 0, 0, {opacity_alpha});
+                    border: 1px solid rgba(255, 255, 255, 0.3);
                     border-radius: {self._scale_size(12)}px;
                 }}
             """
@@ -1864,6 +1865,7 @@ Spectra Information:
             dialog_style = f"""
                 QDialog {{
                     background: {bg_color};
+                    border: 1px solid rgba(255, 255, 255, 0.3);
                     border-radius: {self._scale_size(12)}px;
                 }}
             """
@@ -1875,6 +1877,7 @@ Spectra Information:
             dialog_style = f"""
                 QDialog {{
                     background: rgba(0, 0, 0, {opacity_alpha});
+                    border: 1px solid rgba(255, 255, 255, 0.3);
                     border-radius: {self._scale_size(12)}px;
                 }}
             """
