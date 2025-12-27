@@ -1022,6 +1022,8 @@ class UIBuilder:
         self.window.download_search.setPlaceholderText("Search downloads...")
         self.window.download_search.setStyleSheet(self._get_lineedit_stylesheet())
         self.window.download_search.setClearButtonEnabled(True)
+        # 添加 Enter 键事件处理
+        self.window.download_search.returnPressed.connect(self._on_search_clicked)
         search_layout.addWidget(self.window.download_search, 3)
         # 注册到 TextRenderer
         self.text_renderer.register_widget(
