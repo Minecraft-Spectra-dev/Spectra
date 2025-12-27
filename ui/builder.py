@@ -1036,6 +1036,12 @@ class UIBuilder:
 
         pl.addWidget(search_container)
 
+        # 平台选择和筛选排序按钮容器
+        controls_container = QWidget()
+        controls_layout = QHBoxLayout(controls_container)
+        controls_layout.setContentsMargins(0, 0, 0, 0)
+        controls_layout.setSpacing(self._scale_size(10))
+
         # 平台选择按钮（三段式按钮）
         platform_container = QWidget()
         platform_container.setStyleSheet(f"background:rgba(255,255,255,0.05);border-radius:{self._scale_size(8)}px;")
@@ -1070,7 +1076,60 @@ class UIBuilder:
         # 当前选中的平台索引
         self.window.current_download_platform = 0
 
-        pl.addWidget(platform_container)
+        # 平台选择按钮靠左
+        controls_layout.addWidget(platform_container, 0, Qt.AlignmentFlag.AlignLeft)
+        # 弹性空间，使按钮靠右
+        controls_layout.addStretch(1)
+
+        # 筛选按钮
+        filter_btn = QPushButton()
+        filter_btn.setFixedSize(self._scale_size(32), self._scale_size(32))
+        filter_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        filter_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 0.1);
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.15);
+            }
+            QPushButton:pressed {
+                background: rgba(255, 255, 255, 0.05);
+            }
+        """)
+        funnel_pixmap = load_svg_icon("svg/funnel.svg", self.dpi_scale)
+        if funnel_pixmap:
+            from PyQt6.QtCore import QSize
+            filter_btn.setIcon(QIcon(scale_icon_for_display(funnel_pixmap, 16, self.dpi_scale)))
+            filter_btn.setIconSize(QSize(self._scale_size(16), self._scale_size(16)))
+        controls_layout.addWidget(filter_btn)
+
+        # 排序按钮
+        sort_btn = QPushButton()
+        sort_btn.setFixedSize(self._scale_size(32), self._scale_size(32))
+        sort_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        sort_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(255, 255, 255, 0.1);
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.15);
+            }
+            QPushButton:pressed {
+                background: rgba(255, 255, 255, 0.05);
+            }
+        """)
+        sort_pixmap = load_svg_icon("svg/sort-down.svg", self.dpi_scale)
+        if sort_pixmap:
+            from PyQt6.QtCore import QSize
+            sort_btn.setIcon(QIcon(scale_icon_for_display(sort_pixmap, 16, self.dpi_scale)))
+            sort_btn.setIconSize(QSize(self._scale_size(16), self._scale_size(16)))
+        controls_layout.addWidget(sort_btn)
+
+        pl.addWidget(controls_container)
 
         # 使用统一的滚动区域创建方法
         scroll_area = self._create_scroll_area()
