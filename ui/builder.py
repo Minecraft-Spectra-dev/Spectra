@@ -4,6 +4,12 @@ import os
 import sys
 import logging
 
+# 添加项目根目录到 sys.path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
 logger = logging.getLogger(__name__)
 
 from PyQt6.QtCore import Qt, QEvent
@@ -1277,12 +1283,15 @@ class UIBuilder:
         # 添加弹性空间
         pagination_layout.addStretch()
         
-        # 页码选择框
-        page_combo = QComboBox()
-        page_combo.setFixedHeight(self._scale_size(24))
-        page_combo.setMaximumWidth(self._scale_size(80))
-        page_combo.setStyleSheet(f"""
-            QComboBox {{
+        # 页码输入框
+        page_input = QLineEdit()
+        page_input.setFixedHeight(self._scale_size(24))
+        page_input.setMaximumWidth(self._scale_size(80))
+        page_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        page_input.setPlaceholderText("1")
+        page_input.setText("1")
+        page_input.setStyleSheet(f"""
+            QLineEdit {{
                 background: rgba(255, 255, 255, 0.1);
                 border: 1px solid rgba(255, 255, 255, 0.2);
                 border-radius: {self._scale_size(4)}px;
@@ -1290,36 +1299,21 @@ class UIBuilder:
                 color: white;
                 font-size: 11px;
             }}
-            QComboBox:hover {{
+            QLineEdit:hover {{
                 background: rgba(255, 255, 255, 0.15);
             }}
-            QComboBox::drop-down {{
-                border: none;
-                width: 16px;
-            }}
-            QComboBox::down-arrow {{
-                image: none;
-                border-left: 4px solid transparent;
-                border-right: 4px solid transparent;
-                border-top: 5px solid rgba(255, 255, 255, 0.6);
-            }}
-            QComboBox QAbstractItemView {{
-                background: rgba(0, 0, 0, 0.9);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                border-radius: 4px;
-                selection-background-color: rgba(255, 255, 255, 0.2);
-                color: white;
+            QLineEdit:focus {{
+                border: 1px solid rgba(255, 255, 255, 0.4);
             }}
         """)
-        page_combo.addItems(["1"])
-        page_combo.currentIndexChanged.connect(self._on_page_selected)
-        pagination_layout.addWidget(page_combo)
+        page_input.returnPressed.connect(lambda: self._on_page_selected(page_input))
+        pagination_layout.addWidget(page_input)
         
         # 保存控件的引用
         pagination_container.prev_btn = prev_btn
         pagination_container.next_btn = next_btn
         pagination_container.page_info_label = page_info_label
-        pagination_container.page_combo = page_combo
+        pagination_container.page_input = page_input
         
         return pagination_container
 
@@ -1751,13 +1745,10 @@ class UIBuilder:
             self.window.download_top_pagination.prev_btn.setEnabled(self.window.download_current_page > 1)
             self.window.download_top_pagination.next_btn.setEnabled(self.window.download_current_page < self.window.download_total_pages)
 
-            # 更新页码下拉框
-            self.window.download_top_pagination.page_combo.blockSignals(True)
-            self.window.download_top_pagination.page_combo.clear()
-            for i in range(1, self.window.download_total_pages + 1):
-                self.window.download_top_pagination.page_combo.addItem(str(i))
-            self.window.download_top_pagination.page_combo.setCurrentIndex(self.window.download_current_page - 1)
-            self.window.download_top_pagination.page_combo.blockSignals(False)
+            # 更新页码输入框
+            self.window.download_top_pagination.page_input.blockSignals(True)
+            self.window.download_top_pagination.page_input.setText(str(self.window.download_current_page))
+            self.window.download_top_pagination.page_input.blockSignals(False)
         else:
             # 隐藏顶部翻页控件
             self.window.download_top_pagination.setVisible(False)
@@ -1778,11 +1769,9 @@ class UIBuilder:
 
             # 更新页码下拉框
             self.window.download_bottom_pagination.page_combo.blockSignals(True)
-            self.window.download_bottom_pagination.page_combo.clear()
-            for i in range(1, self.window.download_total_pages + 1):
-                self.window.download_bottom_pagination.page_combo.addItem(str(i))
-            self.window.download_bottom_pagination.page_combo.setCurrentIndex(self.window.download_current_page - 1)
-            self.window.download_bottom_pagination.page_combo.blockSignals(False)
+            self.window.download_bottom_pagination.page_input.blockSignals(True)
+            self.window.download_bottom_pagination.page_input.setText(str(self.window.download_current_page))
+            self.window.download_bottom_pagination.page_input.blockSignals(False)
     
     def _on_prev_page(self):
         """上一页"""
@@ -1794,11 +1783,21 @@ class UIBuilder:
         if self.window.download_current_page < self.window.download_total_pages:
             self._search_modrinth(self.window.download_last_query, self.window.download_current_page + 1)
     
-    def _on_page_selected(self, index):
-        """选择特定页码"""
-        page = index + 1
-        if page != self.window.download_current_page:
-            self._search_modrinth(self.window.download_last_query, page)
+    def _on_page_selected(self, input_widget):
+        """跳转到输入的页码"""
+        try:
+            page_input = input_widget.text().strip()
+            if not page_input:
+                return
+            page = int(page_input)
+            if page < 1:
+                page = 1
+            elif page > self.window.download_total_pages:
+                page = self.window.download_total_pages
+            if page != self.window.download_current_page:
+                self._search_modrinth(self.window.download_last_query, page)
+        except ValueError:
+            pass
     
     def _on_search_error(self, error):
         """搜索错误处理"""

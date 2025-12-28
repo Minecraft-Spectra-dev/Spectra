@@ -337,7 +337,7 @@ class ModrinthResultCard(QWidget):
         download_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         download_btn.setStyleSheet("""
             QPushButton {
-                background: rgba(76, 175, 80, 0.8);
+                background: rgba(255, 255, 255, 0.3);
                 border: none;
                 border-radius: 4px;
                 color: white;
@@ -345,10 +345,10 @@ class ModrinthResultCard(QWidget):
                 font-family: 'Microsoft YaHei UI';
             }
             QPushButton:hover {
-                background: rgba(76, 175, 80, 1);
+                background: rgba(255, 255, 255, 0.5);
             }
             QPushButton:pressed {
-                background: rgba(76, 175, 80, 0.6);
+                background: rgba(255, 255, 255, 0.2);
             }
             QPushButton:disabled {
                 background: rgba(255, 255, 255, 0.2);
@@ -482,10 +482,10 @@ class ModrinthResultCard(QWidget):
                 self.download_btn.setEnabled(False)
                 self.download_btn.setStyleSheet("""
                     QPushButton {
-                        background: rgba(255, 152, 0, 0.8);
+                        background: rgba(255, 255, 255, 0.2);
                         border: none;
                         border-radius: 4px;
-                        color: white;
+                        color: rgba(255, 255, 255, 0.5);
                         font-size: 10px;
                         font-family: 'Microsoft YaHei UI';
                     }
@@ -498,7 +498,7 @@ class ModrinthResultCard(QWidget):
                 self.download_btn.setEnabled(True)
                 self.download_btn.setStyleSheet("""
                     QPushButton {
-                        background: rgba(76, 175, 80, 0.8);
+                        background: rgba(255, 255, 255, 0.3);
                         border: none;
                         border-radius: 4px;
                         color: white;
@@ -506,10 +506,10 @@ class ModrinthResultCard(QWidget):
                         font-family: 'Microsoft YaHei UI';
                     }
                     QPushButton:hover {
-                        background: rgba(76, 175, 80, 1);
+                        background: rgba(255, 255, 255, 0.5);
                     }
                     QPushButton:pressed {
-                        background: rgba(76, 175, 80, 0.6);
+                        background: rgba(255, 255, 255, 0.2);
                     }
                     QPushButton:disabled {
                         background: rgba(255, 255, 255, 0.2);
