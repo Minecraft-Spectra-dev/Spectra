@@ -3,9 +3,9 @@
 import os
 import logging
 import zipfile
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
-from PyQt6.QtGui import QFont, QIcon, QPixmap
-from PyQt6.QtWidgets import (QFileDialog, QHBoxLayout, QHeaderView, QLabel,
+from PyQt6.QtCore import Qt, pyqtSignal, QSize, QEvent
+from PyQt6.QtGui import QFont, QIcon, QPixmap, QWheelEvent
+from PyQt6.QtWidgets import (QFileDialog, QGridLayout, QHBoxLayout, QHeaderView, QLabel,
                              QPushButton, QTreeWidget, QTreeWidgetItem,
                              QVBoxLayout, QWidget)
 from utils import load_svg_icon, scale_icon_for_display
@@ -16,48 +16,60 @@ logger = logging.getLogger(__name__)
 class ResourcepackItemWidget(QWidget):
     """资源包项目部件，支持收藏按钮，使用卡片样式（类似下载页面）"""
 
-    def __init__(self, parent=None, on_favorite_clicked=None, is_favorited=False, dpi_scale=1.0, resourcepack_name="", icon=None, is_editable=False, text_renderer=None):
+    def __init__(self, parent=None, on_favorite_clicked=None, on_edit_clicked=None, is_favorited=False, dpi_scale=1.0, resourcepack_name="", icon=None, is_editable=False, text_renderer=None, description=""):
         super().__init__(parent)
         self.dpi_scale = dpi_scale
         self.on_favorite_clicked = on_favorite_clicked
+        self.on_edit_clicked = on_edit_clicked
         self.is_favorited = is_favorited
         self.resourcepack_name = resourcepack_name
         self.icon = icon
         self.is_editable = is_editable
         self.text_renderer = text_renderer
+        self.description = description
 
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(int(12 * dpi_scale), int(8 * dpi_scale), int(12 * dpi_scale), int(8 * dpi_scale))
-        layout.setSpacing(int(12 * dpi_scale))
+        # 设置固定高度为80px
+        self.setFixedHeight(int(80 * dpi_scale))
+
+        # 使用布局管理器来定位按钮
+        from PyQt6.QtWidgets import QGridLayout
+        layout = QGridLayout(self)
+        layout.setContentsMargins(int(12 * dpi_scale), int(6 * dpi_scale), int(12 * dpi_scale), int(6 * dpi_scale))
+        layout.setHorizontalSpacing(int(12 * dpi_scale))  # 水平间距，图标和文字之间的间距
+        layout.setVerticalSpacing(0)  # 垂直间距为0
+        layout.setColumnStretch(0, 0)  # 第0列（图标）不拉伸
+        layout.setColumnStretch(1, 1)  # 第1列（文字）占据剩余空间
+        layout.setColumnStretch(2, 0)  # 第2列（编辑按钮）不拉伸
+        layout.setColumnStretch(3, 0)  # 第3列（书签按钮）不拉伸
 
         # 图标和文字的容器
         icon_wrapper = QWidget()
         icon_wrapper_layout = QVBoxLayout(icon_wrapper)
-        icon_wrapper_layout.setContentsMargins(0, 0, 0, 0)
+        icon_wrapper_layout.setContentsMargins(0, 0, 0, 0)  # 没有内边距
         icon_wrapper_layout.setSpacing(int(2 * dpi_scale))
-        icon_wrapper_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
+        icon_wrapper_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)  # 左对齐
 
         # 图标容器（固定大小，缩小图标）
         icon_label = QLabel()
-        icon_label.setFixedSize(int(48 * dpi_scale), int(48 * dpi_scale))
+        icon_label.setFixedSize(int(64 * dpi_scale), int(64 * dpi_scale))
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         if icon is not None:
-            # icon 是 QPixmap，缩放到48x48
+            # icon 是 QPixmap，缩放到64x64
             scaled_icon = icon.scaled(
-                int(48 * dpi_scale), int(48 * dpi_scale),
+                int(64 * dpi_scale), int(64 * dpi_scale),
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation
             )
             icon_label.setPixmap(scaled_icon)
         else:
-            # 默认图标，缩放到48x48
+            # 默认图标，缩放到64x64
             default_icon = load_svg_icon("svg/unknown_pack.png", self.dpi_scale)
             if default_icon:
-                scaled_default = scale_icon_for_display(default_icon, 48, self.dpi_scale)
+                scaled_default = scale_icon_for_display(default_icon, 64, self.dpi_scale)
                 if scaled_default:
                     scaled_final = scaled_default.scaled(
-                        int(48 * dpi_scale), int(48 * dpi_scale),
+                        int(64 * dpi_scale), int(64 * dpi_scale),
                         Qt.AspectRatioMode.KeepAspectRatio,
                         Qt.TransformationMode.SmoothTransformation
                     )
@@ -65,62 +77,105 @@ class ResourcepackItemWidget(QWidget):
 
         icon_wrapper_layout.addWidget(icon_label)
 
-        # 可编辑状态标签（在图标下方，只显示"可编辑"或"不可编辑"）
-        editable_label = QLabel()
-        editable_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        editable_label.setStyleSheet("color: rgba(255, 255, 255, 0.5); background: transparent;")
-        editable_font = QFont()
-        # 使用 text_renderer 的字体系列（如果可用）
-        if self.text_renderer:
-            editable_font.setFamily(self.text_renderer.get_font_family())
-        else:
-            editable_font.setFamily("Microsoft YaHei UI")
-        editable_font.setWeight(QFont.Weight.Bold)
-        editable_font.setPointSize(int(6 * dpi_scale))  # ← 修改这里的数值来调整字体大小
-        editable_label.setFont(editable_font)
-        editable_label.setText("可编辑" if is_editable else "不可编辑")
-        self.editable_label = editable_label  # 保存引用以便后续更新
-        icon_wrapper_layout.addWidget(editable_label)
-
         # 设置wrapper的固定宽度
-        icon_wrapper.setFixedWidth(int(48 * dpi_scale))
-        layout.addWidget(icon_wrapper, 0, Qt.AlignmentFlag.AlignTop)
+        icon_wrapper.setFixedWidth(int(64 * dpi_scale))
+
+        # 添加图标到左上角（左对齐，顶部对齐）
+        layout.addWidget(icon_wrapper, 0, 0, 1, 1, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
 
         # 信息区域（使用VBoxLayout，文字独立）
         info_layout = QVBoxLayout()
-        info_layout.setSpacing(int(4 * dpi_scale))
+        info_layout.setContentsMargins(0, 0, 0, 0)  # 没有内边距
+        info_layout.setSpacing(int(2 * dpi_scale))  # 减小标题和描述之间的间距
         info_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
 
-        # 资源包名称
+        # 资源包名称（仅一行，在图标右侧上方）
         name_label = QLabel(resourcepack_name)
         name_font = QFont()
         name_font.setFamily("Microsoft YaHei UI")
         name_font.setWeight(QFont.Weight.Bold)
-        name_font.setPointSize(int(12 * dpi_scale))
+        name_font.setPointSize(int(10 * dpi_scale))  # 字号从12减小到10
         name_label.setFont(name_font)
         name_label.setStyleSheet("color: white; background: transparent;")
         name_label.setWordWrap(False)
         name_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         info_layout.addWidget(name_label)
 
-        # 空白占位（保持与下载页面一致的高度）
-        info_layout.addStretch()
+        # 描述（在资源包标题下方）
+        if description:
+            # 将 \n 替换为实际的换行符，并移除 Minecraft 颜色代码（§ 开头的颜色代码）
+            import re
+            clean_desc = re.sub(r'§[0-9a-fk-or]', '', description)
+            description_label = QLabel(clean_desc)
+            desc_font = QFont()
+            desc_font.setFamily("Microsoft YaHei UI")
+            desc_font.setWeight(QFont.Weight.Normal)
+            desc_font.setPointSize(int(8 * dpi_scale))  # 描述字号缩小到8
+            description_label.setFont(desc_font)
+            description_label.setStyleSheet("color: rgba(255, 255, 255, 0.6); background: transparent;")
+            description_label.setWordWrap(True)  # 允许换行
+            description_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+            info_layout.addWidget(description_label)
 
-        layout.addLayout(info_layout, 1)
+        # 添加信息区域到第0行第1列，占据多列，左上对齐
+        layout.addLayout(info_layout, 0, 1, 1, 1, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
 
-        # 收藏按钮
-        bookmark_btn = QPushButton()
-        bookmark_btn.setFixedSize(int(20 * dpi_scale), int(20 * dpi_scale))
-        bookmark_btn.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                border: none;
+        # 编辑按钮（在收藏按钮左侧，仅可编辑时显示）
+        edit_btn = QPushButton()
+        edit_btn.setFixedSize(int(28 * dpi_scale), int(28 * dpi_scale))
+        edit_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: {int(6 * dpi_scale)}px;
                 padding: 0;
-            }
-            QPushButton:hover {
-                background: rgba(255, 255, 255, 0.1);
-                border-radius: 4px;
-            }
+            }}
+            QPushButton:hover {{
+                background: rgba(255, 255, 255, 0.18);
+                border: 1px solid rgba(255, 255, 255, 0.25);
+            }}
+            QPushButton:pressed {{
+                background: rgba(255, 255, 255, 0.12);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }}
+        """)
+        edit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        edit_btn.clicked.connect(self._on_edit_clicked)
+
+        # 设置编辑图标
+        self._update_edit_icon(edit_btn)
+
+        # 如果不可编辑，隐藏编辑按钮
+        if not self.is_editable:
+            edit_btn.hide()
+
+        # 初始隐藏编辑按钮（鼠标进入时显示）
+        edit_btn.hide()
+
+        # 保存编辑按钮引用
+        self.edit_btn = edit_btn
+
+        # 添加编辑按钮到收藏按钮左侧
+        layout.addWidget(edit_btn, 0, 2, 1, 1, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+
+        # 收藏按钮（放在右上角，第0行第3列）
+        bookmark_btn = QPushButton()
+        bookmark_btn.setFixedSize(int(28 * dpi_scale), int(28 * dpi_scale))
+        bookmark_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: rgba(255, 255, 255, 0.08);
+                border: 1px solid rgba(255, 255, 255, 0.15);
+                border-radius: {int(6 * dpi_scale)}px;
+                padding: 0;
+            }}
+            QPushButton:hover {{
+                background: rgba(255, 255, 255, 0.18);
+                border: 1px solid rgba(255, 255, 255, 0.25);
+            }}
+            QPushButton:pressed {{
+                background: rgba(255, 255, 255, 0.12);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }}
         """)
         bookmark_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         bookmark_btn.clicked.connect(self._on_bookmark_clicked)
@@ -131,32 +186,49 @@ class ResourcepackItemWidget(QWidget):
         # 设置初始图标状态
         self._update_bookmark_icon(bookmark_btn)
 
-        layout.addWidget(bookmark_btn)
+        # 保存按钮引用
+        self.bookmark_btn = bookmark_btn
+
+        # 添加收藏按钮到右上角（第3列）
+        layout.addWidget(bookmark_btn, 0, 3, 1, 1, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
 
     def enterEvent(self, event):
         """鼠标进入事件"""
-        # 查找收藏按钮并显示
-        for i in range(self.layout().count()):
-            widget = self.layout().itemAt(i).widget()
-            if isinstance(widget, QPushButton):
-                widget.show()
-                break
+        # 显示收藏按钮
+        if hasattr(self, 'bookmark_btn'):
+            self.bookmark_btn.show()
+        # 如果资源包可编辑，显示编辑按钮
+        if hasattr(self, 'edit_btn') and self.is_editable:
+            self.edit_btn.show()
         super().enterEvent(event)
 
     def leaveEvent(self, event):
         """鼠标离开事件"""
-        # 查找收藏按钮并隐藏
-        for i in range(self.layout().count()):
-            widget = self.layout().itemAt(i).widget()
-            if isinstance(widget, QPushButton):
-                widget.hide()
-                break
+        # 隐藏收藏按钮
+        if hasattr(self, 'bookmark_btn'):
+            self.bookmark_btn.hide()
+        # 隐藏编辑按钮
+        if hasattr(self, 'edit_btn'):
+            self.edit_btn.hide()
         super().leaveEvent(event)
+
+    def _on_edit_clicked(self):
+        """编辑按钮点击事件"""
+        if self.on_edit_clicked:
+            self.on_edit_clicked()
 
     def _on_bookmark_clicked(self):
         """收藏按钮点击事件"""
         if self.on_favorite_clicked:
             self.on_favorite_clicked()
+
+    def _update_edit_icon(self, btn):
+        """更新编辑图标"""
+        edit_pixmap = load_svg_icon("svg/sliders.svg", self.dpi_scale)
+        if edit_pixmap:
+            btn.setIcon(QIcon(scale_icon_for_display(edit_pixmap, 16, self.dpi_scale)))
+        else:
+            btn.setIcon(QIcon())
 
     def _update_bookmark_icon(self, btn):
         """更新收藏图标"""
@@ -173,12 +245,9 @@ class ResourcepackItemWidget(QWidget):
     def set_favorited(self, is_favorited):
         """设置收藏状态"""
         self.is_favorited = is_favorited
-        # 查找收藏按钮并更新图标
-        for i in range(self.layout().count()):
-            widget = self.layout().itemAt(i).widget()
-            if isinstance(widget, QPushButton):
-                self._update_bookmark_icon(widget)
-                break
+        # 直接更新收藏按钮图标
+        if hasattr(self, 'bookmark_btn'):
+            self._update_bookmark_icon(self.bookmark_btn)
 
 
 class FileExplorer(QWidget):
@@ -228,20 +297,28 @@ class FileExplorer(QWidget):
         self.back_btn.setText(self.translate("file_explorer_back_to_root"))
 
     def eventFilter(self, obj, event):
-        """事件过滤器：在无滚动模式下拦截滚动事件并传递给父级"""
-        if self.no_scroll and obj == self.file_tree.viewport():
-            from PyQt6.QtCore import QEvent
+        """事件过滤器：调整滚轮滚动步进值"""
+        if obj == self.file_tree.viewport():
             if event.type() == QEvent.Type.Wheel:
-                # 拦截滚轮事件并传递给父级滚动区域
-                # 找到父级滚动区域
-                scroll_area = self.parent()
-                while scroll_area and not hasattr(scroll_area, 'widgetResizable'):
-                    scroll_area = scroll_area.parent()
-                
-                # 如果找到滚动区域，传递事件
-                if scroll_area:
-                    scroll_area.wheelEvent(event)
-                return True
+                if self.no_scroll:
+                    # 无滚动模式：拦截滚轮事件并传递给父级滚动区域
+                    # 找到父级滚动区域
+                    scroll_area = self.parent()
+                    while scroll_area and not hasattr(scroll_area, 'widgetResizable'):
+                        scroll_area = scroll_area.parent()
+
+                    # 如果找到滚动区域，传递事件
+                    if scroll_area:
+                        scroll_area.wheelEvent(event)
+                    return True
+                else:
+                    # 正常模式：调整滚动步进值
+                    # 获取垂直滚动条
+                    scroll_bar = self.file_tree.verticalScrollBar()
+                    if scroll_bar:
+                        # 设置滚动步进值为较小值（原来的 2/3）
+                        scroll_bar.setSingleStep(int(13 * self.dpi_scale))
+                        scroll_bar.setPageStep(int(53 * self.dpi_scale))
         return super().eventFilter(obj, event)
 
     def _init_ui(self):
@@ -305,19 +382,25 @@ class FileExplorer(QWidget):
         # 禁用选择模式
         self.file_tree.setSelectionMode(QTreeWidget.SelectionMode.NoSelection)
 
-        # 禁用内部滚动条（由外部容器处理）
-        self.file_tree.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.file_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-
-        # 在无滚动模式下，禁用视口滚动
+        # 根据模式设置滚动条策略
         if self.no_scroll:
-            self.file_tree.viewport().installEventFilter(self)
+            # 无滚动模式：禁用内部滚动条（由外部容器处理）
+            self.file_tree.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            self.file_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        else:
+            # 正常模式：使用默认滚动条策略，并设置为像素滚动模式
+            self.file_tree.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            self.file_tree.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            # 设置为像素滚动模式（平滑滚动，不按项目数量滚动）
             self.file_tree.setHorizontalScrollMode(self.file_tree.ScrollMode.ScrollPerPixel)
             self.file_tree.setVerticalScrollMode(self.file_tree.ScrollMode.ScrollPerPixel)
 
-        # 设置图标大小（88px，适配卡片高度96px）
-        self.file_tree.setIconSize(QSize(int(88 * self.dpi_scale), int(88 * self.dpi_scale)))
-        # 设置资源包项目的高度（DPI缩放前的96px）- 类似下载页面
+        # 安装事件过滤器（用于调整滚轮滚动步进值）
+        self.file_tree.viewport().installEventFilter(self)
+
+        # 设置图标大小（适配新的64x64资源包图标）
+        self.file_tree.setIconSize(QSize(int(64 * self.dpi_scale), int(64 * self.dpi_scale)))
+        # 设置资源包项目的高度（适配64x64图标和描述）
         self.file_tree.setStyleSheet(f"""
             QTreeWidget {{
                 background: rgba(0, 0, 0, 0.2);
@@ -326,8 +409,8 @@ class FileExplorer(QWidget):
                 color: rgba(255, 255, 255, 0.9);
             }}
             QTreeWidget::item {{
-                padding: {int(4 * self.dpi_scale)}px;
-                height: {int(90 * self.dpi_scale)}px;
+                padding: {int(8 * self.dpi_scale)}px;
+                height: {int(80 * self.dpi_scale)}px;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             }}
             QTreeWidget::item:hover {{
@@ -351,6 +434,28 @@ class FileExplorer(QWidget):
                 font-size: {int(11 * self.dpi_scale)}px;
                 font-weight: bold;
             }}
+            QScrollBar:vertical {{
+                background: rgba(255, 255, 255, 0.1);
+                width: 8px;
+                border-radius: 4px;
+                margin: 0px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: rgba(255, 255, 255, 0.3);
+                min-height: 20px;
+                border-radius: 4px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: rgba(255, 255, 255, 0.5);
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                border: none;
+                background: none;
+                height: 0px;
+            }}
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+                background: none;
+            }}
         """)
         
         header = self.file_tree.header()
@@ -360,6 +465,23 @@ class FileExplorer(QWidget):
 
         self.file_tree.itemDoubleClicked.connect(self.on_item_double_clicked)
         layout.addWidget(self.file_tree, 1)
+
+        # 空标签（用于显示无内容或路径不存在的情况）
+        self.empty_label = QLabel()
+        self.empty_label.setStyleSheet(f"""
+            QLabel {{
+                color: rgba(255, 255, 255, 0.5);
+                background: rgba(0, 0, 0, 0.2);
+                border: none;
+                border-radius: {int(4 * self.dpi_scale)}px;
+                padding: {int(20 * self.dpi_scale)}px;
+                font-size: {int(12 * self.dpi_scale)}px;
+                text-align: center;
+            }}
+        """)
+        self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty_label.hide()
+        layout.addWidget(self.empty_label)
     
     def set_minecraft_path(self, path):
         """设置Minecraft路径（根目录使用resourcepacks文件夹）"""
@@ -400,6 +522,11 @@ class FileExplorer(QWidget):
             return "..." + full_path[-47:]
     def navigate_to_root(self):
         """返回根目录（base_path，即当前选定的resourcepacks文件夹）"""
+        # 如果有保存的原始base_path，则恢复它
+        if hasattr(self, '_original_base_path'):
+            self.base_path = self._original_base_path
+            delattr(self, '_original_base_path')
+
         if self.base_path and os.path.exists(self.base_path):
             self.current_path = self.base_path
             display_path = self._format_path_display(self.current_path)
@@ -475,6 +602,10 @@ class FileExplorer(QWidget):
 
         self.file_tree.show()
 
+        # 确保base_path已设置
+        if not hasattr(self, 'base_path') or self.base_path is None:
+            self.base_path = path
+
         if not os.path.exists(path):
             self.file_tree.hide()
             return
@@ -542,12 +673,20 @@ class FileExplorer(QWidget):
                 for name, is_dir, full_path in items:
                     self._add_item(name, is_dir, full_path)
 
+            # 检查当前路径是否为版本隔离的子路径
+            is_version_subpath = self.base_path and self.current_path != self.base_path and "versions" in self.current_path
+
             # 在无滚动模式下，根据内容更新file_tree的高度
             if self.no_scroll:
+                # 主路径：使用最小高度，允许内容超出时父级容器滚动
+                # 计算实际内容高度
                 item_count = self.file_tree.topLevelItemCount()
-                item_height = int(90 * self.dpi_scale)  # 单个项目的固定高度（与下载页面一致）
-                total_height = item_count * item_height + int(8 * self.dpi_scale)  # 加上一些间距
-                self.file_tree.setFixedHeight(total_height)
+                # ResourcepackItemWidget 的高度是 80 * dpi_scale
+                # 每个项目的总高度 = widget高度(80) + padding(8+8) + border-bottom(1)
+                item_height = int(80 * self.dpi_scale) + int(16 * self.dpi_scale) + 1
+                total_height = max(1, item_count * item_height)  # 至少为1
+                self.file_tree.setMinimumHeight(total_height)
+                self.file_tree.setMaximumHeight(total_height)
 
         except PermissionError:
             self.file_tree.hide()
@@ -583,21 +722,29 @@ class FileExplorer(QWidget):
         # 检查资源包是否可编辑
         is_editable = self._is_resourcepack_editable(full_path, is_dir)
 
+        # 获取资源包描述
+        description = self._get_resourcepack_description(full_path, is_dir)
+
         logger.debug(f"Adding resourcepack item: {name}, icon_pixmap: {icon_pixmap is not None}, is_editable: {is_editable}")
 
         # 创建自定义部件并设置为项目的部件
         def on_favorite_clicked():
             self._toggle_favorite_resourcepack(full_path, name)
 
+        def on_edit_clicked():
+            self._edit_resourcepack(full_path, name)
+
         widget = ResourcepackItemWidget(
             parent=self.file_tree,
             on_favorite_clicked=on_favorite_clicked,
+            on_edit_clicked=on_edit_clicked,
             is_favorited=is_favorited,
             dpi_scale=self.dpi_scale,
             resourcepack_name=name,
             icon=icon_pixmap,
             is_editable=is_editable,
-            text_renderer=self.text_renderer
+            text_renderer=self.text_renderer,
+            description=description
         )
 
         # 存储部件引用
@@ -644,7 +791,13 @@ class FileExplorer(QWidget):
         # 重新加载目录以使收藏的资源包置顶
         if self.current_path:
             self._load_directory(self.current_path)
-    
+
+    def _edit_resourcepack(self, full_path, name):
+        """编辑资源包"""
+        logger.info(f"Edit resourcepack: {name}")
+        # 这里可以添加编辑资源包的逻辑
+        # 例如：打开编辑器、编辑pack.rst等
+
     def on_item_double_clicked(self, item, column):
         """双击项目事件"""
         full_path = item.data(0, Qt.ItemDataRole.UserRole)
@@ -806,7 +959,59 @@ class FileExplorer(QWidget):
             return False
         except Exception:
             return False
-    
+
+    def _get_resourcepack_description(self, full_path, is_dir):
+        """从 pack.mcmeta 中获取资源包描述"""
+        import json
+        try:
+            if is_dir:
+                # 文件夹形式的资源包
+                mcmeta_path = os.path.join(full_path, "pack.mcmeta")
+                if os.path.exists(mcmeta_path):
+                    with open(mcmeta_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        description = data.get("pack", {}).get("description", "")
+                        return self._parse_minecraft_text_component(description)
+            elif full_path.endswith('.zip'):
+                # 压缩包形式的资源包
+                try:
+                    with zipfile.ZipFile(full_path, 'r') as zip_ref:
+                        # 查找根目录的pack.mcmeta（不区分大小写）
+                        pack_mcmeta_files = [f for f in zip_ref.namelist() if f.lower().endswith('pack.mcmeta') and f.count('/') == 0]
+                        if pack_mcmeta_files:
+                            pack_mcmeta_path = pack_mcmeta_files[0]
+                            with zip_ref.open(pack_mcmeta_path) as mcmeta_file:
+                                mcmeta_data = mcmeta_file.read().decode('utf-8')
+                                data = json.loads(mcmeta_data)
+                                description = data.get("pack", {}).get("description", "")
+                                return self._parse_minecraft_text_component(description)
+                except Exception:
+                    pass
+            return ""
+        except Exception:
+            return ""
+
+    def _parse_minecraft_text_component(self, component):
+        """解析Minecraft文本组件，支持字符串、对象和数组格式"""
+        if isinstance(component, str):
+            # 简单字符串
+            return component
+        elif isinstance(component, dict):
+            # 单个文本组件
+            text = component.get("text", "")
+            # 如果有嵌套的额外文本（如 with、extra 等），可以递归处理
+            if "extra" in component:
+                extra_text = self._parse_minecraft_text_component(component["extra"])
+                text = text + extra_text
+            return text
+        elif isinstance(component, list):
+            # 文本组件数组
+            result = []
+            for item in component:
+                result.append(self._parse_minecraft_text_component(item))
+            return "".join(result)
+        return ""
+
     def update_font(self, font_family):
         """更新字体"""
         escaped_font = font_family.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"')
