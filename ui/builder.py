@@ -12,7 +12,7 @@ if parent_dir not in sys.path:
 
 logger = logging.getLogger(__name__)
 
-from PyQt6.QtCore import Qt, QEvent
+from PyQt6.QtCore import Qt, QEvent, QThread, pyqtSignal
 from PyQt6.QtGui import QColor, QPixmap, QIcon, QFontDatabase
 from PyQt6.QtWidgets import (QColorDialog, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QSlider, QVBoxLayout, QWidget,
@@ -1668,10 +1668,14 @@ class UIBuilder:
             # 每次添加 2 个卡片，避免阻塞 UI
             batch_size = 2
             end_hit_index = min(current_hit_index + batch_size, len(hits))
-            
+
             # 计算插入位置：start_index + 已添加的卡片数
             insert_index = start_index + current_hit_index
-            
+
+            # 初始化卡片列表（清除旧卡片）
+            if not hasattr(self.window, 'download_cards'):
+                self.window.download_cards = []
+
             for i in range(current_hit_index, end_hit_index):
                 hit = hits[i]
                 project_data = {
@@ -1683,7 +1687,7 @@ class UIBuilder:
                     'project_id': hit.get('project_id', ''),
                     'slug': hit.get('slug', '')
                 }
-                
+
                 # 使用函数包装避免 lambda 闭包问题
                 def make_download_handler(data):
                     return lambda checked=False: self._on_download_modrinth_project(data)
@@ -1700,7 +1704,10 @@ class UIBuilder:
                     language_manager=self.window.language_manager,
                     text_renderer=self.text_renderer
                 )
-                
+
+                # 添加到卡片列表
+                self.window.download_cards.append(result_card)
+
                 # 添加到滚动区域（不立即显示，避免窗口闪烁）
                 layout.insertWidget(insert_index, result_card)
                 insert_index += 1
@@ -1767,8 +1774,7 @@ class UIBuilder:
             self.window.download_bottom_pagination.prev_btn.setEnabled(self.window.download_current_page > 1)
             self.window.download_bottom_pagination.next_btn.setEnabled(self.window.download_current_page < self.window.download_total_pages)
 
-            # 更新页码下拉框
-            self.window.download_bottom_pagination.page_combo.blockSignals(True)
+            # 更新页码输入框
             self.window.download_bottom_pagination.page_input.blockSignals(True)
             self.window.download_bottom_pagination.page_input.setText(str(self.window.download_current_page))
             self.window.download_bottom_pagination.page_input.blockSignals(False)
@@ -1827,16 +1833,111 @@ class UIBuilder:
             error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout = self.window.download_scroll_layout
             layout.insertWidget(layout.count() - 1, error_label)
-    
+
     def _on_download_modrinth_project(self, project_data, checked=False):
         """下载 Modrinth 项目"""
-        logger.info(f"Downloading project: {project_data.get('title', 'Unknown')}")
-        # TODO: 实现下载逻辑
-        # 这里需要：
-        # 1. 获取项目的最新版本
-        # 2. 下载文件到指定目录
-        # 3. 更新文件浏览器显示
-        pass
+        project_title = project_data.get('title', 'Unknown')
+        logger.info(f"Downloading project: {project_title}")
+
+        # 检查是否已有下载线程在运行
+        if hasattr(self.window, '_download_thread') and self.window._download_thread:
+            logger.warning("A download is already in progress")
+            return
+
+        # 获取目标版本路径
+        target_path = self.get_download_target_path()
+        if not target_path:
+            logger.error("No target path configured")
+            return
+
+        # 确保目标目录存在
+        os.makedirs(target_path, exist_ok=True)
+
+        # 设置对应卡片的下载中状态
+        project_id = project_data.get('project_id', '')
+        if hasattr(self.window, 'download_cards'):
+            for card in self.window.download_cards:
+                if card.project_data.get('project_id') == project_id:
+                    card.set_downloading_status(True)
+                    break
+
+        # 创建并启动下载线程
+        self.window._download_thread = DownloadThread(
+            project_data, target_path,
+            language_manager=self.window.language_manager
+        )
+        self.window._download_thread.download_complete.connect(self._on_download_complete)
+        self.window._download_thread.download_error.connect(self._on_download_error)
+        self.window._download_thread.download_progress.connect(self._on_download_progress)
+        self.window._download_thread.finished.connect(self._on_download_thread_finished)
+        self.window._download_thread.start()
+
+    def _on_download_complete(self, file_path, filename):
+        """下载完成回调"""
+        # 注意：不在日志中重复输出，DownloadThread 已输出过
+
+        # 获取当前下载的项目ID
+        project_id = None
+        if hasattr(self.window, '_download_thread'):
+            project_id = self.window._download_thread.project_data.get('project_id', '')
+
+        # 刷新对应卡片的下载状态，直接设置为已下载（避免重复哈希检查）
+        if hasattr(self.window, 'download_cards') and project_id:
+            for card in self.window.download_cards:
+                if card.project_data.get('project_id') == project_id:
+                    card._set_downloaded_status(True)
+                    break
+
+        # 触发文件浏览器刷新
+        if hasattr(self.window, '_refresh_file_browser'):
+            self.window._refresh_file_browser()
+
+    def _on_download_error(self, error_message):
+        """下载错误回调"""
+        logger.error(f"Download error: {error_message}")
+
+        # 恢复对应卡片的下载状态
+        project_id = None
+        if hasattr(self.window, '_download_thread'):
+            project_id = self.window._download_thread.project_data.get('project_id', '')
+
+        if hasattr(self.window, 'download_cards') and project_id:
+            for card in self.window.download_cards:
+                if card.project_data.get('project_id') == project_id:
+                    card.set_downloading_status(False)
+                    break
+
+        # 显示错误提示
+        from PyQt6.QtWidgets import QMessageBox
+        QMessageBox.warning(
+            self.window,
+            "Download Error" if not self.window.language_manager
+                else self.window.language_manager.translate("download_error_title"),
+            error_message
+        )
+
+    def _on_download_progress(self, downloaded, total):
+        """下载进度回调"""
+        logger.debug(f"Download progress: {downloaded}/{total}")
+        # 可以在这里添加进度条显示
+
+    def _on_download_thread_finished(self):
+        """下载线程完成回调"""
+        if hasattr(self.window, '_download_thread'):
+            thread = self.window._download_thread
+
+            # 如果跳过了下载（文件已存在），需要手动更新状态
+            if hasattr(thread, 'skipped') and thread.skipped:
+                project_id = thread.project_data.get('project_id', '')
+                if hasattr(self.window, 'download_cards') and project_id:
+                    for card in self.window.download_cards:
+                        if card.project_data.get('project_id') == project_id:
+                            card._set_downloaded_status(True)
+                            break
+
+            self.window._download_thread.deleteLater()
+            self.window._download_thread = None
+            logger.info("Download thread cleaned up")
 
     def create_console_page(self):
         """创建控制台/日志页面"""
@@ -2964,9 +3065,8 @@ Spectra Information:
     def _create_toggle_switch(self, checked=False):
         """创建自定义切换开关"""
         from PyQt6.QtWidgets import QWidget
-        from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve
+        from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, pyqtProperty
         from PyQt6.QtGui import QPainter, QColor, QBrush
-        from PyQt6.QtCore import pyqtProperty
 
         class ToggleSwitch(QWidget):
             def __init__(self, parent=None, checked=False, dpi_scale=1.0):
@@ -3654,4 +3754,147 @@ Spectra Information:
                     if desc:
                         desc.setStyleSheet(f"color:rgba(255,255,255,0.6);font-size:{self._scale_size(12)}px;font-family:{font_family};background:transparent;")
                     break
+
+
+class DownloadThread(QThread):
+    """文件下载线程"""
+    download_complete = pyqtSignal(str, str)  # file_path, filename
+    download_error = pyqtSignal(str)  # error_message
+    download_progress = pyqtSignal(int, int)  # downloaded, total
+    
+    def __init__(self, project_data, target_path, language_manager=None):
+        super().__init__()
+        self.project_data = project_data
+        self.target_path = target_path
+        self.language_manager = language_manager
+        self.should_stop = False
+        self.skipped = False  # 标记是否跳过下载（文件已存在）
+        
+    def stop(self):
+        """停止下载"""
+        self.should_stop = True
+    
+    def run(self):
+        """执行下载任务"""
+        try:
+            from managers.modrinth_manager import ModrinthManager
+            import urllib.request
+            import urllib.error
+            
+            manager = ModrinthManager()
+            project_id = self.project_data.get('project_id')
+            
+            logger.info(f"Fetching versions for project {project_id}")
+            versions = manager.get_project_versions(project_id)
+            
+            if not versions:
+                self.download_error.emit(
+                    self.language_manager.translate("download_error_no_versions") 
+                    if self.language_manager else "No versions available"
+                )
+                return
+            
+            # 获取最新版本
+            latest_version = versions[0]
+            files = latest_version.get('files', [])
+            
+            if not files:
+                self.download_error.emit(
+                    self.language_manager.translate("download_error_no_files")
+                    if self.language_manager else "No files available for download"
+                )
+                return
+            
+            # 获取主文件
+            file_info = next((f for f in files if f.get('primary', False)), files[0])
+            file_url = file_info.get('url')
+            filename = file_info.get('filename')
+            file_size = file_info.get('size', 0)
+            
+            if not file_url:
+                self.download_error.emit(
+                    self.language_manager.translate("download_error_no_url")
+                    if self.language_manager else "No download URL available"
+                )
+                return
+            
+            # 构建目标文件路径
+            target_file_path = os.path.join(self.target_path, filename)
+            
+            # 获取文件哈希（用于验证）
+            hashes = file_info.get('hashes', {})
+            sha1_hash = hashes.get('sha1')
+            
+            # 检查文件是否已存在
+            if os.path.exists(target_file_path):
+                logger.info(f"File already exists: {target_file_path}")
+                # 验证文件哈希
+                if sha1_hash and self._verify_file_hash(target_file_path, sha1_hash):
+                    logger.info("File hash matches, skipping download")
+                    # 不发出信号，让外部直接处理状态更新
+                    self.skipped = True
+                    return
+                logger.info("File hash mismatch or no hash, re-downloading")
+            
+            # 开始下载
+            logger.info(f"Downloading {filename} from {file_url}")
+            
+            req = urllib.request.Request(file_url)
+            req.add_header('User-Agent', 'Spectra/1.0 (spectra@modrinth)')
+            
+            with urllib.request.urlopen(req, timeout=30) as response:
+                total_size = int(response.headers.get('Content-Length', file_size))
+                downloaded = 0
+                
+                with open(target_file_path + '.tmp', 'wb') as f:
+                    while True:
+                        if self.should_stop:
+                            logger.info("Download cancelled by user")
+                            if os.path.exists(target_file_path + '.tmp'):
+                                os.remove(target_file_path + '.tmp')
+                            return
+                        
+                        chunk = response.read(8192)
+                        if not chunk:
+                            break
+                        
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        self.download_progress.emit(downloaded, total_size)
+                
+                # 下载完成，重命名文件
+                os.rename(target_file_path + '.tmp', target_file_path)
+                
+                # 验证文件哈希
+                if sha1_hash and not self._verify_file_hash(target_file_path, sha1_hash):
+                    logger.error("File hash verification failed")
+                    os.remove(target_file_path)
+                    self.download_error.emit(
+                        self.language_manager.translate("download_error_hash_mismatch")
+                        if self.language_manager else "Downloaded file hash mismatch"
+                    )
+                    return
+                
+                logger.info(f"Download complete: {target_file_path}")
+                self.download_complete.emit(target_file_path, filename)
+                
+        except urllib.error.URLError as e:
+            logger.error(f"Download failed: {e}")
+            self.download_error.emit(f"Network error: {e}")
+        except Exception as e:
+            logger.error(f"Download error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            self.download_error.emit(str(e))
+    
+    def _verify_file_hash(self, filepath, expected_hash):
+        """验证文件哈希"""
+        import hashlib
+        try:
+            with open(filepath, 'rb') as f:
+                file_hash = hashlib.sha1(f.read()).hexdigest()
+                return file_hash.lower() == expected_hash.lower()
+        except Exception as e:
+            logger.error(f"Hash verification error: {e}")
+            return False
 

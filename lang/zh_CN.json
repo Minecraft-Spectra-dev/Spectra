@@ -78,6 +78,7 @@
     "version_isolation": "版本隔离",
     "version_isolation_desc": "开启后可分别管理各版本的资源包",
     "download_btn": "下载",
+    "download_btn_downloading": "下载中...",
     "download_btn_downloaded": "已下载",
     "download_unknown_title": "未知",
     "download_page_info": "第 {current} 页 / 共 {total} 页",
@@ -90,6 +91,11 @@
     "news_no_content": "无内容",
     "news_no_news": "暂无新闻",
     "news_no_news_content": "当前没有可显示的新闻内容。",
-    "console_no_logs": "未找到日志文件。"
+    "console_no_logs": "未找到日志文件。",
+    "download_error_title": "下载错误",
+    "download_error_no_versions": "此项目没有可用版本",
+    "download_error_no_files": "没有可下载的文件",
+    "download_error_no_url": "没有可用的下载地址",
+    "download_error_hash_mismatch": "下载的文件哈希不匹配"
   }
 }

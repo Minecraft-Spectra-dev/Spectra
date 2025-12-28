@@ -199,6 +199,7 @@ class ModrinthResultCard(QWidget):
         self.on_download = on_download
         self.download_target_path = download_target_path
         self.is_downloaded = False
+        self.is_downloading = False
         self.download_btn = None
         self.status_label = None
         self.hash_check_thread = None
@@ -424,16 +425,12 @@ class ModrinthResultCard(QWidget):
     def _start_hash_check(self):
         """启动哈希检查（异步）"""
         project_id = self.project_data.get('project_id', '')
-        logger.info(f"Starting hash check for project {project_id}, target path: {self.download_target_path}")
-
         if not project_id or not self.download_target_path:
-            logger.warning(f"Skipping hash check: project_id={project_id}, target_path={self.download_target_path}")
             return
 
         # 停止之前的哈希检查线程（断开信号连接以避免重复触发）
         old_thread = self.hash_check_thread
         if old_thread and old_thread.isRunning():
-            logger.info("Stopping previous hash check thread")
             # 设置标志位，让线程自然退出
             old_thread.should_run = False
 
@@ -445,14 +442,14 @@ class ModrinthResultCard(QWidget):
             self.hash_check_thread.start()
         except Exception as e:
             logger.error(f"Failed to start hash check thread: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
             # 恢复旧线程引用
             self.hash_check_thread = old_thread
     
     def _on_hash_check_result(self, is_downloaded):
         """哈希检查完成回调"""
-        self._set_downloaded_status(is_downloaded)
+        # 只有当前状态不是"下载中"时才更新
+        if not self.is_downloading:
+            self._set_downloaded_status(is_downloaded)
     
     def _on_hash_check_finished(self):
         """哈希检查线程完成"""
@@ -490,6 +487,7 @@ class ModrinthResultCard(QWidget):
                         font-family: 'Microsoft YaHei UI';
                     }
                 """)
+                self.is_downloading = False  # 下载完成，清除下载中状态
             else:
                 download_text = "Download"
                 if self.language_manager:
@@ -517,16 +515,42 @@ class ModrinthResultCard(QWidget):
                     }
                 """)
     
-    def refresh_download_status(self, new_target_path=None):
+    def set_downloading_status(self, is_downloading):
+        """设置下载中状态"""
+        self.is_downloading = is_downloading
+        if self.download_btn:
+            if is_downloading:
+                downloading_text = "下载中..."
+                if self.language_manager:
+                    downloading_text = self.language_manager.translate("download_btn_downloading", default="下载中...")
+                self.download_btn.setText(downloading_text)
+                self.download_btn.setEnabled(False)
+                self.download_btn.setStyleSheet("""
+                    QPushButton {
+                        background: rgba(102, 132, 255, 0.6);
+                        border: none;
+                        border-radius: 4px;
+                        color: white;
+                        font-size: 10px;
+                        font-family: 'Microsoft YaHei UI';
+                    }
+                """)
+            else:
+                # 如果不在下载中，恢复到未下载状态
+                self._set_downloaded_status(self.is_downloaded)
+
+    def refresh_download_status(self, new_target_path=None, skip_if_downloading=False):
         """刷新下载状态（用于切换版本时调用）"""
+        # 如果正在下载，跳过刷新以避免状态混乱
+        if skip_if_downloading and self.is_downloading:
+            return
+
         if new_target_path is not None:
             self.download_target_path = new_target_path
-        
-        logger.info(f"Refreshing download status for {self.project_data.get('title', 'Unknown')}, target path: {self.download_target_path}")
-        
+
         # 重置状态
         self._set_downloaded_status(False)
-        
+
         # 重新启动哈希检查
         if self.download_target_path:
             from PyQt6.QtCore import QTimer

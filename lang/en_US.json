@@ -78,6 +78,7 @@
     "version_isolation": "Version Isolation",
     "version_isolation_desc": "Enable to manage resource packs for each version separately",
     "download_btn": "Download",
+    "download_btn_downloading": "Downloading...",
     "download_btn_downloaded": "Downloaded",
     "download_unknown_title": "Unknown",
     "download_page_info": "Page {current} of {total}",
@@ -90,6 +91,11 @@
     "news_no_content": "No content",
     "news_no_news": "No news",
     "news_no_news_content": "There are currently no news items to display.",
-    "console_no_logs": "No log files found."
+    "console_no_logs": "No log files found.",
+    "download_error_title": "Download Error",
+    "download_error_no_versions": "No versions available for this project",
+    "download_error_no_files": "No files available for download",
+    "download_error_no_url": "No download URL available",
+    "download_error_hash_mismatch": "Downloaded file hash mismatch"
   }
 }
