@@ -96,6 +96,8 @@
     "download_error_no_versions": "No versions available for this project",
     "download_error_no_files": "No files available for download",
     "download_error_no_url": "No download URL available",
-    "download_error_hash_mismatch": "Downloaded file hash mismatch"
+    "download_error_hash_mismatch": "Downloaded file hash mismatch",
+    "download_progress_label": "Downloading: {filename}",
+    "download_progress_info": "{downloaded:.1f}MB / {total:.1f}MB ({percentage:.1f}%)"
   }
 }

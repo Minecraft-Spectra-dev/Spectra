@@ -38,6 +38,11 @@ class JellyButton(QPushButton):
         painter.drawControl(self.style().ControlElement.CE_PushButton, opt)
 
     def _animate(self, end, duration, curve):
+        # 停止之前的动画
+        if hasattr(self, 'anim') and self.anim is not None:
+            self.anim.stop()
+            self.anim.deleteLater()
+        
         self.anim = QPropertyAnimation()
         self.anim.setDuration(duration)
         self.anim.setStartValue(self._scale)
@@ -59,6 +64,13 @@ class JellyButton(QPushButton):
         if hasattr(win, 'update_cursor'):
             win.update_cursor(ev.globalPosition().toPoint())
         super().mouseMoveEvent(ev)
+    
+    def deleteLater(self):
+        """删除对象时停止动画"""
+        if hasattr(self, 'anim') and self.anim is not None:
+            self.anim.stop()
+            self.anim.deleteLater()
+        super().deleteLater()
 
 
 class CardButton(QPushButton):
@@ -86,6 +98,11 @@ class CardButton(QPushButton):
         painter.drawControl(self.style().ControlElement.CE_PushButton, opt)
 
     def _animate(self, end, duration, curve):
+        # 停止之前的动画
+        if hasattr(self, 'anim') and self.anim is not None:
+            self.anim.stop()
+            self.anim.deleteLater()
+        
         self.anim = QPropertyAnimation()
         self.anim.setDuration(duration)
         self.anim.setStartValue(self._scale)
@@ -101,3 +118,10 @@ class CardButton(QPushButton):
     def mouseReleaseEvent(self, ev):
         self._animate(1.0, 120, QEasingCurve.Type.Linear)
         super().mouseReleaseEvent(ev)
+    
+    def deleteLater(self):
+        """删除对象时停止动画"""
+        if hasattr(self, 'anim') and self.anim is not None:
+            self.anim.stop()
+            self.anim.deleteLater()
+        super().deleteLater()

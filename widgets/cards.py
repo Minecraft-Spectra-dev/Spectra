@@ -167,6 +167,11 @@ class NewsCard(QWidget):
 
     def fade_in(self, duration=300):
         """淡入动画"""
+        # 停止之前的动画
+        if hasattr(self, 'anim') and self.anim is not None:
+            self.anim.stop()
+            self.anim.deleteLater()
+        
         self.anim = QPropertyAnimation(self.opacity_effect, b"opacity")
         self.anim.setDuration(duration)
         self.anim.setStartValue(0.0)
@@ -176,6 +181,11 @@ class NewsCard(QWidget):
     
     def fade_out(self, duration=200, callback=None):
         """淡出动画"""
+        # 停止之前的动画
+        if hasattr(self, 'anim') and self.anim is not None:
+            self.anim.stop()
+            self.anim.deleteLater()
+        
         self.anim = QPropertyAnimation(self.opacity_effect, b"opacity")
         self.anim.setDuration(duration)
         self.anim.setStartValue(1.0)
@@ -190,3 +200,10 @@ class NewsCard(QWidget):
             self.fade_out(callback=self.on_close)
         else:
             self.deleteLater()
+    
+    def deleteLater(self):
+        """删除对象时停止动画"""
+        if hasattr(self, 'anim') and self.anim is not None:
+            self.anim.stop()
+            self.anim.deleteLater()
+        super().deleteLater()

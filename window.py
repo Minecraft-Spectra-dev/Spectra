@@ -82,6 +82,9 @@ class Window(QWidget):
         
         self.ui_builder = UIBuilder(self)
         self.edge_size = self.ui_builder._scale_size(8)
+        
+        # 初始化下载线程引用
+        self._download_thread = None
 
         self.setWindowTitle(self.language_manager.translate("app_title"))
         if os.path.exists("icon.png"):
@@ -659,6 +662,14 @@ class Window(QWidget):
             QTimer.singleShot(100, lambda: self.ui_builder._search_modrinth("", page=1, sort_by=self.current_sort_type))
 
     def toggle_sidebar(self):
+        # 停止之前的动画
+        if hasattr(self, 'anim') and self.anim is not None:
+            self.anim.stop()
+            self.anim.deleteLater()
+        if hasattr(self, 'anim2') and self.anim2 is not None:
+            self.anim2.stop()
+            self.anim2.deleteLater()
+        
         self.anim = QPropertyAnimation(self.sidebar, b"minimumWidth")
         self.anim2 = QPropertyAnimation(self.sidebar, b"maximumWidth")
         for a in (self.anim, self.anim2):

@@ -16,7 +16,7 @@ from PyQt6.QtCore import Qt, QEvent, QThread, pyqtSignal
 from PyQt6.QtGui import QColor, QPixmap, QIcon, QFontDatabase
 from PyQt6.QtWidgets import (QColorDialog, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QSlider, QVBoxLayout, QWidget,
-                             QComboBox, QMenu)
+                             QComboBox, QMenu, QProgressBar)
 
 from styles import SLIDER_STYLE, STYLE_BTN, STYLE_ICON
 from utils import load_svg_icon, scale_icon_for_display
@@ -1197,7 +1197,7 @@ class UIBuilder:
         self.window.download_top_pagination = top_pagination
         top_pagination.setVisible(False)  # 初始隐藏
         scroll_layout.addWidget(top_pagination)
-        
+
         scroll_layout.addStretch()
         
         # 保存滚动内容区域的引用，用于显示搜索结果
@@ -1613,18 +1613,30 @@ class UIBuilder:
         if hasattr(self.window, 'download_scroll_layout'):
             # 清除搜索结果，保留最后一个 stretch 和顶部翻页控件
             layout = self.window.download_scroll_layout
+            
+            # 先获取所有要保留的控件
+            widgets_to_skip = set()
+            if hasattr(self.window, 'download_top_pagination'):
+                widgets_to_skip.add(self.window.download_top_pagination)
+            if hasattr(self.window, 'download_bottom_pagination'):
+                widgets_to_skip.add(self.window.download_bottom_pagination)
+            
             # 从后向前删除，保留最后一个 stretch 和顶部翻页控件
-            for i in range(layout.count() - 2, -1, -1):
+            for i in range(layout.count() - 1, -1, -1):
                 item = layout.itemAt(i)
                 if item and item.widget():
-                    # 跳过顶部翻页控件
-                    if hasattr(self.window, 'download_top_pagination') and item.widget() == self.window.download_top_pagination:
-                        continue
-                    # 隐藏底部翻页控件（但不删除）
-                    if hasattr(self.window, 'download_bottom_pagination') and item.widget() == self.window.download_bottom_pagination:
-                        self.window.download_bottom_pagination.hide()
-                        continue
                     widget = item.widget()
+                    # 跳过要保留的控件
+                    if widget in widgets_to_skip:
+                        # 对于底部翻页控件，只隐藏不删除
+                        if widget == getattr(self.window, 'download_bottom_pagination', None):
+                            widget.hide()
+                        continue
+                    
+                    # 检查是否是 stretch（布局的最后一个是 stretch）
+                    if i == layout.count() - 1:
+                        continue
+                    
                     widget.setParent(None)
                     widget.deleteLater()
     
@@ -1919,7 +1931,17 @@ class UIBuilder:
     def _on_download_progress(self, downloaded, total):
         """下载进度回调"""
         logger.debug(f"Download progress: {downloaded}/{total}")
-        # 可以在这里添加进度条显示
+        # 计算进度
+        if total > 0:
+            progress = int((downloaded / total) * 100)
+            # 更新对应卡片的进度条
+            if hasattr(self.window, '_download_thread') and hasattr(self.window, 'download_cards'):
+                project_id = self.window._download_thread.project_data.get('project_id', '')
+                if project_id:
+                    for card in self.window.download_cards:
+                        if card.project_data.get('project_id') == project_id:
+                            card.update_download_progress(progress)
+                            break
 
     def _on_download_thread_finished(self):
         """下载线程完成回调"""

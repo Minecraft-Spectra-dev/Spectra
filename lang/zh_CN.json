@@ -96,6 +96,8 @@
     "download_error_no_versions": "此项目没有可用版本",
     "download_error_no_files": "没有可下载的文件",
     "download_error_no_url": "没有可用的下载地址",
-    "download_error_hash_mismatch": "下载的文件哈希不匹配"
+    "download_error_hash_mismatch": "下载的文件哈希不匹配",
+    "download_progress_label": "下载中: {filename}",
+    "download_progress_info": "{downloaded:.1f}MB / {total:.1f}MB ({percentage:.1f}%)"
   }
 }
