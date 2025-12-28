@@ -16,7 +16,7 @@ from PyQt6.QtCore import Qt, QEvent, QThread, pyqtSignal
 from PyQt6.QtGui import QColor, QPixmap, QIcon, QFontDatabase
 from PyQt6.QtWidgets import (QColorDialog, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QSlider, QVBoxLayout, QWidget,
-                             QComboBox, QMenu, QProgressBar)
+                             QComboBox, QMenu)
 
 from styles import SLIDER_STYLE, STYLE_BTN, STYLE_ICON
 from utils import load_svg_icon, scale_icon_for_display
@@ -1893,10 +1893,13 @@ class UIBuilder:
         if hasattr(self.window, '_download_thread'):
             project_id = self.window._download_thread.project_data.get('project_id', '')
 
-        # 刷新对应卡片的下载状态，直接设置为已下载（避免重复哈希检查）
+        # 刷新对应卡片的下载状态
         if hasattr(self.window, 'download_cards') and project_id:
             for card in self.window.download_cards:
                 if card.project_data.get('project_id') == project_id:
+                    # 先停止下载状态（隐藏进度条）
+                    card.set_downloading_status(False)
+                    # 然后设置为已下载状态
                     card._set_downloaded_status(True)
                     break
 
@@ -1954,6 +1957,9 @@ class UIBuilder:
                 if hasattr(self.window, 'download_cards') and project_id:
                     for card in self.window.download_cards:
                         if card.project_data.get('project_id') == project_id:
+                            # 确保停止下载状态（隐藏进度条）
+                            card.set_downloading_status(False)
+                            # 然后设置为已下载状态
                             card._set_downloaded_status(True)
                             break
 

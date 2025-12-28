@@ -6,7 +6,7 @@ import logging
 from PyQt6.QtCore import Qt, QUrl, QThread, pyqtSignal, QByteArray
 from PyQt6.QtGui import QFont, QDesktopServices, QPixmap, QIcon
 from PyQt6.QtWidgets import (QGraphicsOpacityEffect, QHBoxLayout, QLabel,
-                             QPushButton, QVBoxLayout, QWidget, QFrame, QProgressBar)
+                             QPushButton, QVBoxLayout, QWidget, QFrame)
 from PyQt6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply, QNetworkReply
 from utils import load_svg_icon, scale_icon_for_display
 
@@ -205,8 +205,7 @@ class ModrinthResultCard(QWidget):
         self.hash_check_thread = None
         self.language_manager = language_manager
         self.text_renderer = text_renderer
-        self.progress_bar = None
-        self.progress_label = None
+        self.download_progress = 0
 
         self.setFixedHeight(int(90 * dpi_scale))
         self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -331,38 +330,7 @@ class ModrinthResultCard(QWidget):
         info_layout.addLayout(stats_layout, 0)
         card_layout.addLayout(info_layout, 1)
 
-        # 右侧容器（进度条和下载按钮）
-        right_container = QWidget()
-        right_layout = QHBoxLayout(right_container)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(int(6 * dpi_scale))
-
-        # 下载进度条（初始隐藏）
-        progress_bar = QProgressBar()
-        progress_bar.setFixedSize(int(60 * dpi_scale), int(32 * dpi_scale))
-        progress_bar.setTextVisible(True)
-        progress_bar.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        progress_bar.setRange(0, 100)
-        progress_bar.setValue(0)
-        progress_bar.setStyleSheet("""
-            QProgressBar {
-                background: rgba(0, 0, 0, 0.4);
-                border: none;
-                border-radius: 4px;
-                color: white;
-                font-size: 9px;
-                text-align: center;
-            }
-            QProgressBar::chunk {
-                background: rgba(102, 132, 255, 0.8);
-                border-radius: 4px;
-            }
-        """)
-        progress_bar.setVisible(False)  # 初始隐藏
-        self.progress_bar = progress_bar
-        right_layout.addWidget(progress_bar)
-
-        # 下载按钮
+        # 下载按钮（也作为进度条显示）
         download_btn_text = "Download"
         if self.language_manager:
             download_btn_text = self.language_manager.translate("download_btn")
@@ -394,9 +362,7 @@ class ModrinthResultCard(QWidget):
             download_btn.clicked.connect(lambda checked=False: on_download(project_data))
 
         self.download_btn = download_btn
-        right_layout.addWidget(download_btn)
-
-        card_layout.addWidget(right_container, 0, Qt.AlignmentFlag.AlignTop)
+        card_layout.addWidget(download_btn, 0, Qt.AlignmentFlag.AlignTop)
 
         # 检查是否已下载（延迟启动，避免阻塞UI）
         if self.download_target_path:
@@ -553,16 +519,14 @@ class ModrinthResultCard(QWidget):
     def set_downloading_status(self, is_downloading):
         """设置下载中状态"""
         self.is_downloading = is_downloading
+        self.download_progress = 0  # 重置进度
         if self.download_btn:
             if is_downloading:
-                downloading_text = "下载中..."
-                if self.language_manager:
-                    downloading_text = self.language_manager.translate("download_btn_downloading", default="下载中...")
-                self.download_btn.setText(downloading_text)
+                self.download_btn.setText("0%")
                 self.download_btn.setEnabled(False)
                 self.download_btn.setStyleSheet("""
                     QPushButton {
-                        background: rgba(102, 132, 255, 0.6);
+                        background: rgba(102, 132, 255, 0.4);
                         border: none;
                         border-radius: 4px;
                         color: white;
@@ -570,26 +534,34 @@ class ModrinthResultCard(QWidget):
                         font-family: 'Microsoft YaHei UI';
                     }
                 """)
-                # 显示进度条并重置
-                if self.progress_bar:
-                    self.progress_bar.setVisible(True)
-                    self.progress_bar.setValue(0)
-                    self.progress_bar.setFormat("0%")
             else:
                 # 如果不在下载中，恢复到未下载状态
                 self._set_downloaded_status(self.is_downloaded)
-                # 隐藏进度条
-                if self.progress_bar:
-                    self.progress_bar.setVisible(False)
 
     def update_download_progress(self, progress):
         """更新下载进度
         Args:
             progress: 进度值 (0-100)
         """
-        if self.progress_bar and self.is_downloading:
-            self.progress_bar.setValue(progress)
-            self.progress_bar.setFormat(f"{progress}%")
+        if self.download_btn and self.is_downloading:
+            self.download_progress = progress
+            # 根据进度计算背景颜色（从浅蓝到深蓝）
+            # 基础颜色: rgba(102, 132, 255, 0.4)
+            # 渐变到: rgba(102, 132, 255, 0.9)
+            opacity = 0.4 + (progress / 100) * 0.5
+            bg_color = f"rgba(102, 132, 255, {opacity:.2f})"
+            
+            self.download_btn.setText(f"{progress}%")
+            self.download_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: {bg_color};
+                    border: none;
+                    border-radius: 4px;
+                    color: white;
+                    font-size: 10px;
+                    font-family: 'Microsoft YaHei UI';
+                }}
+            """)
 
     def refresh_download_status(self, new_target_path=None, skip_if_downloading=False):
         """刷新下载状态（用于切换版本时调用）"""
