@@ -127,17 +127,14 @@ class TextRenderer:
 
         # 检查控件是否已被删除（使用 try-except 包装 isinstance 检查）
         try:
-            from sip import isdeleted
-            if isdeleted(widget):
-                # 控件已被删除，跳过更新
-                return
-        except:
             try:
                 # 尝试调用控件方法，如果失败则说明控件已被删除
                 widget.isVisible()
             except:
                 # 控件已被删除，跳过更新
                 return
+        except:
+            pass
 
         # 获取翻译文本
         if self.language_manager:
@@ -178,14 +175,9 @@ class TextRenderer:
         try:
             # 检查控件是否已被删除
             try:
-                from sip import isdeleted
-                if isdeleted(widget):
-                    return
+                widget.isVisible()
             except:
-                try:
-                    widget.isVisible()
-                except:
-                    return
+                return
 
             # 为 QLabel 设置字体
             if isinstance(widget, QLabel):
