@@ -51,11 +51,11 @@ class VersionCardWidget(QWidget):
         self.setStyleSheet(self._hover_style)
         if self._bookmark_btn and not self._is_favorited:
             # 未收藏的版本悬停时显示收藏图标
+            from PyQt6.QtGui import QIcon
             bookmark_pixmap = load_svg_icon("svg/bookmarks.svg", self._get_dpi_scale())
             if bookmark_pixmap:
-                self._bookmark_btn.scale_icon_for_display(
-                    scale_icon_for_display(bookmark_pixmap, 16, self._get_dpi_scale())
-                )
+                scaled_pixmap = scale_icon_for_display(bookmark_pixmap, 16, self._get_dpi_scale())
+                self._bookmark_btn.setIcon(QIcon(scaled_pixmap))
         if self._edit_btn:
             # 悬停时显示编辑按钮
             self._edit_btn.show()

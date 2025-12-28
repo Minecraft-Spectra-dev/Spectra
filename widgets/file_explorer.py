@@ -14,32 +14,104 @@ logger = logging.getLogger(__name__)
 
 
 class ResourcepackItemWidget(QWidget):
-    """资源包项目部件，支持收藏按钮"""
-    
-    def __init__(self, parent=None, on_favorite_clicked=None, is_favorited=False, dpi_scale=1.0):
+    """资源包项目部件，支持收藏按钮，使用卡片样式（类似下载页面）"""
+
+    def __init__(self, parent=None, on_favorite_clicked=None, is_favorited=False, dpi_scale=1.0, resourcepack_name="", icon=None, is_editable=False, text_renderer=None):
         super().__init__(parent)
         self.dpi_scale = dpi_scale
         self.on_favorite_clicked = on_favorite_clicked
         self.is_favorited = is_favorited
-        
+        self.resourcepack_name = resourcepack_name
+        self.icon = icon
+        self.is_editable = is_editable
+        self.text_renderer = text_renderer
+
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        
-        # 标签（用于显示资源包名称）
-        self.name_label = QLabel()
-        self.name_label.setStyleSheet("""
-            QLabel {
-                color: rgba(255, 255, 255, 0.9);
-                background: transparent;
-            }
-        """)
-        layout.addWidget(self.name_label)
-        
+        layout.setContentsMargins(int(12 * dpi_scale), int(8 * dpi_scale), int(12 * dpi_scale), int(8 * dpi_scale))
+        layout.setSpacing(int(12 * dpi_scale))
+
+        # 图标和文字的容器
+        icon_wrapper = QWidget()
+        icon_wrapper_layout = QVBoxLayout(icon_wrapper)
+        icon_wrapper_layout.setContentsMargins(0, 0, 0, 0)
+        icon_wrapper_layout.setSpacing(int(2 * dpi_scale))
+        icon_wrapper_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
+
+        # 图标容器（固定大小，缩小图标）
+        icon_label = QLabel()
+        icon_label.setFixedSize(int(48 * dpi_scale), int(48 * dpi_scale))
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        if icon is not None:
+            # icon 是 QPixmap，缩放到48x48
+            scaled_icon = icon.scaled(
+                int(48 * dpi_scale), int(48 * dpi_scale),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            icon_label.setPixmap(scaled_icon)
+        else:
+            # 默认图标，缩放到48x48
+            default_icon = load_svg_icon("svg/unknown_pack.png", self.dpi_scale)
+            if default_icon:
+                scaled_default = scale_icon_for_display(default_icon, 48, self.dpi_scale)
+                if scaled_default:
+                    scaled_final = scaled_default.scaled(
+                        int(48 * dpi_scale), int(48 * dpi_scale),
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation
+                    )
+                    icon_label.setPixmap(scaled_final)
+
+        icon_wrapper_layout.addWidget(icon_label)
+
+        # 可编辑状态标签（在图标下方，只显示"可编辑"或"不可编辑"）
+        editable_label = QLabel()
+        editable_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        editable_label.setStyleSheet("color: rgba(255, 255, 255, 0.5); background: transparent;")
+        editable_font = QFont()
+        # 使用 text_renderer 的字体系列（如果可用）
+        if self.text_renderer:
+            editable_font.setFamily(self.text_renderer.get_font_family())
+        else:
+            editable_font.setFamily("Microsoft YaHei UI")
+        editable_font.setWeight(QFont.Weight.Bold)
+        editable_font.setPointSize(int(6 * dpi_scale))  # ← 修改这里的数值来调整字体大小
+        editable_label.setFont(editable_font)
+        editable_label.setText("可编辑" if is_editable else "不可编辑")
+        self.editable_label = editable_label  # 保存引用以便后续更新
+        icon_wrapper_layout.addWidget(editable_label)
+
+        # 设置wrapper的固定宽度
+        icon_wrapper.setFixedWidth(int(48 * dpi_scale))
+        layout.addWidget(icon_wrapper, 0, Qt.AlignmentFlag.AlignTop)
+
+        # 信息区域（使用VBoxLayout，文字独立）
+        info_layout = QVBoxLayout()
+        info_layout.setSpacing(int(4 * dpi_scale))
+        info_layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+
+        # 资源包名称
+        name_label = QLabel(resourcepack_name)
+        name_font = QFont()
+        name_font.setFamily("Microsoft YaHei UI")
+        name_font.setWeight(QFont.Weight.Bold)
+        name_font.setPointSize(int(12 * dpi_scale))
+        name_label.setFont(name_font)
+        name_label.setStyleSheet("color: white; background: transparent;")
+        name_label.setWordWrap(False)
+        name_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        info_layout.addWidget(name_label)
+
+        # 空白占位（保持与下载页面一致的高度）
+        info_layout.addStretch()
+
+        layout.addLayout(info_layout, 1)
+
         # 收藏按钮
-        self.bookmark_btn = QPushButton()
-        self.bookmark_btn.setFixedSize(int(20 * dpi_scale), int(20 * dpi_scale))
-        self.bookmark_btn.setStyleSheet("""
+        bookmark_btn = QPushButton()
+        bookmark_btn.setFixedSize(int(20 * dpi_scale), int(20 * dpi_scale))
+        bookmark_btn.setStyleSheet("""
             QPushButton {
                 background: transparent;
                 border: none;
@@ -50,39 +122,63 @@ class ResourcepackItemWidget(QWidget):
                 border-radius: 4px;
             }
         """)
-        self.bookmark_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.bookmark_btn.clicked.connect(self._on_bookmark_clicked)
-        
+        bookmark_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        bookmark_btn.clicked.connect(self._on_bookmark_clicked)
+
+        # 初始隐藏收藏按钮
+        bookmark_btn.hide()
+
         # 设置初始图标状态
-        self._update_bookmark_icon()
-        
-        layout.addWidget(self.bookmark_btn)
-    
-    def set_name(self, name):
-        """设置资源包名称"""
-        self.name_label.setText(name)
-    
+        self._update_bookmark_icon(bookmark_btn)
+
+        layout.addWidget(bookmark_btn)
+
+    def enterEvent(self, event):
+        """鼠标进入事件"""
+        # 查找收藏按钮并显示
+        for i in range(self.layout().count()):
+            widget = self.layout().itemAt(i).widget()
+            if isinstance(widget, QPushButton):
+                widget.show()
+                break
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        """鼠标离开事件"""
+        # 查找收藏按钮并隐藏
+        for i in range(self.layout().count()):
+            widget = self.layout().itemAt(i).widget()
+            if isinstance(widget, QPushButton):
+                widget.hide()
+                break
+        super().leaveEvent(event)
+
     def _on_bookmark_clicked(self):
         """收藏按钮点击事件"""
         if self.on_favorite_clicked:
             self.on_favorite_clicked()
-    
-    def _update_bookmark_icon(self):
+
+    def _update_bookmark_icon(self, btn):
         """更新收藏图标"""
         if self.is_favorited:
             bookmark_pixmap = load_svg_icon("svg/bookmarks-fill.svg", self.dpi_scale)
         else:
             bookmark_pixmap = load_svg_icon("svg/bookmarks.svg", self.dpi_scale)
-        
+
         if bookmark_pixmap:
-            self.bookmark_btn.setIcon(QIcon(scale_icon_for_display(bookmark_pixmap, 16, self.dpi_scale)))
+            btn.setIcon(QIcon(scale_icon_for_display(bookmark_pixmap, 16, self.dpi_scale)))
         else:
-            self.bookmark_btn.setIcon(QIcon())
-    
+            btn.setIcon(QIcon())
+
     def set_favorited(self, is_favorited):
         """设置收藏状态"""
         self.is_favorited = is_favorited
-        self._update_bookmark_icon()
+        # 查找收藏按钮并更新图标
+        for i in range(self.layout().count()):
+            widget = self.layout().itemAt(i).widget()
+            if isinstance(widget, QPushButton):
+                self._update_bookmark_icon(widget)
+                break
 
 
 class FileExplorer(QWidget):
@@ -155,10 +251,10 @@ class FileExplorer(QWidget):
         layout.setSpacing(0)
 
         # 工具栏
-        toolbar = QWidget()
-        toolbar.setFixedHeight(int(36 * self.dpi_scale))
-        toolbar.setStyleSheet("background: rgba(255, 255, 255, 0.08);")
-        toolbar_layout = QHBoxLayout(toolbar)
+        self.toolbar = QWidget()
+        self.toolbar.setFixedHeight(int(36 * self.dpi_scale))
+        self.toolbar.setStyleSheet("background: rgba(255, 255, 255, 0.08);")
+        toolbar_layout = QHBoxLayout(self.toolbar)
         toolbar_layout.setContentsMargins(int(12 * self.dpi_scale), 0, int(12 * self.dpi_scale), 0)
         toolbar_layout.setSpacing(int(8 * self.dpi_scale))
 
@@ -199,12 +295,15 @@ class FileExplorer(QWidget):
         self.back_btn.setEnabled(False)
         toolbar_layout.addWidget(self.back_btn)
 
-        layout.addWidget(toolbar)
+        layout.addWidget(self.toolbar)
         
         # 文件树
         self.file_tree = QTreeWidget()
         self.file_tree.setHeaderHidden(True)  # 隐藏表头（包含名称和大小列）
         self.file_tree.setColumnCount(1)  # 只显示一列（名称）
+
+        # 禁用选择模式
+        self.file_tree.setSelectionMode(QTreeWidget.SelectionMode.NoSelection)
 
         # 禁用内部滚动条（由外部容器处理）
         self.file_tree.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -218,24 +317,21 @@ class FileExplorer(QWidget):
 
         # 设置图标大小（88px，适配卡片高度96px）
         self.file_tree.setIconSize(QSize(int(88 * self.dpi_scale), int(88 * self.dpi_scale)))
-        # 设置资源包项目的高度（DPI缩放前的96px）
+        # 设置资源包项目的高度（DPI缩放前的96px）- 类似下载页面
         self.file_tree.setStyleSheet(f"""
             QTreeWidget {{
                 background: rgba(0, 0, 0, 0.2);
-                border:1px solid rgba(255, 255, 255, 0.1);
+                border: none;
                 border-radius: {int(4 * self.dpi_scale)}px;
                 color: rgba(255, 255, 255, 0.9);
             }}
             QTreeWidget::item {{
                 padding: {int(4 * self.dpi_scale)}px;
-                height: {int(96 * self.dpi_scale)}px;
+                height: {int(90 * self.dpi_scale)}px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             }}
             QTreeWidget::item:hover {{
                 background: rgba(255, 255, 255, 0.1);
-            }}
-            QTreeWidget::item:selected {{
-                background: rgba(100, 150, 255, 0.3);
-                color: white;
             }}
             QTreeWidget::branch {{
                 background: transparent;
@@ -278,9 +374,11 @@ class FileExplorer(QWidget):
         self.back_btn.setEnabled(False)
         self.resourcepack_mode = True  # 启用资源包模式
         if os.path.exists(self.current_path):
+            self.toolbar.show()
             self.file_tree.show()
             self._load_directory(self.current_path)
         else:
+            self.toolbar.hide()
             self.file_tree.hide()
 
     def _format_path_display(self, path):
@@ -307,6 +405,7 @@ class FileExplorer(QWidget):
             display_path = self._format_path_display(self.current_path)
             self.path_label.setText(display_path)
             self.back_btn.setEnabled(False)
+            self.toolbar.show()
             self._load_directory(self.current_path)
 
     def navigate_to_directory(self, path):
@@ -319,6 +418,7 @@ class FileExplorer(QWidget):
         display_path = self._format_path_display(path)
         self.path_label.setText(display_path)
         self.back_btn.setEnabled(True)
+        self.toolbar.show()
         self.file_tree.show()
         self._load_directory(path)
 
@@ -332,9 +432,11 @@ class FileExplorer(QWidget):
             display_path = self._format_path_display(self.current_path)
             self.path_label.setText(display_path)
             self.back_btn.setEnabled(False)
+            self.toolbar.show()
             self.file_tree.show()
             self._load_directory(self.current_path)
         else:
+            self.toolbar.hide()
             self.file_tree.hide()
     
     def navigate_to_version_resourcepacks(self, version_name):
@@ -409,9 +511,14 @@ class FileExplorer(QWidget):
             if self.resourcepack_mode:
                 resourcepack_items = []
                 for name, is_dir, full_path in items:
+                    # 只处理文件夹或zip文件
                     if is_dir or name.endswith('.zip'):
-                        resourcepack_items.append((name, is_dir, full_path))
-                
+                        # 检查是否是有效的资源包（必须包含pack.mcmeta）
+                        if self._is_valid_resourcepack(full_path, is_dir):
+                            resourcepack_items.append((name, is_dir, full_path))
+
+                logger.info(f"Resourcepack mode: found {len(resourcepack_items)} valid resourcepacks out of {len(items)} items")
+
                 # 分离收藏和非收藏
                 favorites = []
                 non_favorites = []
@@ -420,14 +527,16 @@ class FileExplorer(QWidget):
                         favorites.append((name, is_dir, full_path))
                     else:
                         non_favorites.append((name, is_dir, full_path))
-                
+
                 # 先添加收藏的资源包
                 for name, is_dir, full_path in favorites:
                     self._add_resourcepack_item(name, is_dir, full_path, is_favorited=True)
-                
+
                 # 再添加非收藏的资源包
                 for name, is_dir, full_path in non_favorites:
                     self._add_resourcepack_item(name, is_dir, full_path, is_favorited=False)
+
+                logger.info(f"Added {len(favorites) + len(non_favorites)} resourcepack items to tree")
             else:
                 # 非资源包模式，正常显示
                 for name, is_dir, full_path in items:
@@ -436,14 +545,17 @@ class FileExplorer(QWidget):
             # 在无滚动模式下，根据内容更新file_tree的高度
             if self.no_scroll:
                 item_count = self.file_tree.topLevelItemCount()
-                item_height = int(96 * self.dpi_scale)  # 单个项目的固定高度
+                item_height = int(90 * self.dpi_scale)  # 单个项目的固定高度（与下载页面一致）
                 total_height = item_count * item_height + int(8 * self.dpi_scale)  # 加上一些间距
                 self.file_tree.setFixedHeight(total_height)
 
         except PermissionError:
             self.file_tree.hide()
+            self.toolbar.hide()
         except Exception as e:
+            logger.error(f"Error loading directory: {e}", exc_info=True)
             self.file_tree.hide()
+            self.toolbar.hide()
     
     def _add_item(self, name, is_dir, full_path):
         """添加普通项目"""
@@ -460,15 +572,18 @@ class FileExplorer(QWidget):
             item.setData(0, Qt.ItemDataRole.UserRole, full_path)
     
     def _add_resourcepack_item(self, name, is_dir, full_path, is_favorited):
-        """添加资源包项目（带收藏按钮）"""
+        """添加资源包项目（带收藏按钮，使用卡片样式）"""
         item = QTreeWidgetItem()
         item.setData(0, Qt.ItemDataRole.UserRole, full_path)
         self.file_tree.addTopLevelItem(item)
 
-        # 显示pack.png图标
-        icon = self._get_resourcepack_icon(full_path, is_dir)
-        if icon:
-            item.setIcon(0, icon)
+        # 获取pack.png图标（用于卡片显示）
+        icon_pixmap = self._get_resourcepack_icon_pixmap(full_path, is_dir)
+
+        # 检查资源包是否可编辑
+        is_editable = self._is_resourcepack_editable(full_path, is_dir)
+
+        logger.debug(f"Adding resourcepack item: {name}, icon_pixmap: {icon_pixmap is not None}, is_editable: {is_editable}")
 
         # 创建自定义部件并设置为项目的部件
         def on_favorite_clicked():
@@ -478,13 +593,16 @@ class FileExplorer(QWidget):
             parent=self.file_tree,
             on_favorite_clicked=on_favorite_clicked,
             is_favorited=is_favorited,
-            dpi_scale=self.dpi_scale
+            dpi_scale=self.dpi_scale,
+            resourcepack_name=name,
+            icon=icon_pixmap,
+            is_editable=is_editable,
+            text_renderer=self.text_renderer
         )
-        widget.set_name(name)
-        
+
         # 存储部件引用
         self._item_widgets[full_path] = widget
-        
+
         # 设置项目部件
         self.file_tree.setItemWidget(item, 0, widget)
 
@@ -546,8 +664,14 @@ class FileExplorer(QWidget):
 
     def _get_resourcepack_icon(self, full_path, is_dir):
         """获取资源包图标（pack.png），图标大小适配卡片高度96px"""
+        pixmap = self._get_resourcepack_icon_pixmap(full_path, is_dir)
+        if pixmap:
+            return QIcon(pixmap)
+        return None
+
+    def _get_resourcepack_icon_pixmap(self, full_path, is_dir):
+        """获取资源包图标（pack.png）作为QPixmap，图标大小适配卡片高度90px"""
         try:
-            icon_path = None
             is_valid_pack = False  # 标记是否是有效的材质包
 
             # 检查是否有pack.mcmeta文件来判断是否是材质包
@@ -567,14 +691,14 @@ class FileExplorer(QWidget):
                 if os.path.exists(icon_path):
                     pixmap = QPixmap(icon_path)
                     if not pixmap.isNull():
-                        # 缩放图标以适配卡片高度（96px，留一些padding）
-                        icon_size = int(88 * self.dpi_scale)
+                        # 缩放图标以适配卡片高度（64px，与ResourcepackItemWidget一致）
+                        icon_size = int(64 * self.dpi_scale)
                         scaled_pixmap = pixmap.scaled(
                             icon_size, icon_size,
                             Qt.AspectRatioMode.KeepAspectRatio,
                             Qt.TransformationMode.SmoothTransformation
                         )
-                        return QIcon(scaled_pixmap)
+                        return scaled_pixmap
             elif full_path.endswith('.zip'):
                 # 压缩包形式的资源包
                 try:
@@ -587,14 +711,14 @@ class FileExplorer(QWidget):
                                 img_data = img_file.read()
                                 pixmap = QPixmap()
                                 if pixmap.loadFromData(img_data):
-                                    # 缩放图标以适配卡片高度（96px，留一些padding）
-                                    icon_size = int(88 * self.dpi_scale)
+                                    # 缩放图标以适配卡片高度（64px）
+                                    icon_size = int(64 * self.dpi_scale)
                                     scaled_pixmap = pixmap.scaled(
                                         icon_size, icon_size,
                                         Qt.AspectRatioMode.KeepAspectRatio,
                                         Qt.TransformationMode.SmoothTransformation
                                     )
-                                    return QIcon(scaled_pixmap)
+                                    return scaled_pixmap
                 except Exception:
                     pass
 
@@ -605,24 +729,24 @@ class FileExplorer(QWidget):
                 if os.path.exists(default_icon_path):
                     pixmap = QPixmap(default_icon_path)
                     if not pixmap.isNull():
-                        icon_size = int(88 * self.dpi_scale)
+                        icon_size = int(64 * self.dpi_scale)
                         scaled_pixmap = pixmap.scaled(
                             icon_size, icon_size,
                             Qt.AspectRatioMode.KeepAspectRatio,
                             Qt.TransformationMode.SmoothTransformation
                         )
-                        return QIcon(scaled_pixmap)
+                        return scaled_pixmap
             elif is_dir:
                 # 不是材质包的文件夹，使用folder2.svg
                 folder_icon = load_svg_icon("svg/folder2.svg", self.dpi_scale)
                 if folder_icon:
-                    icon_size = int(88 * self.dpi_scale)
+                    icon_size = int(64 * self.dpi_scale)
                     scaled_pixmap = folder_icon.scaled(
                         icon_size, icon_size,
                         Qt.AspectRatioMode.KeepAspectRatio,
                         Qt.TransformationMode.SmoothTransformation
                     )
-                    return QIcon(scaled_pixmap)
+                    return scaled_pixmap
 
             return None
         except Exception:
@@ -638,6 +762,50 @@ class FileExplorer(QWidget):
             return f"{size / (1024 * 1024):.1f} MB"
         else:
             return f"{size / (1024 * 1024 * 1024):.1f} GB"
+
+    def _is_valid_resourcepack(self, full_path, is_dir):
+        """检查文件/文件夹是否是有效的资源包（存在 pack.mcmeta）"""
+        try:
+            if is_dir:
+                # 文件夹形式的资源包
+                return os.path.exists(os.path.join(full_path, "pack.mcmeta"))
+            elif full_path.endswith('.zip'):
+                # 压缩包形式的资源包
+                try:
+                    with zipfile.ZipFile(full_path, 'r') as zip_ref:
+                        pack_mcmeta_files = [f for f in zip_ref.namelist() if f.lower().endswith('pack.mcmeta')]
+                        return len(pack_mcmeta_files) > 0
+                except Exception:
+                    pass
+            return False
+        except Exception:
+            return False
+
+    def _is_resourcepack_editable(self, full_path, is_dir):
+        """检查资源包是否可编辑（存在 pack.rst）"""
+        try:
+            # 首先检查是否是有效的材质包（存在pack.mcmeta）
+            is_valid_pack = self._is_valid_resourcepack(full_path, is_dir)
+
+            # 只有有效的材质包才检查是否可编辑
+            if not is_valid_pack:
+                return False
+
+            if is_dir:
+                # 文件夹形式的资源包，检查根目录是否有pack.rst
+                return os.path.exists(os.path.join(full_path, "pack.rst"))
+            elif full_path.endswith('.zip'):
+                # 压缩包形式的资源包，检查根目录是否有pack.rst
+                try:
+                    with zipfile.ZipFile(full_path, 'r') as zip_ref:
+                        # 查找根目录的pack.rst（不区分大小写）
+                        pack_rst_files = [f for f in zip_ref.namelist() if f.lower().endswith('pack.rst') and f.count('/') == 0]
+                        return len(pack_rst_files) > 0
+                except Exception:
+                    pass
+            return False
+        except Exception:
+            return False
     
     def update_font(self, font_family):
         """更新字体"""
