@@ -310,6 +310,10 @@ class FileExplorer(QWidget):
         self._filter_favorites_only = False  # 是否仅显示收藏的资源包
         self._sort_by = "name"  # 排序方式: name, size, time
         self._sort_order = "asc"  # 排序顺序: asc, desc
+        self._cached_resourcepacks = []  # 缓存的资源包数据: [(name, is_dir, full_path, icon_pixmap, description, file_size, modified_time, is_favorited, is_editable)]
+        self._cached_folders = []  # 缓存的文件夹数据: [(name, is_dir, full_path)]
+        self._cache_valid = False  # 缓存是否有效
+        self._search_timer = None  # 搜索防抖定时器
         self._init_ui()
 
     def translate(self, key, **kwargs):
@@ -446,10 +450,12 @@ class FileExplorer(QWidget):
         # 当前路径标签
         self.path_label = QLabel(self.translate("file_explorer_no_path"))
         self.path_label.setWordWrap(False)
+        self.path_label.setAlignment(Qt.AlignmentFlag.AlignVCenter)
         self.path_label.setStyleSheet(f"""
             QLabel {{
                 color: rgba(255, 255, 255, 0.7);
                 background: transparent;
+                border: none;
                 font-size: {int(13 * self.dpi_scale)}px;
             }}
         """)
@@ -484,6 +490,31 @@ class FileExplorer(QWidget):
 
         path_card_layout.addWidget(self.back_btn)
 
+        # 刷新按钮
+        self.refresh_btn = QPushButton()
+        self.refresh_btn.setFixedSize(int(36 * self.dpi_scale), int(32 * self.dpi_scale))
+        self.refresh_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: {int(6 * self.dpi_scale)}px;
+                padding: 0;
+            }}
+            QPushButton:hover {{
+                background: rgba(255, 255, 255, 0.2);
+            }}
+            QPushButton:pressed {{
+                background: rgba(255, 255, 255, 0.15);
+            }}
+        """)
+        self.refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.refresh_btn.clicked.connect(self._on_refresh_clicked)
+        # 设置刷新按钮图标
+        refresh_icon = load_svg_icon("svg/arrow-repeat.svg", self.dpi_scale)
+        if refresh_icon:
+            self.refresh_btn.setIcon(QIcon(scale_icon_for_display(refresh_icon, 16, self.dpi_scale)))
+        path_card_layout.addWidget(self.refresh_btn)
+
         # 在文件资源管理器中打开按钮
         self.open_explorer_btn = QPushButton()
         self.open_explorer_btn.setFixedSize(int(36 * self.dpi_scale), int(32 * self.dpi_scale))
@@ -511,20 +542,23 @@ class FileExplorer(QWidget):
 
         path_card_layout.addWidget(self.open_explorer_btn)
 
-        # 搜索框和筛选排序按钮容器（仅在有资源包时显示）
+        # 搜索框和筛选排序按钮（仅在有资源包时显示）
         self.search_container = QWidget()
+        self.search_container.setStyleSheet("background: transparent; border: none;")
         search_layout = QHBoxLayout(self.search_container)
         search_layout.setContentsMargins(0, 0, 0, 0)
         search_layout.setSpacing(int(8 * self.dpi_scale))
+        search_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         # 搜索输入框
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText(self.translate("resourcepack_search_placeholder"))
+        self.search_input.setFixedHeight(int(32 * self.dpi_scale))
         self.search_input.setStyleSheet(self.builder._get_lineedit_stylesheet() if hasattr(self, 'builder') else f"""
             QLineEdit {{
                 background: rgba(255, 255, 255, 0.1);
                 border: 1px solid rgba(255, 255, 255, 0.2);
-                border-radius: {int(6 * self.dpi_scale)}px;
+                border-radius: {int(16 * self.dpi_scale)}px;
                 padding: 0 {int(10 * self.dpi_scale)}px;
                 color: rgba(255, 255, 255, 0.9);
                 font-size: {int(12 * self.dpi_scale)}px;
@@ -532,6 +566,29 @@ class FileExplorer(QWidget):
             QLineEdit:focus {{
                 background: rgba(255, 255, 255, 0.15);
                 border: 1px solid rgba(100, 150, 255, 0.6);
+            }}
+            /* 隐藏清除按钮背景 */
+            QLineEdit * {{
+                background: transparent;
+                border: none;
+                border-radius: 0px;
+                margin: 0px;
+                padding: 0px;
+            }}
+            QToolButton {{
+                background: transparent;
+                border: none;
+                border-radius: 0px;
+                padding: 0px;
+                margin: 0px;
+            }}
+            QToolButton:hover {{
+                background: transparent;
+                border: none;
+            }}
+            QToolButton:pressed {{
+                background: transparent;
+                border: none;
             }}
         """)
         self.search_input.setClearButtonEnabled(True)
@@ -550,6 +607,9 @@ class FileExplorer(QWidget):
             }}
             QPushButton:hover {{
                 background: rgba(255, 255, 255, 0.2);
+            }}
+            QPushButton:pressed {{
+                background: rgba(255, 255, 255, 0.15);
             }}
         """)
         self.filter_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -574,6 +634,9 @@ class FileExplorer(QWidget):
             QPushButton:hover {{
                 background: rgba(255, 255, 255, 0.2);
             }}
+            QPushButton:pressed {{
+                background: rgba(255, 255, 255, 0.15);
+            }}
         """)
         self.sort_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.sort_btn.clicked.connect(self._show_sort_menu)
@@ -584,6 +647,7 @@ class FileExplorer(QWidget):
         if sort_icon:
             self.sort_btn.setIcon(QIcon(scale_icon_for_display(sort_icon, 16, self.dpi_scale)))
 
+        # 将搜索容器添加到路径卡片中
         path_card_layout.addWidget(self.search_container)
         self.search_container.hide()  # 初始隐藏，在资源包模式下显示
 
@@ -596,12 +660,29 @@ class FileExplorer(QWidget):
             }}
         """)
         main_card_layout = QVBoxLayout(self.main_card)
-        main_card_layout.setContentsMargins(0, 0, 0, 0)
+        main_card_layout.setContentsMargins(0, 0, int(8 * self.dpi_scale), int(8 * self.dpi_scale))
         main_card_layout.setSpacing(0)
+        main_card_layout.setAlignment(Qt.AlignmentFlag.AlignTop)  # 顶部对齐
 
         # 将路径卡片添加到主卡片中
         main_card_layout.addWidget(self.path_card)
-        
+
+        # 空标签（用于显示无内容或路径不存在的情况）
+        self.empty_label = QLabel()
+        self.empty_label.setStyleSheet(f"""
+            QLabel {{
+                color: rgba(255, 255, 255, 0.5);
+                background: transparent;
+                border: none;
+                padding: {int(8 * self.dpi_scale)}px {int(12 * self.dpi_scale)}px;
+                font-size: {int(12 * self.dpi_scale)}px;
+                text-align: center;
+            }}
+        """)
+        self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty_label.hide()
+        main_card_layout.addWidget(self.empty_label)
+
         # 文件树
         self.file_tree = QTreeWidget()
         self.file_tree.setHeaderHidden(True)  # 隐藏表头（包含名称和大小列）
@@ -667,14 +748,14 @@ class FileExplorer(QWidget):
             }}
             QScrollBar:vertical {{
                 background: rgba(255, 255, 255, 0.1);
-                width: 8px;
-                border-radius: 4px;
+                width: {int(10 * self.dpi_scale)}px;
+                border-radius: {int(5 * self.dpi_scale)}px;
                 margin: 0px;
             }}
             QScrollBar::handle:vertical {{
                 background: rgba(255, 255, 255, 0.3);
-                min-height: 20px;
-                border-radius: 4px;
+                min-height: {int(20 * self.dpi_scale)}px;
+                border-radius: {int(5 * self.dpi_scale)}px;
             }}
             QScrollBar::handle:vertical:hover {{
                 background: rgba(255, 255, 255, 0.5);
@@ -698,23 +779,6 @@ class FileExplorer(QWidget):
         main_card_layout.addWidget(self.file_tree, 1)
 
         layout.addWidget(self.main_card, 1)
-
-        # 空标签（用于显示无内容或路径不存在的情况）
-        self.empty_label = QLabel()
-        self.empty_label.setStyleSheet(f"""
-            QLabel {{
-                color: rgba(255, 255, 255, 0.5);
-                background: rgba(0, 0, 0, 0.2);
-                border: none;
-                border-radius: {int(4 * self.dpi_scale)}px;
-                padding: {int(20 * self.dpi_scale)}px;
-                font-size: {int(12 * self.dpi_scale)}px;
-                text-align: center;
-            }}
-        """)
-        self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.empty_label.hide()
-        layout.addWidget(self.empty_label)
     
     def set_minecraft_path(self, path):
         """设置Minecraft路径（根目录使用resourcepacks文件夹）"""
@@ -731,7 +795,7 @@ class FileExplorer(QWidget):
         if os.path.exists(self.current_path):
             self.path_card.show()
             self.file_tree.show()
-            self._load_directory(self.current_path)
+            self._load_directory(self.current_path, use_cache=False)
         else:
             self.path_card.hide()
             self.file_tree.hide()
@@ -770,7 +834,7 @@ class FileExplorer(QWidget):
             self.path_label.setText(display_path)
             self.back_btn.setEnabled(False)
             self.path_card.show()
-            self._load_directory(self.current_path)
+            self._load_directory(self.current_path, use_cache=False)
 
     def open_in_explorer(self):
         """在文件资源管理器中打开当前路径"""
@@ -791,6 +855,14 @@ class FileExplorer(QWidget):
         """关闭文件浏览器（发出关闭请求信号）"""
         self.close_requested.emit()
 
+    def _on_refresh_clicked(self):
+        """刷新当前目录"""
+        if self.current_path and os.path.exists(self.current_path):
+            # 清除缓存，强制重新加载
+            self._cache_valid = False
+            self._load_directory(self.current_path, use_cache=False)
+            logger.info(f"Refreshed directory: {self.current_path}")
+
     def navigate_to_directory(self, path):
         """导航到指定目录"""
         if not os.path.exists(path):
@@ -803,7 +875,7 @@ class FileExplorer(QWidget):
         self.back_btn.setEnabled(True)
         self.path_card.show()
         self.file_tree.show()
-        self._load_directory(path)
+        self._load_directory(path, use_cache=False)
 
     def set_resourcepacks_path(self, path, minecraft_path):
         """直接设置resourcepacks路径（用于多层级导航）"""
@@ -817,7 +889,7 @@ class FileExplorer(QWidget):
             self.back_btn.setEnabled(False)
             self.path_card.show()
             self.file_tree.show()
-            self._load_directory(self.current_path)
+            self._load_directory(self.current_path, use_cache=False)
         else:
             self.path_card.hide()
             self.file_tree.hide()
@@ -848,15 +920,29 @@ class FileExplorer(QWidget):
             self.back_btn.setEnabled(True)
             self.path_card.show()
             self.file_tree.show()
-            self._load_directory(resourcepacks_path)
+            self._load_directory(resourcepacks_path, use_cache=False)
         else:
             self.path_card.hide()
             self.file_tree.hide()
     
-    def _load_directory(self, path):
-        """加载目录内容"""
+    def _load_directory(self, path, use_cache=False):
+        """加载目录内容
+        
+        Args:
+            path: 目录路径
+            use_cache: 是否使用缓存的数据（用于搜索/筛选/排序时）
+        """
+        # 如果使用缓存且缓存有效，直接从缓存刷新显示
+        if use_cache and self._cache_valid and self.resourcepack_mode:
+            self._refresh_display_from_cache()
+            return
+        
+        # 不使用缓存或缓存失效，重新加载文件系统
         self.file_tree.clear()
         self._item_widgets = {}  # 清空项目部件缓存
+        self._cached_resourcepacks = []  # 清空资源包缓存
+        self._cached_folders = []  # 清空文件夹缓存
+        self._cache_valid = False  # 标记缓存无效
 
         self.file_tree.show()
 
@@ -919,71 +1005,11 @@ class FileExplorer(QWidget):
 
                 logger.info(f"Resourcepack mode: found {len(resourcepack_items)} valid resourcepacks and {len(non_resourcepack_dirs)} folders out of {len(items)} items")
 
-                # 应用搜索过滤（按名称）
-                if self._search_text:
-                    search_lower = self._search_text.lower()
-                    resourcepack_items = [(n, d, p) for n, d, p in resourcepack_items if search_lower in n.lower()]
-                    non_resourcepack_dirs = [(n, d, p) for n, d, p in non_resourcepack_dirs if search_lower in n.lower()]
+                # 缓存所有资源包数据（包括图标、描述等）
+                self._cache_resourcepack_data(resourcepack_items, non_resourcepack_dirs, favorited_resourcepacks)
 
-                # 获取收藏的资源包列表
-                favorited_resourcepacks = []
-                if self.config_manager:
-                    config = self.config_manager.config if hasattr(self.config_manager, 'config') else self.config_manager
-                    favorited_resourcepacks = config.get("favorited_resourcepacks", [])
-
-                # 分离收藏和非收藏的资源包
-                favorites = []
-                non_favorites = []
-                for name, is_dir, full_path in resourcepack_items:
-                    if full_path in favorited_resourcepacks:
-                        favorites.append((name, is_dir, full_path))
-                    else:
-                        non_favorites.append((name, is_dir, full_path))
-
-                # 应用筛选（仅显示收藏）
-                if self._filter_favorites_only:
-                    non_favorites = []
-
-                # 应用排序
-                def get_sort_key(item):
-                    name, is_dir, full_path = item
-                    if self._sort_by == "name":
-                        return name.lower()
-                    elif self._sort_by == "size":
-                        # 获取文件/文件夹大小
-                        if is_dir:
-                            return 0
-                        try:
-                            return os.path.getsize(full_path)
-                        except:
-                            return 0
-                    elif self._sort_by == "time":
-                        # 获取文件/文件夹修改时间
-                        try:
-                            return os.path.getmtime(full_path)
-                        except:
-                            return 0
-                    return item[0]
-
-                # 排序收藏和非收藏的资源包
-                reverse = (self._sort_order == "desc")
-                favorites.sort(key=get_sort_key, reverse=reverse)
-                non_favorites.sort(key=get_sort_key, reverse=reverse)
-
-                # 文件夹置顶显示（按名称排序）
-                non_resourcepack_dirs.sort(key=lambda x: x[0])
-                for name, is_dir, full_path in non_resourcepack_dirs:
-                    self._add_item(name, is_dir, full_path)
-
-                # 先添加收藏的资源包
-                for name, is_dir, full_path in favorites:
-                    self._add_resourcepack_item(name, is_dir, full_path, is_favorited=True)
-
-                # 再添加非收藏的资源包
-                for name, is_dir, full_path in non_favorites:
-                    self._add_resourcepack_item(name, is_dir, full_path, is_favorited=False)
-
-                logger.info(f"Added {len(non_resourcepack_dirs)} folder items and {len(favorites) + len(non_favorites)} resourcepack items to tree")
+                # 从缓存中刷新显示
+                self._refresh_display_from_cache()
             else:
                 # 非资源包模式，正常显示
                 self.search_container.hide()
@@ -1159,9 +1185,9 @@ class FileExplorer(QWidget):
             is_favorited = full_path in favorited_resourcepacks
             self._item_widgets[full_path].set_favorited(is_favorited)
         
-        # 重新加载目录以使收藏的资源包置顶
+        # 使用缓存刷新显示以使收藏的资源包置顶
         if self.current_path:
-            self._load_directory(self.current_path)
+            self._refresh_display_from_cache()
 
     def _edit_resourcepack(self, full_path, name):
         """编辑资源包"""
@@ -1169,11 +1195,226 @@ class FileExplorer(QWidget):
         # 这里可以添加编辑资源包的逻辑
         # 例如：打开编辑器、编辑packset.json等
 
+    def _cache_resourcepack_data(self, resourcepack_items, non_resourcepack_dirs, favorited_resourcepacks):
+        """缓存资源包和文件夹数据
+        
+        Args:
+            resourcepack_items: 资源包列表 [(name, is_dir, full_path)]
+            non_resourcepack_dirs: 非资源包文件夹列表 [(name, is_dir, full_path)]
+            favorited_resourcepacks: 收藏的资源包路径列表
+        """
+        self._cached_folders = list(non_resourcepack_dirs)  # 缓存文件夹
+        
+        # 缓存资源包数据（包括图标、描述等）
+        for name, is_dir, full_path in resourcepack_items:
+            # 获取pack.png图标（用于卡片显示）
+            icon_pixmap = self._get_resourcepack_icon_pixmap(full_path, is_dir)
+            
+            # 检查资源包是否可编辑
+            is_editable = self._is_resourcepack_editable(full_path, is_dir)
+            
+            # 获取资源包描述
+            description = self._get_resourcepack_description(full_path, is_dir)
+            
+            # 获取文件大小和修改时间
+            file_size = ""
+            modified_time = ""
+            try:
+                if is_dir:
+                    # 文件夹：显示"文件夹"文字
+                    file_size = "文件夹"
+                else:
+                    # 文件：显示文件大小
+                    size = os.path.getsize(full_path)
+                    file_size = self._format_size(size)
+                # 获取修改时间（文件夹和文件都显示）
+                mtime = os.path.getmtime(full_path)
+                import datetime
+                modified_time = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                pass
+            
+            # 检查是否收藏
+            is_favorited = full_path in favorited_resourcepacks
+            
+            # 缓存资源包数据
+            self._cached_resourcepacks.append((name, is_dir, full_path, icon_pixmap, description, file_size, modified_time, is_favorited, is_editable))
+        
+        self._cache_valid = True  # 标记缓存有效
+        logger.info(f"Cached {len(self._cached_resourcepacks)} resourcepacks and {len(self._cached_folders)} folders")
+
+    def _refresh_display_from_cache(self):
+        """从缓存中刷新显示（不重新读取文件系统）"""
+        self.file_tree.clear()
+        self._item_widgets = {}  # 清空项目部件缓存
+        
+        # 应用搜索过滤（按名称）
+        filtered_folders = self._cached_folders
+        filtered_resourcepacks = self._cached_resourcepacks
+        
+        if self._search_text:
+            search_lower = self._search_text.lower()
+            filtered_folders = [(n, d, p) for n, d, p in filtered_folders if search_lower in n.lower()]
+            filtered_resourcepacks = [(n, d, p, i, desc, fs, mt, fav, ed) for n, d, p, i, desc, fs, mt, fav, ed in filtered_resourcepacks if search_lower in n.lower()]
+        
+        # 获取最新的收藏状态
+        favorited_resourcepacks = []
+        if self.config_manager:
+            config = self.config_manager.config if hasattr(self.config_manager, 'config') else self.config_manager
+            favorited_resourcepacks = config.get("favorited_resourcepacks", [])
+        
+        # 分离收藏和非收藏的资源包
+        favorites = []
+        non_favorites = []
+        for item in filtered_resourcepacks:
+            name, is_dir, full_path, icon_pixmap, description, file_size, modified_time, is_favorited, is_editable = item
+            # 更新收藏状态
+            is_favorited = full_path in favorited_resourcepacks
+            if is_favorited:
+                favorites.append((name, is_dir, full_path, icon_pixmap, description, file_size, modified_time, is_favorited, is_editable))
+            else:
+                non_favorites.append((name, is_dir, full_path, icon_pixmap, description, file_size, modified_time, is_favorited, is_editable))
+        
+        # 应用筛选（仅显示收藏）
+        if self._filter_favorites_only:
+            non_favorites = []
+        
+        # 应用排序
+        def get_sort_key(item):
+            name, is_dir, full_path, icon_pixmap, description, file_size, modified_time, is_favorited, is_editable = item
+            if self._sort_by == "name":
+                return name.lower()
+            elif self._sort_by == "size":
+                # 从缓存的 file_size 解析大小
+                if is_dir:
+                    return 0
+                try:
+                    # 解析文件大小字符串
+                    size_str = file_size.replace(" B", "").replace(" KB", "").replace(" MB", "").replace(" GB", "").strip()
+                    size = float(size_str)
+                    if "KB" in file_size:
+                        size *= 1024
+                    elif "MB" in file_size:
+                        size *= 1024 * 1024
+                    elif "GB" in file_size:
+                        size *= 1024 * 1024 * 1024
+                    return int(size)
+                except:
+                    return 0
+            elif self._sort_by == "time":
+                # 解析修改时间
+                try:
+                    import datetime
+                    dt = datetime.datetime.strptime(modified_time, "%Y-%m-%d %H:%M")
+                    return dt.timestamp()
+                except:
+                    return 0
+            return item[0]
+        
+        # 排序收藏和非收藏的资源包
+        reverse = (self._sort_order == "desc")
+        favorites.sort(key=get_sort_key, reverse=reverse)
+        non_favorites.sort(key=get_sort_key, reverse=reverse)
+        
+        # 文件夹置顶显示（按名称排序）
+        filtered_folders.sort(key=lambda x: x[0])
+        
+        # 添加文件夹
+        for name, is_dir, full_path in filtered_folders:
+            self._add_item(name, is_dir, full_path)
+        
+        # 先添加收藏的资源包
+        for name, is_dir, full_path, icon_pixmap, description, file_size, modified_time, is_favorited, is_editable in favorites:
+            self._add_resourcepack_item_from_cache(name, is_dir, full_path, is_favorited, icon_pixmap, description, file_size, modified_time, is_editable)
+        
+        # 再添加非收藏的资源包
+        for name, is_dir, full_path, icon_pixmap, description, file_size, modified_time, is_favorited, is_editable in non_favorites:
+            self._add_resourcepack_item_from_cache(name, is_dir, full_path, is_favorited, icon_pixmap, description, file_size, modified_time, is_editable)
+        
+        # 检查当前路径是否为版本隔离的子路径
+        is_version_subpath = self.base_path and self.current_path != self.base_path and "versions" in self.current_path
+        
+        # 如果没有内容，显示空标签并隐藏 file_tree
+        if self.file_tree.topLevelItemCount() == 0:
+            self.file_tree.hide()
+            self.empty_label.setText(self.translate("file_explorer_empty"))
+            self.empty_label.show()
+        else:
+            self.empty_label.hide()
+            self.file_tree.show()
+        
+        # 在无滚动模式下，根据内容更新file_tree的高度
+        if self.no_scroll:
+            # 主路径：使用最小高度，允许内容超出时父级容器滚动
+            # 计算实际内容高度
+            item_count = self.file_tree.topLevelItemCount()
+            # ResourcepackItemWidget 的高度是 80 * dpi_scale
+            # 每个项目的总高度 = widget高度(80) + padding(8+8) + border-bottom(1)
+            item_height = int(80 * self.dpi_scale) + int(16 * self.dpi_scale) + 1
+            total_height = max(1, item_count * item_height)  # 至少为1
+            self.file_tree.setMinimumHeight(total_height)
+            self.file_tree.setMaximumHeight(total_height)
+    
+    def _add_resourcepack_item_from_cache(self, name, is_dir, full_path, is_favorited, icon_pixmap, description, file_size, modified_time, is_editable):
+        """从缓存添加资源包项目（带收藏按钮，使用卡片样式）"""
+        item = QTreeWidgetItem()
+        item.setData(0, Qt.ItemDataRole.UserRole, full_path)
+        self.file_tree.addTopLevelItem(item)
+        
+        logger.debug(f"Adding resourcepack item from cache: {name}, icon_pixmap: {icon_pixmap is not None}, is_editable: {is_editable}")
+        
+        # 创建自定义部件并设置为项目的部件
+        def on_favorite_clicked():
+            self._toggle_favorite_resourcepack(full_path, name)
+        
+        def on_edit_clicked():
+            self._edit_resourcepack(full_path, name)
+        
+        widget = ResourcepackItemWidget(
+            parent=self.file_tree,
+            on_favorite_clicked=on_favorite_clicked,
+            on_edit_clicked=on_edit_clicked,
+            is_favorited=is_favorited,
+            dpi_scale=self.dpi_scale,
+            resourcepack_name=name,
+            icon=icon_pixmap,
+            is_editable=is_editable,
+            text_renderer=self.text_renderer,
+            description=description,
+            file_size=file_size,
+            modified_time=modified_time
+        )
+        
+        # 存储部件引用
+        self._item_widgets[full_path] = widget
+        
+        # 设置项目部件
+        self.file_tree.setItemWidget(item, 0, widget)
+        
+        if is_dir:
+            # 添加占位子项
+            QTreeWidgetItem(item).setText(0, "...")
+
     def _on_search_changed(self, text):
-        """搜索框内容变化时触发"""
+        """搜索框内容变化时触发（使用防抖优化性能）"""
         self._search_text = text.strip()
+        
+        # 如果已有定时器，先停止它
+        if self._search_timer is not None:
+            self._search_timer.stop()
+        
+        # 创建防抖定时器（300ms 延迟）
+        from PyQt6.QtCore import QTimer
+        self._search_timer = QTimer()
+        self._search_timer.setSingleShot(True)
+        self._search_timer.timeout.connect(self._perform_search)
+        self._search_timer.start(300)  # 300ms 防抖延迟
+    
+    def _perform_search(self):
+        """执行实际的搜索操作"""
         if self.current_path:
-            self._load_directory(self.current_path)
+            # 使用缓存的资源包数据，不重新加载文件系统
+            self._refresh_display_from_cache()
 
     def _toggle_filter_favorites(self):
         """切换筛选（仅显示收藏）"""
@@ -1204,7 +1445,8 @@ class FileExplorer(QWidget):
                 }}
             """)
         if self.current_path:
-            self._load_directory(self.current_path)
+            # 使用缓存刷新显示
+            self._refresh_display_from_cache()
 
     def _show_sort_menu(self):
         """显示排序菜单"""
@@ -1252,13 +1494,15 @@ class FileExplorer(QWidget):
         """排序方式选择"""
         self._sort_by = sort_type
         if self.current_path:
-            self._load_directory(self.current_path)
+            # 使用缓存刷新显示
+            self._refresh_display_from_cache()
 
     def _on_sort_order_selected(self, order_type):
         """排序顺序选择"""
         self._sort_order = order_type
         if self.current_path:
-            self._load_directory(self.current_path)
+            # 使用缓存刷新显示
+            self._refresh_display_from_cache()
 
     def on_item_double_clicked(self, item, column):
         """双击项目事件"""
