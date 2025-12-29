@@ -785,6 +785,19 @@ class Window(QWidget):
         # 重新加载实例页面
         self.ui_builder._refresh_instance_page()
 
+        # 更新下载页面的版本选择框显示状态
+        if hasattr(self, 'download_version_combo'):
+            self.download_version_combo.setVisible(checked)
+            # 如果关闭版本隔离，清空版本列表；如果开启，重新加载版本列表
+            if checked:
+                self.ui_builder.downloads_page_builder._load_versions_to_download_combo()
+            else:
+                self.download_version_combo.clear()
+
+        # 如果版本隔离被关闭，关闭所有打开的版本资源包页面
+        if not checked and hasattr(self, 'instance_stack'):
+            self.ui_builder.instances_page_builder._close_all_version_pages()
+
     def change_language(self, index):
         """切换语言"""
         languages = self.language_manager.get_all_languages()

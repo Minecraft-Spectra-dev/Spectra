@@ -602,6 +602,19 @@ class InstancesPageBuilder:
         self.builder.window.instance_stack.removeWidget(widget_to_remove)
         widget_to_remove.deleteLater()
 
+    def _close_all_version_pages(self):
+        """关闭所有版本资源包页面，返回到主页面"""
+        count = self.builder.window.instance_stack.count()
+        # 只保留第一页（主页面），删除所有其他页面
+        while count > 1:
+            widget_to_remove = self.builder.window.instance_stack.widget(1)
+            if widget_to_remove:
+                self.builder.window.instance_stack.removeWidget(widget_to_remove)
+                widget_to_remove.deleteLater()
+            count = self.builder.window.instance_stack.count()
+        # 确保返回到主页面
+        self.builder.window.instance_stack.setCurrentIndex(0)
+
     def _detect_version_type(self, minecraft_path, version_name):
         """检测Minecraft版本类型（fabric/forge/neoforge/vanilla）"""
         try:
