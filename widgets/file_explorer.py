@@ -185,17 +185,7 @@ class ResourcepackItemWidget(QWidget):
         # 保存编辑按钮引用
         self.edit_btn = edit_btn
 
-        # 添加编辑按钮到收藏按钮左侧
-        layout.addWidget(edit_btn, 0, 2, 1, 1, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
-
-        # 添加元数据到第0行，跨越第2-3列（在按钮右侧）
-        metadata_wrapper = QWidget()
-        metadata_wrapper.setLayout(metadata_layout)
-        metadata_wrapper.setFixedHeight(int(20 * dpi_scale))  # 限制高度避免挤压
-        metadata_wrapper.setStyleSheet("background: transparent;")  # 去除背景
-        layout.addWidget(metadata_wrapper, 0, 2, 1, 2, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom)
-
-        # 收藏按钮（放在右上角，第0行第3列）
+        # 收藏按钮（放在编辑按钮旁边）
         bookmark_btn = QPushButton()
         bookmark_btn.setFixedSize(int(28 * dpi_scale), int(28 * dpi_scale))
         bookmark_btn.setStyleSheet(f"""
@@ -226,8 +216,26 @@ class ResourcepackItemWidget(QWidget):
         # 保存按钮引用
         self.bookmark_btn = bookmark_btn
 
-        # 添加收藏按钮到右上角（第3列）
-        layout.addWidget(bookmark_btn, 0, 3, 1, 1, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+        # 按钮容器（将编辑和收藏按钮放在一起）
+        buttons_layout = QHBoxLayout()
+        buttons_layout.setContentsMargins(0, 0, 0, 0)
+        buttons_layout.setSpacing(int(4 * dpi_scale))  # 按钮之间的小间距
+        buttons_layout.addWidget(edit_btn)
+        buttons_layout.addWidget(bookmark_btn)
+
+        buttons_wrapper = QWidget()
+        buttons_wrapper.setLayout(buttons_layout)
+        buttons_wrapper.setStyleSheet("background: transparent;")
+
+        # 添加按钮容器到右上角
+        layout.addWidget(buttons_wrapper, 0, 2, 1, 2, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+
+        # 添加元数据到第0行，跨越第2-3列（在按钮下方）
+        metadata_wrapper = QWidget()
+        metadata_wrapper.setLayout(metadata_layout)
+        metadata_wrapper.setFixedHeight(int(20 * dpi_scale))  # 限制高度避免挤压
+        metadata_wrapper.setStyleSheet("background: transparent;")  # 去除背景
+        layout.addWidget(metadata_wrapper, 0, 2, 1, 2, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom)
 
     def enterEvent(self, event):
         """鼠标进入事件"""
