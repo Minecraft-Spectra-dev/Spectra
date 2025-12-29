@@ -6,7 +6,7 @@ import zipfile
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QEvent
 from PyQt6.QtGui import QFont, QIcon, QPixmap, QWheelEvent
 from PyQt6.QtWidgets import (QFileDialog, QGridLayout, QHBoxLayout, QHeaderView, QLabel,
-                             QPushButton, QTreeWidget, QTreeWidgetItem,
+                             QLineEdit, QPushButton, QTreeWidget, QTreeWidgetItem,
                              QVBoxLayout, QWidget)
 from utils import load_svg_icon, scale_icon_for_display
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class ResourcepackItemWidget(QWidget):
     """资源包项目部件，支持收藏按钮，使用卡片样式（类似下载页面）"""
 
-    def __init__(self, parent=None, on_favorite_clicked=None, on_edit_clicked=None, is_favorited=False, dpi_scale=1.0, resourcepack_name="", icon=None, is_editable=False, text_renderer=None, description=""):
+    def __init__(self, parent=None, on_favorite_clicked=None, on_edit_clicked=None, is_favorited=False, dpi_scale=1.0, resourcepack_name="", icon=None, is_editable=False, text_renderer=None, description="", file_size="", modified_time=""):
         super().__init__(parent)
         self.dpi_scale = dpi_scale
         self.on_favorite_clicked = on_favorite_clicked
@@ -27,6 +27,8 @@ class ResourcepackItemWidget(QWidget):
         self.is_editable = is_editable
         self.text_renderer = text_renderer
         self.description = description
+        self.file_size = file_size
+        self.modified_time = modified_time
 
         # 设置固定高度为80px
         self.setFixedHeight(int(80 * dpi_scale))
@@ -116,6 +118,34 @@ class ResourcepackItemWidget(QWidget):
             description_label.setWordWrap(True)  # 允许换行
             description_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
             info_layout.addWidget(description_label)
+
+        # 文件大小和修改时间（横向布局）
+        metadata_layout = QHBoxLayout()
+        metadata_layout.setContentsMargins(0, 0, 0, 0)
+        metadata_layout.setSpacing(int(8 * dpi_scale))
+
+        if file_size:
+            size_label = QLabel(file_size)
+            size_font = QFont()
+            size_font.setFamily("Microsoft YaHei UI")
+            size_font.setWeight(QFont.Weight.Normal)
+            size_font.setPointSize(int(7 * dpi_scale))
+            size_label.setFont(size_font)
+            size_label.setStyleSheet("color: rgba(255, 255, 255, 0.5); background: transparent;")
+            metadata_layout.addWidget(size_label)
+
+        if modified_time:
+            time_label = QLabel(modified_time)
+            time_font = QFont()
+            time_font.setFamily("Microsoft YaHei UI")
+            time_font.setWeight(QFont.Weight.Normal)
+            time_font.setPointSize(int(7 * dpi_scale))
+            time_label.setFont(time_font)
+            time_label.setStyleSheet("color: rgba(255, 255, 255, 0.5); background: transparent;")
+            metadata_layout.addWidget(time_label)
+
+        metadata_layout.addStretch()
+        info_layout.addLayout(metadata_layout)
 
         # 添加信息区域到第0行第1列，占据多列，左上对齐
         layout.addLayout(info_layout, 0, 1, 1, 1, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
@@ -269,6 +299,10 @@ class FileExplorer(QWidget):
         self.base_path = None  # 保存当前resourcepacks路径作为返回的根目录
         self.resourcepack_mode = False  # 是否为资源包浏览模式
         self._item_widgets = {}  # 存储资源包项目部件：{full_path: widget}
+        self._search_text = ""  # 搜索文本
+        self._filter_favorites_only = False  # 是否仅显示收藏的资源包
+        self._sort_by = "name"  # 排序方式: name, size, time
+        self._sort_order = "asc"  # 排序顺序: asc, desc
         self._init_ui()
 
     def translate(self, key, **kwargs):
@@ -469,6 +503,82 @@ class FileExplorer(QWidget):
             self.open_explorer_btn.setIcon(QIcon(scale_icon_for_display(explorer_icon, 16, self.dpi_scale)))
 
         path_card_layout.addWidget(self.open_explorer_btn)
+
+        # 搜索框和筛选排序按钮容器（仅在有资源包时显示）
+        self.search_container = QWidget()
+        search_layout = QHBoxLayout(self.search_container)
+        search_layout.setContentsMargins(0, 0, 0, 0)
+        search_layout.setSpacing(int(8 * self.dpi_scale))
+
+        # 搜索输入框
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText(self.translate("resourcepack_search_placeholder"))
+        self.search_input.setStyleSheet(self.builder._get_lineedit_stylesheet() if hasattr(self, 'builder') else f"""
+            QLineEdit {{
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: {int(6 * self.dpi_scale)}px;
+                padding: 0 {int(10 * self.dpi_scale)}px;
+                color: rgba(255, 255, 255, 0.9);
+                font-size: {int(12 * self.dpi_scale)}px;
+            }}
+            QLineEdit:focus {{
+                background: rgba(255, 255, 255, 0.15);
+                border: 1px solid rgba(100, 150, 255, 0.6);
+            }}
+        """)
+        self.search_input.setClearButtonEnabled(True)
+        self.search_input.textChanged.connect(self._on_search_changed)
+        search_layout.addWidget(self.search_input, 1)
+
+        # 筛选按钮（仅收藏）
+        self.filter_btn = QPushButton()
+        self.filter_btn.setFixedSize(int(32 * self.dpi_scale), int(32 * self.dpi_scale))
+        self.filter_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: {int(6 * self.dpi_scale)}px;
+                padding: 0;
+            }}
+            QPushButton:hover {{
+                background: rgba(255, 255, 255, 0.2);
+            }}
+        """)
+        self.filter_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.filter_btn.clicked.connect(self._toggle_filter_favorites)
+        search_layout.addWidget(self.filter_btn)
+
+        # 设置筛选按钮图标
+        filter_icon = load_svg_icon("svg/funnel.svg", self.dpi_scale)
+        if filter_icon:
+            self.filter_btn.setIcon(QIcon(scale_icon_for_display(filter_icon, 16, self.dpi_scale)))
+
+        # 排序按钮
+        self.sort_btn = QPushButton()
+        self.sort_btn.setFixedSize(int(32 * self.dpi_scale), int(32 * self.dpi_scale))
+        self.sort_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: {int(6 * self.dpi_scale)}px;
+                padding: 0;
+            }}
+            QPushButton:hover {{
+                background: rgba(255, 255, 255, 0.2);
+            }}
+        """)
+        self.sort_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sort_btn.clicked.connect(self._show_sort_menu)
+        search_layout.addWidget(self.sort_btn)
+
+        # 设置排序按钮图标
+        sort_icon = load_svg_icon("svg/sort-down.svg", self.dpi_scale)
+        if sort_icon:
+            self.sort_btn.setIcon(QIcon(scale_icon_for_display(sort_icon, 16, self.dpi_scale)))
+
+        path_card_layout.addWidget(self.search_container)
+        self.search_container.hide()  # 初始隐藏，在资源包模式下显示
 
         # 大卡片容器（包含路径栏和资源包列表）
         self.main_card = QWidget()
@@ -781,6 +891,9 @@ class FileExplorer(QWidget):
 
             # 在资源包模式下，显示文件夹和有效的资源包
             if self.resourcepack_mode:
+                # 显示搜索、筛选和排序控件
+                self.search_container.show()
+
                 resourcepack_items = []
                 non_resourcepack_dirs = []
 
@@ -799,6 +912,18 @@ class FileExplorer(QWidget):
 
                 logger.info(f"Resourcepack mode: found {len(resourcepack_items)} valid resourcepacks and {len(non_resourcepack_dirs)} folders out of {len(items)} items")
 
+                # 应用搜索过滤（按名称）
+                if self._search_text:
+                    search_lower = self._search_text.lower()
+                    resourcepack_items = [(n, d, p) for n, d, p in resourcepack_items if search_lower in n.lower()]
+                    non_resourcepack_dirs = [(n, d, p) for n, d, p in non_resourcepack_dirs if search_lower in n.lower()]
+
+                # 获取收藏的资源包列表
+                favorited_resourcepacks = []
+                if self.config_manager:
+                    config = self.config_manager.config if hasattr(self.config_manager, 'config') else self.config_manager
+                    favorited_resourcepacks = config.get("favorited_resourcepacks", [])
+
                 # 分离收藏和非收藏的资源包
                 favorites = []
                 non_favorites = []
@@ -807,6 +932,36 @@ class FileExplorer(QWidget):
                         favorites.append((name, is_dir, full_path))
                     else:
                         non_favorites.append((name, is_dir, full_path))
+
+                # 应用筛选（仅显示收藏）
+                if self._filter_favorites_only:
+                    non_favorites = []
+
+                # 应用排序
+                def get_sort_key(item):
+                    name, is_dir, full_path = item
+                    if self._sort_by == "name":
+                        return name.lower()
+                    elif self._sort_by == "size":
+                        # 获取文件/文件夹大小
+                        if is_dir:
+                            return 0
+                        try:
+                            return os.path.getsize(full_path)
+                        except:
+                            return 0
+                    elif self._sort_by == "time":
+                        # 获取文件/文件夹修改时间
+                        try:
+                            return os.path.getmtime(full_path)
+                        except:
+                            return 0
+                    return item[0]
+
+                # 排序收藏和非收藏的资源包
+                reverse = (self._sort_order == "desc")
+                favorites.sort(key=get_sort_key, reverse=reverse)
+                non_favorites.sort(key=get_sort_key, reverse=reverse)
 
                 # 文件夹置顶显示（按名称排序）
                 non_resourcepack_dirs.sort(key=lambda x: x[0])
@@ -824,6 +979,7 @@ class FileExplorer(QWidget):
                 logger.info(f"Added {len(non_resourcepack_dirs)} folder items and {len(favorites) + len(non_favorites)} resourcepack items to tree")
             else:
                 # 非资源包模式，正常显示
+                self.search_container.hide()
                 for name, is_dir, full_path in items:
                     self._add_item(name, is_dir, full_path)
 
@@ -911,6 +1067,19 @@ class FileExplorer(QWidget):
         # 获取资源包描述
         description = self._get_resourcepack_description(full_path, is_dir)
 
+        # 获取文件大小和修改时间
+        file_size = ""
+        modified_time = ""
+        try:
+            if not is_dir:
+                size = os.path.getsize(full_path)
+                file_size = self._format_size(size)
+            mtime = os.path.getmtime(full_path)
+            import datetime
+            modified_time = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            pass
+
         logger.debug(f"Adding resourcepack item: {name}, icon_pixmap: {icon_pixmap is not None}, is_editable: {is_editable}")
 
         # 创建自定义部件并设置为项目的部件
@@ -930,7 +1099,9 @@ class FileExplorer(QWidget):
             icon=icon_pixmap,
             is_editable=is_editable,
             text_renderer=self.text_renderer,
-            description=description
+            description=description,
+            file_size=file_size,
+            modified_time=modified_time
         )
 
         # 存储部件引用
@@ -983,6 +1154,97 @@ class FileExplorer(QWidget):
         logger.info(f"Edit resourcepack: {name}")
         # 这里可以添加编辑资源包的逻辑
         # 例如：打开编辑器、编辑packrst.json等
+
+    def _on_search_changed(self, text):
+        """搜索框内容变化时触发"""
+        self._search_text = text.strip()
+        if self.current_path:
+            self._load_directory(self.current_path)
+
+    def _toggle_filter_favorites(self):
+        """切换筛选（仅显示收藏）"""
+        self._filter_favorites_only = not self._filter_favorites_only
+        # 更新筛选按钮样式
+        if self._filter_favorites_only:
+            self.filter_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: rgba(100, 150, 255, 0.6);
+                    border: 1px solid rgba(100, 150, 255, 0.8);
+                    border-radius: {int(6 * self.dpi_scale)}px;
+                    padding: 0;
+                }}
+                QPushButton:hover {{
+                    background: rgba(100, 150, 255, 0.8);
+                }}
+            """)
+        else:
+            self.filter_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: rgba(255, 255, 255, 0.1);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    border-radius: {int(6 * self.dpi_scale)}px;
+                    padding: 0;
+                }}
+                QPushButton:hover {{
+                    background: rgba(255, 255, 255, 0.2);
+                }}
+            """)
+        if self.current_path:
+            self._load_directory(self.current_path)
+
+    def _show_sort_menu(self):
+        """显示排序菜单"""
+        from PyQt6.QtWidgets import QMenu
+        menu = QMenu(self)
+
+        # 创建排序方式子菜单
+        sort_by_menu = menu.addMenu(self.translate("resourcepack_sort_name"))
+
+        # 排序选项
+        sort_options = [
+            ("name", self.translate("resourcepack_sort_name")),
+            ("size", self.translate("resourcepack_sort_size")),
+            ("time", self.translate("resourcepack_sort_time")),
+        ]
+
+        for sort_type, text in sort_options:
+            action = sort_by_menu.addAction(text)
+            if sort_type == self._sort_by:
+                action.setCheckable(True)
+                action.setChecked(True)
+            action.triggered.connect(lambda checked, st=sort_type: self._on_sort_by_selected(st))
+
+        # 创建排序顺序子菜单
+        sort_order_menu = menu.addMenu(self.translate("resourcepack_sort_asc"))
+
+        order_options = [
+            ("asc", self.translate("resourcepack_sort_asc")),
+            ("desc", self.translate("resourcepack_sort_desc")),
+        ]
+
+        for order_type, text in order_options:
+            action = sort_order_menu.addAction(text)
+            if order_type == self._sort_order:
+                action.setCheckable(True)
+                action.setChecked(True)
+            action.triggered.connect(lambda checked, ot=order_type: self._on_sort_order_selected(ot))
+
+        # 在排序按钮下方显示菜单
+        button = self.sort_btn
+        global_pos = button.mapToGlobal(button.rect().bottomLeft())
+        menu.exec(global_pos)
+
+    def _on_sort_by_selected(self, sort_type):
+        """排序方式选择"""
+        self._sort_by = sort_type
+        if self.current_path:
+            self._load_directory(self.current_path)
+
+    def _on_sort_order_selected(self, order_type):
+        """排序顺序选择"""
+        self._sort_order = order_type
+        if self.current_path:
+            self._load_directory(self.current_path)
 
     def on_item_double_clicked(self, item, column):
         """双击项目事件"""

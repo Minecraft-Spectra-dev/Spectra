@@ -100,6 +100,14 @@
     "download_error_no_url": "No download URL available",
     "download_error_hash_mismatch": "Downloaded file hash mismatch",
     "download_progress_label": "Downloading: {filename}",
-    "download_progress_info": "{downloaded:.1f}MB / {total:.1f}MB ({percentage:.1f}%)"
+    "download_progress_info": "{downloaded:.1f}MB / {total:.1f}MB ({percentage:.1f}%)",
+    "resourcepack_search_placeholder": "Search resource packs...",
+    "resourcepack_filter_all": "All",
+    "resourcepack_filter_favorites": "Favorites Only",
+    "resourcepack_sort_name": "By Name",
+    "resourcepack_sort_size": "By Size",
+    "resourcepack_sort_time": "By Modified Time",
+    "resourcepack_sort_asc": "Ascending",
+    "resourcepack_sort_desc": "Descending"
   }
 }
