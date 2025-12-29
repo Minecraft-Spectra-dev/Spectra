@@ -38,7 +38,7 @@ class ResourcepackItemWidget(QWidget):
         layout = QGridLayout(self)
         layout.setContentsMargins(int(12 * dpi_scale), int(6 * dpi_scale), int(12 * dpi_scale), int(6 * dpi_scale))
         layout.setHorizontalSpacing(int(12 * dpi_scale))  # 水平间距，图标和文字之间的间距
-        layout.setVerticalSpacing(0)  # 垂直间距为0
+        layout.setVerticalSpacing(int(4 * dpi_scale))  # 垂直间距
         layout.setColumnStretch(0, 0)  # 第0列（图标）不拉伸
         layout.setColumnStretch(1, 1)  # 第1列（文字）占据剩余空间
         layout.setColumnStretch(2, 0)  # 第2列（编辑按钮）不拉伸
@@ -119,10 +119,12 @@ class ResourcepackItemWidget(QWidget):
             description_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
             info_layout.addWidget(description_label)
 
-        # 文件大小和修改时间（横向布局）
+        # 文件大小和修改时间（横向布局，右对齐）
         metadata_layout = QHBoxLayout()
         metadata_layout.setContentsMargins(0, 0, 0, 0)
         metadata_layout.setSpacing(int(8 * dpi_scale))
+
+        metadata_layout.addStretch()
 
         if file_size:
             size_label = QLabel(file_size)
@@ -143,9 +145,6 @@ class ResourcepackItemWidget(QWidget):
             time_label.setFont(time_font)
             time_label.setStyleSheet("color: rgba(255, 255, 255, 0.5); background: transparent;")
             metadata_layout.addWidget(time_label)
-
-        metadata_layout.addStretch()
-        info_layout.addLayout(metadata_layout)
 
         # 添加信息区域到第0行第1列，占据多列，左上对齐
         layout.addLayout(info_layout, 0, 1, 1, 1, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
@@ -188,6 +187,13 @@ class ResourcepackItemWidget(QWidget):
 
         # 添加编辑按钮到收藏按钮左侧
         layout.addWidget(edit_btn, 0, 2, 1, 1, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+
+        # 添加元数据到第0行，跨越第2-3列（在按钮右侧）
+        metadata_wrapper = QWidget()
+        metadata_wrapper.setLayout(metadata_layout)
+        metadata_wrapper.setFixedHeight(int(20 * dpi_scale))  # 限制高度避免挤压
+        metadata_wrapper.setStyleSheet("background: transparent;")  # 去除背景
+        layout.addWidget(metadata_wrapper, 0, 2, 1, 2, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom)
 
         # 收藏按钮（放在右上角，第0行第3列）
         bookmark_btn = QPushButton()
@@ -1038,7 +1044,9 @@ class FileExplorer(QWidget):
                 icon=icon_pixmap,
                 is_editable=False,
                 text_renderer=self.text_renderer,
-                description=""
+                description="",
+                file_size="文件夹",
+                modified_time=""
             )
 
             # 设置项目部件
@@ -1072,9 +1080,14 @@ class FileExplorer(QWidget):
         file_size = ""
         modified_time = ""
         try:
-            if not is_dir:
+            if is_dir:
+                # 文件夹：显示"文件夹"文字
+                file_size = "文件夹"
+            else:
+                # 文件：显示文件大小
                 size = os.path.getsize(full_path)
                 file_size = self._format_size(size)
+            # 获取修改时间（文件夹和文件都显示）
             mtime = os.path.getmtime(full_path)
             import datetime
             modified_time = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
