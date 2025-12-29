@@ -179,8 +179,9 @@ class ResourcepackItemWidget(QWidget):
         if not self.is_editable:
             edit_btn.hide()
 
-        # 初始隐藏编辑按钮（鼠标进入时显示）
-        edit_btn.hide()
+        # 初始隐藏编辑按钮（鼠标进入时显示）- 仅对可编辑的资源包生效
+        if self.is_editable:
+            edit_btn.hide()
 
         # 保存编辑按钮引用
         self.edit_btn = edit_btn
@@ -1153,7 +1154,7 @@ class FileExplorer(QWidget):
         """编辑资源包"""
         logger.info(f"Edit resourcepack: {name}")
         # 这里可以添加编辑资源包的逻辑
-        # 例如：打开编辑器、编辑packrst.json等
+        # 例如：打开编辑器、编辑packset.json等
 
     def _on_search_changed(self, text):
         """搜索框内容变化时触发"""
@@ -1384,7 +1385,7 @@ class FileExplorer(QWidget):
             return False
 
     def _is_resourcepack_editable(self, full_path, is_dir):
-        """检查资源包是否可编辑（存在 packrst.json）"""
+        """检查资源包是否可编辑（存在 packset.json）"""
         try:
             # 首先检查是否是有效的材质包（存在pack.mcmeta）
             is_valid_pack = self._is_valid_resourcepack(full_path, is_dir)
@@ -1394,14 +1395,14 @@ class FileExplorer(QWidget):
                 return False
 
             if is_dir:
-                # 文件夹形式的资源包，检查根目录是否有packrst.json
-                return os.path.exists(os.path.join(full_path, "packrst.json"))
+                # 文件夹形式的资源包，检查根目录是否有packset.json
+                return os.path.exists(os.path.join(full_path, "packset.json"))
             elif full_path.endswith('.zip'):
-                # 压缩包形式的资源包，检查根目录是否有packrst.json
+                # 压缩包形式的资源包，检查根目录是否有packset.json
                 try:
                     with zipfile.ZipFile(full_path, 'r') as zip_ref:
-                        # 查找根目录的packrst.json（不区分大小写）
-                        pack_rst_files = [f for f in zip_ref.namelist() if f.lower().endswith('packrst.json') and f.count('/') == 0]
+                        # 查找根目录的packset.json（不区分大小写）
+                        pack_rst_files = [f for f in zip_ref.namelist() if f.lower().endswith('packset.json') and f.count('/') == 0]
                         return len(pack_rst_files) > 0
                 except Exception:
                     pass
