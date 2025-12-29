@@ -8,7 +8,7 @@ from PyQt6.QtGui import QFont, QDesktopServices, QPixmap, QIcon
 from PyQt6.QtWidgets import (QGraphicsOpacityEffect, QHBoxLayout, QLabel,
                              QPushButton, QVBoxLayout, QWidget, QFrame)
 from PyQt6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply, QNetworkReply
-from utils import load_svg_icon, scale_icon_for_display
+from utils import load_svg_icon, scale_icon_for_display, normalize_path
 
 logger = logging.getLogger(__name__)
 
@@ -126,11 +126,11 @@ class HashCheckThread(QThread):
 
             # 检查目标路径是否存在
             if not os.path.exists(self.target_path):
-                logger.warning(f"Target path does not exist: {self.target_path}")
+                logger.warning(f"Target path does not exist: {normalize_path(self.target_path)}")
                 self.finished.emit()
                 return
 
-            logger.debug(f"Checking {len(os.listdir(self.target_path))} files in {self.target_path}")
+            logger.debug(f"Checking {len(os.listdir(self.target_path))} files in {normalize_path(self.target_path)}")
 
             # 遍历本地文件并计算哈希
             zip_files = []

@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdi
                              QPushButton, QFileDialog, QCheckBox, QComboBox)
 from PyQt6.QtGui import QPixmap
 
-from utils import load_svg_icon, scale_icon_for_display
+from utils import load_svg_icon, scale_icon_for_display, normalize_path
 from widgets import ClickableLabel, FileExplorer
 
 logger = logging.getLogger(__name__)
@@ -220,20 +220,19 @@ class InstancesPageBuilder:
     def _create_root_resourcepacks_container(self):
         """创建根目录材质包容器"""
         root_resourcepacks_container = QWidget()
-        root_resourcepacks_container.setStyleSheet(
-            f"background:rgba(255,255,255,0.08);border-radius:{self.builder._scale_size(8)}px;"
-        )
+        root_resourcepacks_container.setStyleSheet("background:transparent;")
         root_resourcepacks_layout = QVBoxLayout(root_resourcepacks_container)
         root_resourcepacks_layout.setContentsMargins(0, 0, 0, 0)
         root_resourcepacks_layout.setSpacing(0)
 
-        # 创建文件浏览器用于显示根目录材质包（无滚动模式）
+        # 创建文件浏览器用于显示根目录材质包（无滚动模式，不显示关闭按钮）
         self.builder.window.root_resourcepacks_explorer = FileExplorer(
             dpi_scale=self.builder.dpi_scale,
             config_manager=self.builder.window.config_manager,
             language_manager=self.builder.window.language_manager,
             text_renderer=self.builder.text_renderer,
-            no_scroll=True
+            no_scroll=True,
+            show_close_button=False
         )
         root_resourcepacks_layout.addWidget(self.builder.window.root_resourcepacks_explorer)
 
@@ -249,17 +248,16 @@ class InstancesPageBuilder:
         pl.setContentsMargins(0, 0, 0, 0)
         pl.setSpacing(0)
 
-        # 顶部导航栏（包含标题和返回按钮）
-        nav_bar = self._create_nav_bar(title, resourcepacks_path)
-        pl.addWidget(nav_bar)
-
-        # 文件浏览器
+        # 文件浏览器（现在包含自己的标题和路径卡片）
         self.builder.window.file_explorer = FileExplorer(
             dpi_scale=self.builder.dpi_scale,
             config_manager=self.builder.window.config_manager,
             language_manager=self.builder.window.language_manager,
             text_renderer=self.builder.text_renderer
         )
+
+        # 连接关闭按钮信号
+        self.builder.window.file_explorer.close_requested.connect(self._navigate_instance_back)
 
         # 设置资源包路径
         if resourcepacks_path and os.path.exists(resourcepacks_path):
@@ -273,59 +271,15 @@ class InstancesPageBuilder:
 
         return page
 
-    def _create_nav_bar(self, title, resourcepacks_path):
-        """创建导航栏"""
-        nav_bar = QWidget()
-        nav_bar.setFixedHeight(self.builder._scale_size(40))
-        nav_bar.setStyleSheet("background:rgba(255,255,255,0.05);")
-        nav_layout = QHBoxLayout(nav_bar)
-        nav_layout.setContentsMargins(
-            self.builder._scale_size(20), 0,
-            self.builder._scale_size(20), 0
-        )
-        nav_layout.setSpacing(self.builder._scale_size(10))
-
-        # 返回按钮
-        back_btn = ClickableLabel()
-        back_btn.setFixedSize(self.builder._scale_size(28), self.builder._scale_size(28))
-        border_radius = self.builder._scale_size(14)
-        back_btn.setHoverStyle(
-            f"background:rgba(255,255,255,0.1);border-radius:{border_radius}px;",
-            f"background:rgba(255,255,255,0.15);border-radius:{border_radius}px;"
-        )
-        back_btn.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        back_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        x_pixmap = load_svg_icon("svg/x.svg", self.builder.dpi_scale)
-        if x_pixmap:
-            back_btn.setPixmap(scale_icon_for_display(x_pixmap, 16, self.builder.dpi_scale))
-        back_btn.setCallback(lambda: self._navigate_instance_back())
-        nav_layout.addWidget(back_btn)
-
-        # 页面标题
-        title_label = QLabel(title)
-        title_label.setStyleSheet(
-            f"color:white;font-size:{self.builder._scale_size(16)}px;font-weight:bold;"
-            f"font-family:'{self.builder._get_font_family()}';background:transparent;"
-        )
-        nav_layout.addWidget(title_label)
-        nav_layout.addStretch()
-
-        self.builder.window.resourcepack_page_title = title_label
-
-        if "resourcepacks_path" not in resourcepacks_path:
-            self.builder.text_renderer.register_widget(title_label, "instance_version_root", group="instance_page")
-
-        return nav_bar
-
     def _setup_file_explorer_path(self, resourcepacks_path):
         """设置文件浏览器路径"""
         minecraft_path = None
-        if "\\versions\\" in resourcepacks_path or "/versions/" in resourcepacks_path:
-            parts = resourcepacks_path.replace("\\", "/").split("/versions/")
+        if "\\versions\\" in resourcepacks_path:
+            parts = resourcepacks_path.split("\\versions\\")
             if len(parts) > 1:
                 minecraft_path = parts[0]
         else:
-            parts = resourcepacks_path.replace("\\", "/").split("/resourcepacks")
+            parts = resourcepacks_path.split("\\resourcepacks")
             if len(parts) > 1:
                 minecraft_path = parts[0]
 
@@ -338,7 +292,7 @@ class InstancesPageBuilder:
             self.builder.window.file_explorer.resourcepack_mode = True
             display_path = self.builder.window.file_explorer._format_path_display(resourcepacks_path)
             self.builder.window.file_explorer.path_label.setText(display_path)
-            self.builder.window.file_explorer.path_label.show()
+            self.builder.window.file_explorer.path_card.show()
             self.builder.window.file_explorer.back_btn.setEnabled(False)
             self.builder.window.file_explorer.empty_label.hide()
             self.builder.window.file_explorer.file_tree.show()
@@ -623,7 +577,7 @@ class InstancesPageBuilder:
 
     def _navigate_to_resourcepack_page(self, title, resourcepacks_path):
         """导航到资源包页面（第二层）"""
-        logger.info(f"Navigating to resourcepack page: {title}, path: {resourcepacks_path}")
+        logger.info(f"Navigating to resourcepack page: {title}, path: {normalize_path(resourcepacks_path)}")
 
         # 检查是否已经存在相同路径的资源包页面
         for i in range(self.builder.window.instance_stack.count()):

@@ -10,6 +10,7 @@ import urllib.request
 import urllib.error
 
 from PyQt6.QtCore import QThread, pyqtSignal
+from utils import normalize_path
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ class DownloadThread(QThread):
 
             # 检查文件是否已存在
             if os.path.exists(target_file_path):
-                logger.info(f"File already exists: {target_file_path}")
+                logger.info(f"File already exists: {normalize_path(target_file_path)}")
                 # 验证文件哈希
                 if sha1_hash and self._verify_file_hash(target_file_path, sha1_hash):
                     logger.info("File hash matches, skipping download")
@@ -132,7 +133,7 @@ class DownloadThread(QThread):
                     )
                     return
 
-                logger.info(f"Download complete: {target_file_path}")
+                logger.info(f"Download complete: {normalize_path(target_file_path)}")
                 self.download_complete.emit(target_file_path, filename)
 
         except urllib.error.URLError as e:

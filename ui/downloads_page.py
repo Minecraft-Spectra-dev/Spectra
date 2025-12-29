@@ -9,7 +9,7 @@ from PyQt6.QtCore import Qt, QThread, QTimer, QSize
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QMenu, QComboBox
 from PyQt6.QtGui import QIcon
 
-from utils import load_svg_icon, scale_icon_for_display
+from utils import load_svg_icon, scale_icon_for_display, normalize_path
 
 logger = logging.getLogger(__name__)
 
@@ -309,7 +309,7 @@ class DownloadsPageBuilder:
             return
 
         new_target_path = self.builder.get_download_target_path()
-        logger.info(f"Version changed, new target path: {new_target_path}")
+        logger.info(f"Version changed, new target path: {normalize_path(new_target_path)}")
 
         layout = self.builder.window.download_scroll_layout
         card_count = 0
@@ -752,7 +752,7 @@ class DownloadsPageBuilder:
             # 如果版本隔离关闭，直接返回根目录的resourcepacks路径
             if not self.builder.window.config.get("version_isolation", True):
                 root_resourcepacks_path = os.path.join(minecraft_path, "resourcepacks")
-                logger.info(f"Version isolation OFF, target path: {root_resourcepacks_path}")
+                logger.info(f"Version isolation OFF, target path: {normalize_path(root_resourcepacks_path)}")
                 return root_resourcepacks_path
 
             # 版本隔离开启时，根据下拉框选择返回对应路径
@@ -763,15 +763,15 @@ class DownloadsPageBuilder:
                 root_text = self.builder.window.language_manager.translate("instance_version_root")
                 if selected_version == root_text:
                     root_resourcepacks_path = os.path.join(minecraft_path, "resourcepacks")
-                    logger.info(f"Root directory selected, target path: {root_resourcepacks_path}")
+                    logger.info(f"Root directory selected, target path: {normalize_path(root_resourcepacks_path)}")
                     return root_resourcepacks_path
                 else:
                     version_resourcepacks_path = os.path.join(minecraft_path, "versions", selected_version, "resourcepacks")
-                    logger.info(f"Version selected, target path: {version_resourcepacks_path}")
+                    logger.info(f"Version selected, target path: {normalize_path(version_resourcepacks_path)}")
                     return version_resourcepacks_path
 
             root_resourcepacks_path = os.path.join(minecraft_path, "resourcepacks")
-            logger.info(f"No version selected, default to root, target path: {root_resourcepacks_path}")
+            logger.info(f"No version selected, default to root, target path: {normalize_path(root_resourcepacks_path)}")
             return root_resourcepacks_path
         except Exception as e:
             logger.error(f"Error getting download target path: {e}")

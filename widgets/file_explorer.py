@@ -194,11 +194,11 @@ class ResourcepackItemWidget(QWidget):
 
     def enterEvent(self, event):
         """鼠标进入事件"""
-        # 显示收藏按钮
-        if hasattr(self, 'bookmark_btn'):
+        # 只有在可收藏时才显示收藏按钮
+        if hasattr(self, 'bookmark_btn') and self.on_favorite_clicked is not None:
             self.bookmark_btn.show()
         # 如果资源包可编辑，显示编辑按钮
-        if hasattr(self, 'edit_btn') and self.is_editable:
+        if hasattr(self, 'edit_btn') and self.is_editable and self.on_edit_clicked is not None:
             self.edit_btn.show()
         super().enterEvent(event)
 
@@ -254,14 +254,16 @@ class FileExplorer(QWidget):
     """文件浏览器组件"""
 
     file_selected = pyqtSignal(str)  # 文件选择信号
+    close_requested = pyqtSignal()  # 关闭请求信号
 
-    def __init__(self, parent=None, dpi_scale=1.0, config_manager=None, language_manager=None, text_renderer=None, no_scroll=False):
+    def __init__(self, parent=None, dpi_scale=1.0, config_manager=None, language_manager=None, text_renderer=None, no_scroll=False, show_close_button=True):
         super().__init__(parent)
         self.dpi_scale = dpi_scale
         self.config_manager = config_manager
         self.language_manager = language_manager
         self.text_renderer = text_renderer  # 新增 text_renderer 参数
         self.no_scroll = no_scroll  # 无滚动模式：让file_tree根据内容自动调整大小
+        self.show_close_button = show_close_button  # 是否显示关闭按钮
         self.current_path = None
         self.root_path = None  # 保存minecraft路径
         self.base_path = None  # 保存当前resourcepacks路径作为返回的根目录
@@ -287,14 +289,15 @@ class FileExplorer(QWidget):
 
     def update_language(self):
         """更新界面语言"""
+        # 更新页面标题
+        if hasattr(self, 'page_title'):
+            self.page_title.setText(self.translate("page_resourcepacks"))
+
         # 更新路径标签
         if self.current_path:
             self.path_label.setText(self._format_path_display(self.current_path))
         else:
             self.path_label.setText(self.translate("file_explorer_no_path"))
-
-        # 更新返回按钮
-        self.back_btn.setText(self.translate("file_explorer_back_to_root"))
 
     def eventFilter(self, obj, event):
         """事件过滤器：调整滚轮滚动步进值"""
@@ -325,40 +328,102 @@ class FileExplorer(QWidget):
         """初始化UI"""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        layout.setSpacing(int(12 * self.dpi_scale))
 
-        # 工具栏
-        self.toolbar = QWidget()
-        self.toolbar.setFixedHeight(int(36 * self.dpi_scale))
-        self.toolbar.setStyleSheet("background: rgba(255, 255, 255, 0.08);")
-        toolbar_layout = QHBoxLayout(self.toolbar)
-        toolbar_layout.setContentsMargins(int(12 * self.dpi_scale), 0, int(12 * self.dpi_scale), 0)
-        toolbar_layout.setSpacing(int(8 * self.dpi_scale))
+        # 页面标题和关闭按钮容器
+        self.title_container = QWidget()
+        self.title_container.setStyleSheet("background: transparent;")
+        title_layout = QHBoxLayout(self.title_container)
+        title_layout.setContentsMargins(0, 0, 0, 0)
+        title_layout.setSpacing(int(12 * self.dpi_scale))
 
-        # 当前路径标签（默认隐藏）
-        self.path_label = QLabel(self.translate("file_explorer_no_path"))
-        self.path_label.setStyleSheet(f"""
+        # 关闭按钮（返回到版本界面）
+        if self.show_close_button:
+            self.close_btn = QPushButton()
+            self.close_btn.setFixedSize(int(24 * self.dpi_scale), int(24 * self.dpi_scale))
+            self.close_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: transparent;
+                    border: 1px solid rgba(255, 255, 255, 0.3);
+                    border-radius: {int(12 * self.dpi_scale)}px;
+                    padding: 0;
+                }}
+                QPushButton:hover {{
+                    background: rgba(255, 255, 255, 0.15);
+                    border: 1px solid rgba(255, 255, 255, 0.5);
+                }}
+                QPushButton:pressed {{
+                    background: rgba(255, 255, 255, 0.1);
+                    border: 1px solid rgba(255, 255, 255, 0.4);
+                }}
+            """)
+            self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.close_btn.clicked.connect(self.close_explorer)
+
+            # 设置关闭按钮图标
+            close_icon = load_svg_icon("svg/x.svg", self.dpi_scale)
+            if close_icon:
+                self.close_btn.setIcon(QIcon(scale_icon_for_display(close_icon, 18, self.dpi_scale)))
+
+            title_layout.addWidget(self.close_btn)
+
+        # 页面标题
+        self.page_title = QLabel(self.translate("page_resourcepacks"))
+        self.page_title.setStyleSheet(f"""
             QLabel {{
-                color: rgba(255,255,255, 0.7);
+                color: white;
                 background: transparent;
-                font-size: {int(12 * self.dpi_scale)}px;
+                font-size: {int(20 * self.dpi_scale)}px;
+                font-weight: bold;
             }}
         """)
-        toolbar_layout.addWidget(self.path_label)
+        title_layout.addWidget(self.page_title)
+        title_layout.addStretch()
 
-        toolbar_layout.addStretch()
+        layout.addWidget(self.title_container)
 
-        # 返回按钮
-        self.back_btn = QPushButton(self.translate("file_explorer_back_to_root"))
-        self.back_btn.setFixedHeight(int(24 * self.dpi_scale))
+        # 如果不显示关闭按钮，隐藏标题容器
+        if not self.show_close_button:
+            self.title_container.hide()
+
+        # 路径卡片（现在作为主卡片的顶部区域）
+        self.path_card = QWidget()
+        self.path_card.setFixedHeight(int(44 * self.dpi_scale))
+        self.path_card.setStyleSheet(f"""
+            QWidget {{
+                background: rgba(255, 255, 255, 0.08);
+                border: none;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                border-top-left-radius: {int(8 * self.dpi_scale)}px;
+                border-top-right-radius: {int(8 * self.dpi_scale)}px;
+            }}
+        """)
+        path_card_layout = QHBoxLayout(self.path_card)
+        path_card_layout.setContentsMargins(int(12 * self.dpi_scale), int(6 * self.dpi_scale), int(12 * self.dpi_scale), int(6 * self.dpi_scale))
+        path_card_layout.setSpacing(int(10 * self.dpi_scale))
+
+        # 当前路径标签
+        self.path_label = QLabel(self.translate("file_explorer_no_path"))
+        self.path_label.setWordWrap(False)
+        self.path_label.setStyleSheet(f"""
+            QLabel {{
+                color: rgba(255, 255, 255, 0.7);
+                background: transparent;
+                font-size: {int(13 * self.dpi_scale)}px;
+            }}
+        """)
+        path_card_layout.addWidget(self.path_label)
+        path_card_layout.addStretch()
+
+        # 返回根目录按钮
+        self.back_btn = QPushButton()
+        self.back_btn.setFixedSize(int(36 * self.dpi_scale), int(32 * self.dpi_scale))
         self.back_btn.setStyleSheet(f"""
             QPushButton {{
                 background: rgba(255, 255, 255, 0.1);
                 border: 1px solid rgba(255, 255, 255, 0.2);
-                border-radius: {int(4 * self.dpi_scale)}px;
-                color: white;
-                padding: 0 {int(12 * self.dpi_scale)}px;
-                font-size: {int(11 * self.dpi_scale)}px;
+                border-radius: {int(6 * self.dpi_scale)}px;
+                padding: 0;
             }}
             QPushButton:hover {{
                 background: rgba(255, 255, 255, 0.2);
@@ -370,9 +435,55 @@ class FileExplorer(QWidget):
         self.back_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.back_btn.clicked.connect(self.navigate_to_root)
         self.back_btn.setEnabled(False)
-        toolbar_layout.addWidget(self.back_btn)
+        
+        # 设置返回根目录按钮图标
+        back_icon = load_svg_icon("svg/arrow-90deg-left.svg", self.dpi_scale)
+        if back_icon:
+            self.back_btn.setIcon(QIcon(scale_icon_for_display(back_icon, 16, self.dpi_scale)))
 
-        layout.addWidget(self.toolbar)
+        path_card_layout.addWidget(self.back_btn)
+
+        # 在文件资源管理器中打开按钮
+        self.open_explorer_btn = QPushButton()
+        self.open_explorer_btn.setFixedSize(int(36 * self.dpi_scale), int(32 * self.dpi_scale))
+        self.open_explorer_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: {int(6 * self.dpi_scale)}px;
+                padding: 0;
+            }}
+            QPushButton:hover {{
+                background: rgba(255, 255, 255, 0.2);
+            }}
+            QPushButton:pressed {{
+                background: rgba(255, 255, 255, 0.15);
+            }}
+        """)
+        self.open_explorer_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.open_explorer_btn.clicked.connect(self.open_in_explorer)
+        
+        # 设置文件资源管理器按钮图标
+        explorer_icon = load_svg_icon("svg/folder2.svg", self.dpi_scale)
+        if explorer_icon:
+            self.open_explorer_btn.setIcon(QIcon(scale_icon_for_display(explorer_icon, 16, self.dpi_scale)))
+
+        path_card_layout.addWidget(self.open_explorer_btn)
+
+        # 大卡片容器（包含路径栏和资源包列表）
+        self.main_card = QWidget()
+        self.main_card.setStyleSheet(f"""
+            QWidget {{
+                background: rgba(0, 0, 0, 0.3);
+                border-radius: {int(8 * self.dpi_scale)}px;
+            }}
+        """)
+        main_card_layout = QVBoxLayout(self.main_card)
+        main_card_layout.setContentsMargins(0, 0, 0, 0)
+        main_card_layout.setSpacing(0)
+
+        # 将路径卡片添加到主卡片中
+        main_card_layout.addWidget(self.path_card)
         
         # 文件树
         self.file_tree = QTreeWidget()
@@ -400,12 +511,12 @@ class FileExplorer(QWidget):
 
         # 设置图标大小（适配新的64x64资源包图标）
         self.file_tree.setIconSize(QSize(int(64 * self.dpi_scale), int(64 * self.dpi_scale)))
-        # 设置资源包项目的高度（适配64x64图标和描述）
+
+        # 设置资源包项目的样式
         self.file_tree.setStyleSheet(f"""
             QTreeWidget {{
-                background: rgba(0, 0, 0, 0.2);
+                background: transparent;
                 border: none;
-                border-radius: {int(4 * self.dpi_scale)}px;
                 color: rgba(255, 255, 255, 0.9);
             }}
             QTreeWidget::item {{
@@ -414,7 +525,7 @@ class FileExplorer(QWidget):
                 border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             }}
             QTreeWidget::item:hover {{
-                background: rgba(255, 255, 255, 0.1);
+                background: rgba(255, 255, 255, 0.15);
             }}
             QTreeWidget::branch {{
                 background: transparent;
@@ -424,6 +535,9 @@ class FileExplorer(QWidget):
             }}
             QTreeWidget::branch:has-children:open {{
                 image: none;
+            }}
+            QTreeWidget::viewport {{
+                background: transparent;
             }}
             QHeaderView::section {{
                 background: rgba(255, 255, 255, 0.08);
@@ -457,14 +571,16 @@ class FileExplorer(QWidget):
                 background: none;
             }}
         """)
-        
+
         header = self.file_tree.header()
         header.setStretchLastSection(True)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
 
         self.file_tree.itemDoubleClicked.connect(self.on_item_double_clicked)
-        layout.addWidget(self.file_tree, 1)
+        main_card_layout.addWidget(self.file_tree, 1)
+
+        layout.addWidget(self.main_card, 1)
 
         # 空标签（用于显示无内容或路径不存在的情况）
         self.empty_label = QLabel()
@@ -496,23 +612,27 @@ class FileExplorer(QWidget):
         self.back_btn.setEnabled(False)
         self.resourcepack_mode = True  # 启用资源包模式
         if os.path.exists(self.current_path):
-            self.toolbar.show()
+            self.path_card.show()
             self.file_tree.show()
             self._load_directory(self.current_path)
         else:
-            self.toolbar.hide()
+            self.path_card.hide()
             self.file_tree.hide()
 
     def _format_path_display(self, path):
-        """格式化路径显示（统一使用反斜杠，只显示base_path内的路径）"""
+        """格式化路径显示（使用 . 表示根目录）"""
         # 在资源包模式下，只显示base_path内的路径
         if self.resourcepack_mode and self.base_path:
             if path.startswith(self.base_path):
                 # 只显示base_path文件夹内的路径
-                sub_path = path[len(self.base_path):].lstrip(os.sep).lstrip("/")
+                sub_path = path[len(self.base_path):].lstrip(os.sep).lstrip("/").lstrip("\\")
                 # 统一使用反斜杠
                 sub_path = sub_path.replace("/", "\\")
-                return sub_path if sub_path else self.translate("file_explorer_resourcepacks_folder")
+                # 根目录显示 .，子目录显示 .\文件夹名
+                if not sub_path:
+                    return "."
+                else:
+                    return ".\\" + sub_path
 
         # 默认显示完整路径
         full_path = path.replace("/", "\\")
@@ -532,8 +652,27 @@ class FileExplorer(QWidget):
             display_path = self._format_path_display(self.current_path)
             self.path_label.setText(display_path)
             self.back_btn.setEnabled(False)
-            self.toolbar.show()
+            self.path_card.show()
             self._load_directory(self.current_path)
+
+    def open_in_explorer(self):
+        """在文件资源管理器中打开当前路径"""
+        if self.current_path and os.path.exists(self.current_path):
+            import subprocess
+            import sys
+            try:
+                if sys.platform == 'win32':
+                    subprocess.Popen(['explorer', self.current_path])
+                elif sys.platform == 'darwin':
+                    subprocess.Popen(['open', self.current_path])
+                else:
+                    subprocess.Popen(['xdg-open', self.current_path])
+            except Exception as e:
+                logger.error(f"Failed to open in file explorer: {e}")
+
+    def close_explorer(self):
+        """关闭文件浏览器（发出关闭请求信号）"""
+        self.close_requested.emit()
 
     def navigate_to_directory(self, path):
         """导航到指定目录"""
@@ -545,7 +684,7 @@ class FileExplorer(QWidget):
         display_path = self._format_path_display(path)
         self.path_label.setText(display_path)
         self.back_btn.setEnabled(True)
-        self.toolbar.show()
+        self.path_card.show()
         self.file_tree.show()
         self._load_directory(path)
 
@@ -559,11 +698,11 @@ class FileExplorer(QWidget):
             display_path = self._format_path_display(self.current_path)
             self.path_label.setText(display_path)
             self.back_btn.setEnabled(False)
-            self.toolbar.show()
+            self.path_card.show()
             self.file_tree.show()
             self._load_directory(self.current_path)
         else:
-            self.toolbar.hide()
+            self.path_card.hide()
             self.file_tree.hide()
     
     def navigate_to_version_resourcepacks(self, version_name):
@@ -590,9 +729,11 @@ class FileExplorer(QWidget):
             display_path = "...\\versions\\" + version_name + "\\resourcepacks"
             self.path_label.setText(display_path)
             self.back_btn.setEnabled(True)
+            self.path_card.show()
             self.file_tree.show()
             self._load_directory(resourcepacks_path)
         else:
+            self.path_card.hide()
             self.file_tree.hide()
     
     def _load_directory(self, path):
@@ -638,19 +779,27 @@ class FileExplorer(QWidget):
                 config = self.config_manager.config if hasattr(self.config_manager, 'config') else self.config_manager
                 favorited_resourcepacks = config.get("favorited_resourcepacks", [])
 
-            # 在资源包模式下，分离收藏和非收藏的资源包
+            # 在资源包模式下，显示文件夹和有效的资源包
             if self.resourcepack_mode:
                 resourcepack_items = []
+                non_resourcepack_dirs = []
+
                 for name, is_dir, full_path in items:
-                    # 只处理文件夹或zip文件
-                    if is_dir or name.endswith('.zip'):
+                    if is_dir:
                         # 检查是否是有效的资源包（必须包含pack.mcmeta）
                         if self._is_valid_resourcepack(full_path, is_dir):
                             resourcepack_items.append((name, is_dir, full_path))
+                        else:
+                            # 不是资源包的文件夹
+                            non_resourcepack_dirs.append((name, is_dir, full_path))
+                    elif name.endswith('.zip'):
+                        # 检查zip文件是否是有效的资源包
+                        if self._is_valid_resourcepack(full_path, False):
+                            resourcepack_items.append((name, is_dir, full_path))
 
-                logger.info(f"Resourcepack mode: found {len(resourcepack_items)} valid resourcepacks out of {len(items)} items")
+                logger.info(f"Resourcepack mode: found {len(resourcepack_items)} valid resourcepacks and {len(non_resourcepack_dirs)} folders out of {len(items)} items")
 
-                # 分离收藏和非收藏
+                # 分离收藏和非收藏的资源包
                 favorites = []
                 non_favorites = []
                 for name, is_dir, full_path in resourcepack_items:
@@ -658,6 +807,11 @@ class FileExplorer(QWidget):
                         favorites.append((name, is_dir, full_path))
                     else:
                         non_favorites.append((name, is_dir, full_path))
+
+                # 文件夹置顶显示（按名称排序）
+                non_resourcepack_dirs.sort(key=lambda x: x[0])
+                for name, is_dir, full_path in non_resourcepack_dirs:
+                    self._add_item(name, is_dir, full_path)
 
                 # 先添加收藏的资源包
                 for name, is_dir, full_path in favorites:
@@ -667,7 +821,7 @@ class FileExplorer(QWidget):
                 for name, is_dir, full_path in non_favorites:
                     self._add_resourcepack_item(name, is_dir, full_path, is_favorited=False)
 
-                logger.info(f"Added {len(favorites) + len(non_favorites)} resourcepack items to tree")
+                logger.info(f"Added {len(non_resourcepack_dirs)} folder items and {len(favorites) + len(non_favorites)} resourcepack items to tree")
             else:
                 # 非资源包模式，正常显示
                 for name, is_dir, full_path in items:
@@ -675,6 +829,15 @@ class FileExplorer(QWidget):
 
             # 检查当前路径是否为版本隔离的子路径
             is_version_subpath = self.base_path and self.current_path != self.base_path and "versions" in self.current_path
+
+            # 如果没有内容，显示空标签并隐藏 file_tree
+            if self.file_tree.topLevelItemCount() == 0:
+                self.file_tree.hide()
+                self.empty_label.setText(self.translate("file_explorer_empty"))
+                self.empty_label.show()
+            else:
+                self.empty_label.hide()
+                self.file_tree.show()
 
             # 在无滚动模式下，根据内容更新file_tree的高度
             if self.no_scroll:
@@ -690,26 +853,49 @@ class FileExplorer(QWidget):
 
         except PermissionError:
             self.file_tree.hide()
-            self.toolbar.hide()
+            self.path_card.hide()
         except Exception as e:
             logger.error(f"Error loading directory: {e}", exc_info=True)
             self.file_tree.hide()
-            self.toolbar.hide()
-    
-    def _add_item(self, name, is_dir, full_path):
-        """添加普通项目"""
-        item = QTreeWidgetItem()
-        item.setText(0, name)
-        self.file_tree.addTopLevelItem(item)
+            self.path_card.hide()
 
+    def _add_item(self, name, is_dir, full_path):
+        """添加普通项目（文件夹使用ResourcepackItemWidget样式）"""
         if is_dir:
+            # 文件夹：使用ResourcepackItemWidget样式（不可收藏，无描述）
+            item = QTreeWidgetItem()
             item.setData(0, Qt.ItemDataRole.UserRole, full_path)
+            self.file_tree.addTopLevelItem(item)
+
+            # 获取文件夹图标（使用与资源包相同的渲染逻辑）
+            icon_pixmap = self._get_resourcepack_icon_pixmap(full_path, is_dir)
+
+            # 创建ResourcepackItemWidget（文件夹不显示收藏按钮和编辑按钮）
+            widget = ResourcepackItemWidget(
+                parent=self.file_tree,
+                on_favorite_clicked=None,
+                on_edit_clicked=None,
+                is_favorited=False,
+                dpi_scale=self.dpi_scale,
+                resourcepack_name=name,
+                icon=icon_pixmap,
+                is_editable=False,
+                text_renderer=self.text_renderer,
+                description=""
+            )
+
+            # 设置项目部件
+            self.file_tree.setItemWidget(item, 0, widget)
+
             # 添加占位子项
             QTreeWidgetItem(item).setText(0, "...")
         else:
-            # 文件：设置路径
+            # 文件：使用普通样式
+            item = QTreeWidgetItem()
+            item.setText(0, name)
             item.setData(0, Qt.ItemDataRole.UserRole, full_path)
-    
+            self.file_tree.addTopLevelItem(item)
+
     def _add_resourcepack_item(self, name, is_dir, full_path, is_favorited):
         """添加资源包项目（带收藏按钮，使用卡片样式）"""
         item = QTreeWidgetItem()
@@ -796,7 +982,7 @@ class FileExplorer(QWidget):
         """编辑资源包"""
         logger.info(f"Edit resourcepack: {name}")
         # 这里可以添加编辑资源包的逻辑
-        # 例如：打开编辑器、编辑pack.rst等
+        # 例如：打开编辑器、编辑packrst.json等
 
     def on_item_double_clicked(self, item, column):
         """双击项目事件"""
@@ -806,6 +992,7 @@ class FileExplorer(QWidget):
             display_path = self._format_path_display(full_path)
             self.path_label.setText(display_path)
             self.back_btn.setEnabled(True)
+            self.path_card.show()
             self._load_directory(full_path)
         elif full_path:
             self.file_selected.emit(full_path)
@@ -935,7 +1122,7 @@ class FileExplorer(QWidget):
             return False
 
     def _is_resourcepack_editable(self, full_path, is_dir):
-        """检查资源包是否可编辑（存在 pack.rst）"""
+        """检查资源包是否可编辑（存在 packrst.json）"""
         try:
             # 首先检查是否是有效的材质包（存在pack.mcmeta）
             is_valid_pack = self._is_valid_resourcepack(full_path, is_dir)
@@ -945,14 +1132,14 @@ class FileExplorer(QWidget):
                 return False
 
             if is_dir:
-                # 文件夹形式的资源包，检查根目录是否有pack.rst
-                return os.path.exists(os.path.join(full_path, "pack.rst"))
+                # 文件夹形式的资源包，检查根目录是否有packrst.json
+                return os.path.exists(os.path.join(full_path, "packrst.json"))
             elif full_path.endswith('.zip'):
-                # 压缩包形式的资源包，检查根目录是否有pack.rst
+                # 压缩包形式的资源包，检查根目录是否有packrst.json
                 try:
                     with zipfile.ZipFile(full_path, 'r') as zip_ref:
-                        # 查找根目录的pack.rst（不区分大小写）
-                        pack_rst_files = [f for f in zip_ref.namelist() if f.lower().endswith('pack.rst') and f.count('/') == 0]
+                        # 查找根目录的packrst.json（不区分大小写）
+                        pack_rst_files = [f for f in zip_ref.namelist() if f.lower().endswith('packrst.json') and f.count('/') == 0]
                         return len(pack_rst_files) > 0
                 except Exception:
                     pass
@@ -1017,30 +1204,24 @@ class FileExplorer(QWidget):
         escaped_font = font_family.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"')
         font_family_quoted = f'"{escaped_font}"'
         
+        # 更新页面标题字体
+        if hasattr(self, 'page_title'):
+            self.page_title.setStyleSheet(f"""
+                QLabel {{
+                    color: white;
+                    background: transparent;
+                    font-size: {int(20 * self.dpi_scale)}px;
+                    font-weight: bold;
+                    font-family: {font_family_quoted};
+                }}
+            """)
+        
         self.path_label.setStyleSheet(f"""
             QLabel {{
                 color: rgba(255,255,255, 0.7);
                 background: transparent;
-                font-size: {int(12 * self.dpi_scale)}px;
+                font-size: {int(13 * self.dpi_scale)}px;
                 font-family: {font_family_quoted};
-            }}
-        """)
-        
-        self.back_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: rgba(255, 255, 255, 0.1);
-                border:1px solid rgba(255, 255, 255, 0.2);
-                border-radius: {int(4 * self.dpi_scale)}px;
-                color: white;
-                padding: 0 {int(12 * self.dpi_scale)}px;
-                font-size: {int(11 * self.dpi_scale)}px;
-                font-family: {font_family_quoted};
-            }}
-            QPushButton:hover {{
-                background: rgba(255, 255, 255, 0.2);
-            }}
-            QPushButton:pressed {{
-                background: rgba(255, 255, 255, 0.15);
             }}
         """)
         
