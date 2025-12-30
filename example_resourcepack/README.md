@@ -1,5 +1,4 @@
 # Packset 资源包配置系统示例
-
 本示例展示如何创建一个可配置的资源包，支持通过 Packset 系统控制资源内容。
 
 ## 目录结构
@@ -28,19 +27,36 @@ example_resourcepack/
 
 主配置文件定义了所有可配置的功能（features）。
 
+#### 配置文件格式
+
 ```json
 {
   "schema_version": 1,                    // 配置格式版本(请勿修改)
   "feature": {
-    "high_contrast_mode": "bool",          // 开关类型功能
-    "theme_selector": "toggle"               // 切换类型功能
+    "switch_feature": "bool",              // 开关类型功能
+    "status_feature": "toggle"              // 切换类型功能
+  },
+  "category": {                            // 可选项：配置分类（如果不需要分类可省略此字段）
+    "list": ["gui", "font"],              // 分类ID列表（定义显示顺序）
+    "data": {
+      "gui": {
+        "name": "GUI 设置",              // 分类显示名称
+        "description": "用于配置界面相关的选项",
+        "list": ["switch_feature"]       // 该分类下的功能列表
+      },
+      "font": {
+        "name": "字体设置",
+        "description": "用于配置字体相关的选项",
+        "list": ["status_feature"]
+      }
+    }
   },
   "config": {
-    "high_contrast_mode": {
+    "switch_feature": {
       "default": "false",                   // 默认值
       "toggle": [...]                         // 关联的配置项
     },
-    "theme_selector": {
+    "status_feature": {
       "default": "classic",                 // 默认状态
       "scope": ["classic", "modern", "minimal"],  // 可选状态列表
       "paths": [...]                           // 关联的配置项
@@ -164,6 +180,16 @@ example_resourcepack/
 3. 根据需要创建子 Packset 文件（.packset.json）
 4. 在 `assets` 中添加对应的资源文件
 
+### 使用分类功能（可选项）
+
+1. 在 `packset.json` 中添加 `category` 字段（如果不需要分类可省略此字段）
+2. 在 `category.list` 中定义分类 ID 的顺序
+3. 在 `category.data` 中为每个分类配置：
+   - `name`：显示名称
+   - `description`：描述文本
+   - `list`：该分类下的功能列表
+4. 确保 `list` 中的功能在 `feature` 和 `config` 中都有定义
+
 ### 文件操作说明
 
 - 文件不会被删除，只是被重命名或移动
@@ -195,11 +221,16 @@ A: 在配置文件的 `default` 字段中设置。对于 bool 类型，可以是
 
 A: 没有限制。你可以定义任意数量的状态或选项。
 
+**Q: 必须使用分类功能吗？**
+
+A: 不是必须的。`category` 字段为可选项，如果不需要分类可以省略此字段，所有配置项会显示在一个卡片中。分类功能有助于组织配置，使界面更清晰。
+
 ## 技术细节
 
 - `schema_version`：用于确保配置文件格式的兼容性
 - 路径区分大小写（在某些系统上）
 - 所有文件操作都会记录日志，便于调试
+- 分类 ID 使用下划线替代连字符，以避免属性名问题
 
 ## 完整示例
 

@@ -1,32 +1,54 @@
 {
   "schema_version": 1,
   "feature": {
-    "high_contrast_mode": "bool",
-    "theme_selector": "toggle"
+    "switch_feature": "bool",
+    "status_feature": "toggle"
+  },
+  "category": {
+    "list": [
+      "gui",
+      "font"
+    ],
+    "data": {
+      "gui": {
+        "name": "GUI 设置",
+        "description": "用于测试的描述：switch",
+        "list": [
+          "switch_feature"
+        ]
+      },
+      "font": {
+        "name": "字体设置",
+        "description": "用于测试的描述：status",
+        "list": [
+          "status_feature"
+        ]
+      }
+    }
   },
   "config": {
-    "high_contrast_mode": {
-      "default": "false",
+    "switch_feature": {
+      "default": "true",
       "toggle": [
         {
           "type": "bool",
-          "id": "border_overlay",
-          "file_path": "assets/minecraft/textures/gui/border_overlay.json"
+          "id": "info_icon",
+          "file_path": "assets/minecraft/textures/gui/info_icon.png"
         },
         {
           "type": "toggle",
-          "id": "menu_theme",
-          "file_path": "assets/minecraft/textures/gui/menu_theme.packset.json"
+          "id": "test",
+          "file_path": "assets/minecraft/textures/font/test.packset.json"
         }
       ]
     },
-    "theme_selector": {
-      "default": "classic",
-      "scope": ["classic", "modern", "minimal"],
+    "status_feature": {
+      "default": "st0",
+      "scope": ["st0", "st1", "st2"],
       "paths": [
         {
-          "id": "background_theme",
-          "file_path": "assets/minecraft/textures/gui/background_theme.packset.json"
+          "id": "accessibility",
+          "file_path": "assets/minecraft/textures/gui/accessibility.packset.json"
         }
       ]
     }

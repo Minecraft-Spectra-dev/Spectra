@@ -254,7 +254,10 @@ class ResourcepackConfigEditorPage(QWidget):
         self.config_content = QWidget()
         self.config_content.setStyleSheet("background: transparent;")
         self.config_layout = QVBoxLayout(self.config_content)
-        self.config_layout.setContentsMargins(0, 0, 0, 0)
+        self.config_layout.setContentsMargins(
+            int(20 * self.dpi_scale), 0,
+            int(20 * self.dpi_scale), 0
+        )
         self.config_layout.setSpacing(int(12 * self.dpi_scale))
         self.config_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         
@@ -320,11 +323,15 @@ class ResourcepackConfigEditorPage(QWidget):
             self._show_error_message("格式不正确：config 必须是字典")
             return
 
-        # 验证通过，创建配置项 UI
-        self._create_config_items_ui(feature, config)
+        # 验证通过，创建配置项 UI（支持分类）
+        category = self.packset_data.get("category")
+        if category and isinstance(category, dict):
+            self._create_category_items_ui(category, feature, config)
+        else:
+            self._create_config_items_ui(feature, config)
 
     def _create_config_items_ui(self, feature, config):
-        """创建配置项 UI"""
+        """创建配置项 UI（无分类）"""
         # 加载已保存的配置
         saved_config = self._load_saved_config()
 
@@ -355,6 +362,150 @@ class ResourcepackConfigEditorPage(QWidget):
                 self._create_status_items(group_layout, feature_name, feature_config, saved_config)
 
         self.config_layout.addWidget(group_container)
+
+    def _create_category_items_ui(self, category, feature, config):
+        """创建配置项 UI（带分类）"""
+        # 加载已保存的配置
+        saved_config = self._load_saved_config()
+
+        category_list = category.get("list", [])
+        category_data = category.get("data", {})
+
+        # 遍历分类列表
+        for category_id in category_list:
+            if category_id not in category_data:
+                continue
+
+            cat_info = category_data[category_id]
+            cat_name = cat_info.get("name", category_id)
+            cat_description = cat_info.get("description", "")
+            cat_features = cat_info.get("list", [])
+
+            # 创建可展开的分类卡片
+            category_container = self._create_expandable_category(
+                category_id, cat_name, cat_description
+            )
+
+            # 获取分类的内容区域布局（使用下划线代替连字符）
+            safe_category_id = category_id.replace('-', '_')
+            content_layout = getattr(self, f"category_{safe_category_id}_content_layout", None)
+            if content_layout is None:
+                self.config_layout.addWidget(category_container)
+                continue
+
+            # 遍历该分类下的所有 feature
+            for feature_name in cat_features:
+                if feature_name not in feature or feature_name not in config:
+                    continue
+
+                feature_config = config[feature_name]
+                feature_type = feature.get(feature_name, "").strip().lower()
+
+                # 存储配置数据
+                self.feature_config_map[feature_name] = feature_config
+
+                # 根据 feature 类型创建配置项
+                if feature_type == "bool":
+                    # switch 功能：开关类型
+                    self._create_switch_items(content_layout, feature_name, feature_config, saved_config)
+                elif feature_type == "toggle":
+                    # status 功能：下拉菜单类型
+                    self._create_status_items(content_layout, feature_name, feature_config, saved_config)
+
+            self.config_layout.addWidget(category_container)
+
+    def _create_expandable_category(self, category_id, title, description):
+        """创建可展开的分类卡片（参考设置页面样式）"""
+        container = QWidget()
+        container.setStyleSheet(f"background: rgba(255, 255, 255, 0.08); border-radius: {int(8 * self.dpi_scale)}px;")
+        main_layout = QVBoxLayout(container)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # 创建分类头部按钮
+        from widgets import CardButton
+        header = CardButton()
+        header.setFixedHeight(int(56 * self.dpi_scale))
+        header.setCursor(Qt.CursorShape.PointingHandCursor)
+        border_radius = int(8 * self.dpi_scale)
+        header.setStyleSheet(
+            f"QPushButton{{background:transparent;border:none;"
+            f"border-top-left-radius:{border_radius}px;border-top-right-radius:{border_radius}px;}}"
+            f"QPushButton:hover{{background:rgba(255,255,255,0.05);}}"
+            f"QPushButton:pressed{{background:rgba(255,255,255,0.02);}}"
+        )
+
+        # 点击事件处理 - 使用闭包捕获 category_id
+        def make_toggle_handler(cid):
+            return lambda: self._toggle_category(cid)
+        header.clicked.connect(make_toggle_handler(category_id))
+
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(
+            int(15 * self.dpi_scale), int(10 * self.dpi_scale),
+            int(15 * self.dpi_scale), int(10 * self.dpi_scale)
+        )
+        header_layout.setSpacing(int(12 * self.dpi_scale))
+
+        # 标题和描述布局
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(int(2 * self.dpi_scale))
+        text_layout.setContentsMargins(0, 0, 0, 0)
+
+        title_lbl = QLabel(title)
+        title_lbl.setStyleSheet(
+            f"color:white;font-size:{int(14 * self.dpi_scale)}px;"
+            f"font-family:'Microsoft YaHei UI';background:transparent;"
+        )
+        title_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        text_layout.addWidget(title_lbl)
+
+        desc_lbl = QLabel(description)
+        desc_lbl.setStyleSheet(
+            f"color:rgba(255,255,255,0.6);font-size:{int(12 * self.dpi_scale)}px;"
+            f"font-family:'Microsoft YaHei UI';background:transparent;"
+        )
+        desc_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        text_layout.addWidget(desc_lbl)
+
+        header_layout.addLayout(text_layout)
+        header_layout.addStretch()
+
+        main_layout.addWidget(header)
+
+        # 内容区域容器
+        content_container = QWidget()
+        content_container.setStyleSheet("background:transparent;")
+        content_layout = QVBoxLayout(content_container)
+        content_layout.setContentsMargins(
+            int(15 * self.dpi_scale), int(12 * self.dpi_scale),
+            int(15 * self.dpi_scale), int(12 * self.dpi_scale)
+        )
+        content_layout.setSpacing(int(8 * self.dpi_scale))
+        content_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        content_container.setVisible(False)  # 默认收起
+
+        main_layout.addWidget(content_container)
+
+        # 保存引用（使用下划线代替连字符，避免属性名问题）
+        safe_id = category_id.replace('-', '_')
+        setattr(self, f"category_{safe_id}_content_layout", content_layout)
+        setattr(self, f"category_{safe_id}_header", header)
+        setattr(self, f"category_{safe_id}_content_widget", content_container)
+        setattr(self, f"category_{safe_id}_visible", False)
+
+        return container
+
+    def _toggle_category(self, category_id):
+        """切换分类展开/收起状态"""
+        safe_category_id = category_id.replace('-', '_')
+        content_widget = getattr(self, f"category_{safe_category_id}_content_widget", None)
+
+        if content_widget:
+            current_visible = getattr(self, f"category_{safe_category_id}_visible", True)
+            new_visible = not current_visible
+            content_widget.setVisible(new_visible)
+            setattr(self, f"category_{safe_category_id}_visible", new_visible)
 
     def _load_saved_config(self):
         """加载已保存的配置"""
