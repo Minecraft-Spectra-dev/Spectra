@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "feature": {
+    "high_contrast_mode": "bool",
+    "theme_selector": "toggle"
+  },
+  "config": {
+    "high_contrast_mode": {
+      "default": "false",
+      "toggle": [
+        {
+          "type": "bool",
+          "id": "border_overlay",
+          "file_path": "assets/minecraft/textures/gui/border_overlay.json"
+        },
+        {
+          "type": "toggle",
+          "id": "menu_theme",
+          "file_path": "assets/minecraft/textures/gui/menu_theme.packset.json"
+        }
+      ]
+    },
+    "theme_selector": {
+      "default": "classic",
+      "scope": ["classic", "modern", "minimal"],
+      "paths": [
+        {
+          "id": "background_theme",
+          "file_path": "assets/minecraft/textures/gui/background_theme.packset.json"
+        }
+      ]
+    }
+  }
+}

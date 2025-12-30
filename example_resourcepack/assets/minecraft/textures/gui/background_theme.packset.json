@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "type": "toggle",
+  "states": [
+    {
+      "name": "classic",
+      "file_path": "assets/minecraft/textures/gui/backgrounds/classic.jpg"
+    },
+    {
+      "name": "modern",
+      "file_path": "assets/minecraft/textures/gui/backgrounds/modern.jpg"
+    },
+    {
+      "name": "minimal",
+      "file_path": "assets/minecraft/textures/gui/backgrounds/minimal.jpg"
+    }
+  ]
+}

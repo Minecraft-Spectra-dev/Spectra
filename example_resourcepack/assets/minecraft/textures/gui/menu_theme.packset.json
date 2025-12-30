@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "type": "bool",
+  "assets": [
+    {
+      "name": "圆角样式",
+      "file_path": "assets/minecraft/textures/gui/borders/rounded.png"
+    },
+    {
+      "name": "直角样式",
+      "file_path": "assets/minecraft/textures/gui/borders/square.png"
+    }
+  ],
+  "toggles": [
+    {
+      "name": "标题栏透明度",
+      "path": "assets/minecraft/textures/gui/title_opacity.json",
+      "toggle_path": "assets/minecraft/textures/gui/title_opacity_alt.json"
+    }
+  ]
+}
