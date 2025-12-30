@@ -7,6 +7,9 @@
 example_resourcepack/
 ├── pack.mcmeta                          # Minecraft 资源包元数据
 ├── packset.json                        # Packset 配置文件（核心配置）
+├── packset_lang/                       # 资源包自定义本地化目录（可选）
+│   ├── zh_CN.json                      # 简体中文翻译
+│   └── en_US.json                      # 英文翻译
 ├── assets/
 │   └── minecraft/
 │       └── textures/
@@ -40,13 +43,13 @@ example_resourcepack/
     "list": ["gui", "font"],              // 分类ID列表（定义显示顺序）
     "data": {
       "gui": {
-        "name": "GUI 设置",              // 分类显示名称
-        "description": "用于配置界面相关的选项",
+        "name": "GUI Settings",           // 分类显示名称（原始文本，会被本地化覆盖）
+        "description": "Configure interface options",
         "list": ["switch_feature"]       // 该分类下的功能列表
       },
       "font": {
-        "name": "字体设置",
-        "description": "用于配置字体相关的选项",
+        "name": "Font Settings",
+        "description": "Configure font options",
         "list": ["status_feature"]
       }
     }
@@ -173,12 +176,66 @@ example_resourcepack/
 
 ## 使用说明
 
+### 添加自定义本地化（可选）
+
+在资源包根目录下创建 `packset_lang/` 目录，并为每种支持的语言创建 JSON 文件：
+
+```
+packset_lang/
+├── zh_CN.json    # 简体中文
+├── en_US.json    # 美式英语
+├── ja_JP.json    # 日语
+└── ...
+```
+
+#### 本地化文件格式
+
+```json
+{
+  "category.{分类ID}.name": "分类名称",
+  "category.{分类ID}.description": "分类描述",
+  "feature.{功能名}": "功能显示名称"
+}
+```
+
+#### 示例：zh_CN.json
+
+```json
+{
+  "category.gui.name": "GUI 设置",
+  "category.gui.description": "用于配置界面相关的选项",
+  "category.font.name": "字体设置",
+  "category.font.description": "用于配置字体相关的选项",
+  "feature.switch_feature": "开关功能",
+  "feature.status_feature": "状态功能"
+}
+```
+
+#### 示例：en_US.json
+
+```json
+{
+  "category.gui.name": "GUI Settings",
+  "category.gui.description": "Configure interface options",
+  "category.font.name": "Font Settings",
+  "category.font.description": "Configure font options",
+  "feature.switch_feature": "Switch Feature",
+  "feature.status_feature": "Status Feature"
+}
+```
+
+**注意**：
+- 本地化是可选的，如果没有翻译文件，会使用 `packset.json` 中的原始文本
+- 如果翻译文件中没有对应的键，会回退到原始文本
+- 翻译键必须严格匹配格式：`category.{category_id}.name`、`category.{category_id}.description`、`feature.{feature_name}`
+
 ### 添加新功能
 
 1. 在 `packset.json` 的 `feature` 中添加新功能名和类型
 2. 在 `config` 中添加对应配置
 3. 根据需要创建子 Packset 文件（.packset.json）
 4. 在 `assets` 中添加对应的资源文件
+5. （推荐）在本地化文件中添加对应翻译
 
 ### 使用分类功能（可选项）
 

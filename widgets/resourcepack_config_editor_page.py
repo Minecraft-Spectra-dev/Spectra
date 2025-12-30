@@ -80,6 +80,21 @@ class ZipResourcePackHelper:
         with open(full_path, 'r', encoding='utf-8') as f:
             return json.load(f)
 
+    def write_json(self, relative_path, data):
+        """写入 JSON 文件
+
+        Args:
+            relative_path: 相对路径
+            data: 要写入的数据（字典或列表）
+        """
+        full_path = os.path.join(self.temp_dir, relative_path)
+        # 确保目录存在
+        dir_path = os.path.dirname(full_path)
+        if dir_path and not os.path.exists(dir_path):
+            os.makedirs(dir_path, exist_ok=True)
+        with open(full_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
 
 class ResourcepackConfigEditorPage(QWidget):
     """资源包配置编辑器页面"""
@@ -95,14 +110,57 @@ class ResourcepackConfigEditorPage(QWidget):
         self.config_widgets = {}  # 存储配置项部件 {config_id: widget}
         self.feature_config_map = {}  # 存储配置数据 {feature_name: feature_config}
         self.zip_helper = None  # 压缩包辅助类
+        self.packset_lang = {}  # 存储资源包自定义本地化 {lang_code: translations}
 
         self._init_ui()
         self._load_packset_data()
 
-    def translate(self, key, **kwargs):
-        """翻译辅助方法"""
-        if self.text_renderer:
-            return self.text_renderer.translate(key, **kwargs)
+    def translate(self, key, default=None, **kwargs):
+        """翻译辅助方法（资源包专用）
+
+        仅用于资源包配置界面的本地化翻译：
+
+        翻译键格式：
+        - category.{category_id}.name
+        - category.{category_id}.description
+        - feature.{feature_name}
+
+        优先级：
+        1. 资源包自定义本地化（packset_lang）
+        2. 默认值
+        3. 翻译键本身
+
+        Args:
+            key: 翻译键
+            default: 默认值（可选）
+            **kwargs: 格式化参数
+
+        Returns:
+            翻译后的文本
+        """
+        # 获取当前语言代码
+        current_lang = None
+        if self.text_renderer and hasattr(self.text_renderer, 'language_manager'):
+            current_lang = self.text_renderer.language_manager.get_language()
+
+        # 尝试从当前语言的资源包本地化获取
+        if current_lang and current_lang in self.packset_lang:
+            packset_translations = self.packset_lang[current_lang]
+            if key in packset_translations:
+                text = packset_translations[key]
+                # 支持简单的格式化
+                if kwargs:
+                    try:
+                        text = text.format(**kwargs)
+                    except (KeyError, ValueError):
+                        pass
+                return text
+
+        # 回退到默认值
+        if default is not None:
+            return default
+
+        # 最后回退到键名本身
         return key
 
     def _format_path(self, full_path):
@@ -264,11 +322,57 @@ class ResourcepackConfigEditorPage(QWidget):
         scroll_area.setWidget(self.config_content)
         layout.addWidget(scroll_area, 1)
 
+    def _load_packset_lang(self):
+        """加载资源包自定义本地化文件
+
+        从 packset_lang 目录加载所有语言的本地化文件
+        """
+        self.packset_lang = {}
+
+        try:
+            if os.path.isdir(self.full_path):
+                # 文件夹形式的资源包
+                lang_dir = os.path.join(self.full_path, "packset_lang")
+                if os.path.exists(lang_dir):
+                    for filename in os.listdir(lang_dir):
+                        if filename.endswith('.json'):
+                            lang_code = filename[:-5]  # 移除 .json 后缀
+                            lang_file = os.path.join(lang_dir, filename)
+                            try:
+                                with open(lang_file, 'r', encoding='utf-8') as f:
+                                    self.packset_lang[lang_code] = json.load(f)
+                                logger.debug(f"加载资源包本地化文件: {filename} ({lang_code})")
+                            except json.JSONDecodeError as e:
+                                logger.warning(f"资源包本地化文件格式错误: {filename} - {e}")
+
+            elif self.full_path.endswith('.zip'):
+                # 压缩包形式的资源包
+                try:
+                    with zipfile.ZipFile(self.full_path, 'r') as zip_ref:
+                        # 查找 packset_lang 目录下的所有 .json 文件
+                        lang_files = [f for f in zip_ref.namelist()
+                                     if f.startswith('packset_lang/') and f.endswith('.json')]
+                        for lang_file in lang_files:
+                            # 提取语言代码 (例如: packset_lang/zh_CN.json -> zh_CN)
+                            lang_code = os.path.basename(lang_file)[:-5]
+                            try:
+                                with zip_ref.open(lang_file) as f:
+                                    self.packset_lang[lang_code] = json.load(f)
+                                logger.debug(f"加载资源包本地化文件: {lang_file} ({lang_code})")
+                            except json.JSONDecodeError as e:
+                                logger.warning(f"资源包本地化文件格式错误: {lang_file} - {e}")
+                except Exception as e:
+                    logger.error(f"读取资源包本地化文件失败: {e}")
+
+            logger.debug(f"资源包自定义本地化加载完成，共 {len(self.packset_lang)} 种语言")
+        except Exception as e:
+            logger.error(f"加载资源包本地化失败: {e}")
+
     def _load_packset_data(self):
         """加载 packset.json 数据"""
         try:
             packset_json = None
-            
+
             if os.path.isdir(self.full_path):
                 # 文件夹形式的资源包
                 packset_path = os.path.join(self.full_path, "packset.json")
@@ -286,9 +390,11 @@ class ResourcepackConfigEditorPage(QWidget):
                                 packset_json = packset_file.read().decode('utf-8')
                 except Exception as e:
                     logger.error(f"Error reading packset.json from zip: {e}")
-            
+
             if packset_json:
                 self.packset_data = json.loads(packset_json)
+                # 加载资源包自定义本地化
+                self._load_packset_lang()
                 self._validate_and_create_ui()
             else:
                 self._show_error_message("格式不正确：未找到 packset.json 文件")
@@ -377,8 +483,9 @@ class ResourcepackConfigEditorPage(QWidget):
                 continue
 
             cat_info = category_data[category_id]
-            cat_name = cat_info.get("name", category_id)
-            cat_description = cat_info.get("description", "")
+            # 使用自定义本地化键获取分类名称和描述
+            cat_name = self.translate(f"category.{category_id}.name", default=cat_info.get("name", category_id))
+            cat_description = self.translate(f"category.{category_id}.description", default=cat_info.get("description", ""))
             cat_features = cat_info.get("list", [])
 
             # 创建可展开的分类卡片
@@ -520,8 +627,9 @@ class ResourcepackConfigEditorPage(QWidget):
 
     def _create_switch_items(self, layout, feature_name, feature_config, saved_config=None):
         """创建开关类型的配置项"""
-        # 使用 feature_name 作为配置项名称
-        item_label = QLabel(feature_name)
+        # 使用自定义本地化键获取功能名称
+        display_name = self.translate(f"feature.{feature_name}", default=feature_name)
+        item_label = QLabel(display_name)
         item_label.setStyleSheet(
             f"background: transparent;"
             f"color: rgba(255, 255, 255, 0.9);"
@@ -553,8 +661,9 @@ class ResourcepackConfigEditorPage(QWidget):
 
     def _create_status_items(self, layout, feature_name, feature_config, saved_config=None):
         """创建状态切换类型的配置项"""
-        # 使用 feature_name 作为配置项名称
-        item_label = QLabel(feature_name)
+        # 使用自定义本地化键获取功能名称
+        display_name = self.translate(f"feature.{feature_name}", default=feature_name)
+        item_label = QLabel(display_name)
         item_label.setStyleSheet(
             f"background: transparent;"
             f"color: rgba(255, 255, 255, 0.9);"

@@ -1,0 +1,8 @@
+{
+  "category.gui.name": "GUI Settings",
+  "category.gui.description": "Configure interface options",
+  "category.font.name": "Font Settings",
+  "category.font.description": "Configure font options",
+  "feature.switch_feature": "Switch Feature",
+  "feature.status_feature": "Status Feature"
+}

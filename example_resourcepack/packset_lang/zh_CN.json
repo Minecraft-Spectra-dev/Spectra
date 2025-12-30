@@ -1,0 +1,8 @@
+{
+  "category.gui.name": "开关功能类",
+  "category.gui.description": "用于测试的描述：开关功能",
+  "category.font.name": "状态功能类",
+  "category.font.description": "用于测试的描述：状态功能",
+  "feature.switch_feature": "开关功能",
+  "feature.status_feature": "状态功能"
+}
