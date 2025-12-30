@@ -37,15 +37,8 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist\Spectra\example_resourcepack | Out-Null
           Copy-Item example_resourcepack\* dist\Spectra\example_resourcepack -Recurse -Force
 
-      - name: Create ZIP archive
-        shell: pwsh
-        run: |
-          $zip = "dist\Spectra-${{ github.sha }}.zip"
-          if (Test-Path $zip) { Remove-Item $zip -Force }
-          Compress-Archive -Path dist\Spectra\* -DestinationPath $zip
-
       - name: capture build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Spectra-build
-          path: dist/Spectra-${{ github.sha }}.zip
+          name: Spectra
+          path: dist/Spectra
