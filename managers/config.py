@@ -42,7 +42,7 @@ class ConfigManager:
                     "language": config.get("language", "zh_CN"),
                     "minecraft_path": config.get("minecraft_path", ""),
                     "favorited_versions": config.get("favorited_versions", []),
-                    "favorited_resourcepacks": config.get("favorited_resourcepacks", []),
+                    "favorited_resourcepacks": [path.replace('\\', '/') for path in config.get("favorited_resourcepacks", [])],
                     "version_aliases": config.get("version_aliases", {}),
                     "version_isolation": config.get("version_isolation", True),
                     "dev_console_enabled": config.get("dev_console_enabled", False)

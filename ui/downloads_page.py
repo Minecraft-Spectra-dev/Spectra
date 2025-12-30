@@ -340,22 +340,22 @@ class DownloadsPageBuilder:
         menu = QMenu(self.builder.window)
         menu.setStyleSheet("""
             QMenu {
-                background: rgba(30, 30, 30, 0.95);
-                border: 1px solid rgba(255, 255, 255, 0.2);
+                background: rgba(0, 0, 0, 0.8);
+                border: 1px solid rgba(255, 255, 255, 0.15);
                 border-radius: 4px;
                 padding: 4px;
             }
             QMenu::item {
                 background: transparent;
-                color: white;
+                color: rgba(255, 255, 255, 0.9);
                 padding: 6px 24px;
                 font-size: 13px;
             }
             QMenu::item:selected {
-                background: rgba(255, 255, 255, 0.15);
+                background: rgba(255, 255, 255, 0.2);
             }
             QMenu::item:checked {
-                background: rgba(100, 150, 255, 0.3);
+                background: rgba(255, 255, 255, 0.2);
             }
         """)
 

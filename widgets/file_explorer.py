@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QSize, QEvent
 from PyQt6.QtGui import QFont, QIcon, QPixmap, QWheelEvent
 from PyQt6.QtWidgets import (QFileDialog, QGridLayout, QHBoxLayout, QHeaderView, QLabel,
                              QLineEdit, QPushButton, QTreeWidget, QTreeWidgetItem,
-                             QVBoxLayout, QWidget)
+                             QVBoxLayout, QWidget, QStackedWidget)
 from utils import load_svg_icon, scale_icon_for_display
 
 logger = logging.getLogger(__name__)
@@ -301,7 +301,7 @@ class FileExplorer(QWidget):
     file_selected = pyqtSignal(str)  # 文件选择信号
     close_requested = pyqtSignal()  # 关闭请求信号
 
-    def __init__(self, parent=None, dpi_scale=1.0, config_manager=None, language_manager=None, text_renderer=None, no_scroll=False, show_close_button=True):
+    def __init__(self, parent=None, dpi_scale=1.0, config_manager=None, language_manager=None, text_renderer=None, no_scroll=False, show_close_button=True, instances_page_builder=None):
         super().__init__(parent)
         self.dpi_scale = dpi_scale
         self.config_manager = config_manager
@@ -309,6 +309,7 @@ class FileExplorer(QWidget):
         self.text_renderer = text_renderer  # 新增 text_renderer 参数
         self.no_scroll = no_scroll  # 无滚动模式：让file_tree根据内容自动调整大小
         self.show_close_button = show_close_button  # 是否显示关闭按钮
+        self.instances_page_builder = instances_page_builder  # 实例页面构建器，用于导航到配置编辑器
         self.current_path = None
         self.root_path = None  # 保存minecraft路径
         self.base_path = None  # 保存当前resourcepacks路径作为返回的根目录
@@ -989,6 +990,8 @@ class FileExplorer(QWidget):
             if self.config_manager and self.resourcepack_mode:
                 config = self.config_manager.config if hasattr(self.config_manager, 'config') else self.config_manager
                 favorited_resourcepacks = config.get("favorited_resourcepacks", [])
+                # 统一路径为正斜杠
+                favorited_resourcepacks = [path.replace('\\', '/') for path in favorited_resourcepacks]
 
             # 在资源包模式下，显示文件夹和有效的资源包
             if self.resourcepack_mode:
@@ -1166,20 +1169,24 @@ class FileExplorer(QWidget):
         """切换资源包的收藏状态"""
         if not self.config_manager:
             return
-        
+
         # 获取配置
         config = self.config_manager.config if hasattr(self.config_manager, 'config') else self.config_manager
         favorited_resourcepacks = config.get("favorited_resourcepacks", [])
-        
-        if full_path in favorited_resourcepacks:
+        # 统一路径为正斜杠
+        favorited_resourcepacks = [path.replace('\\', '/') for path in favorited_resourcepacks]
+        # 统一 full_path 为正斜杠
+        normalized_path = full_path.replace('\\', '/')
+
+        if normalized_path in favorited_resourcepacks:
             # 取消收藏
-            favorited_resourcepacks.remove(full_path)
+            favorited_resourcepacks.remove(normalized_path)
             logger.info(f"Removing resourcepack from favorites: {name}")
         else:
             # 添加收藏
-            favorited_resourcepacks.append(full_path)
+            favorited_resourcepacks.append(normalized_path)
             logger.info(f"Adding resourcepack to favorites: {name}")
-        
+
         # 更新配置
         if hasattr(self.config_manager, 'set'):
             self.config_manager.set("favorited_resourcepacks", favorited_resourcepacks)
@@ -1187,12 +1194,12 @@ class FileExplorer(QWidget):
             config["favorited_resourcepacks"] = favorited_resourcepacks
             if hasattr(self.config_manager, 'save_config'):
                 self.config_manager.save_config()
-        
+
         # 更新项目的收藏状态
         if full_path in self._item_widgets:
-            is_favorited = full_path in favorited_resourcepacks
+            is_favorited = normalized_path in favorited_resourcepacks
             self._item_widgets[full_path].set_favorited(is_favorited)
-        
+
         # 使用缓存刷新显示以使收藏的资源包置顶
         if self.current_path:
             self._refresh_display_from_cache()
@@ -1200,8 +1207,45 @@ class FileExplorer(QWidget):
     def _edit_resourcepack(self, full_path, name):
         """编辑资源包"""
         logger.info(f"Edit resourcepack: {name}")
-        # 这里可以添加编辑资源包的逻辑
-        # 例如：打开编辑器、编辑packset.json等
+        
+        # 使用 instances_page_builder 来导航到配置编辑器页面
+        if self.instances_page_builder:
+            self.instances_page_builder._navigate_to_config_editor_page(full_path, name)
+        else:
+            # 如果没有 instances_page_builder，尝试使用原有的方式导航
+            from widgets.resourcepack_config_editor_page import ResourcepackConfigEditorPage
+            
+            # 查找父级的 QStackedWidget（用于页面导航）
+            stack_widget = None
+            parent = self.parent()
+            while parent:
+                if isinstance(parent, QStackedWidget):
+                    stack_widget = parent
+                    break
+                parent = parent.parent()
+            
+            if stack_widget:
+                # 创建并添加配置编辑器页面
+                config_page = ResourcepackConfigEditorPage(
+                    parent=stack_widget,
+                    full_path=full_path,
+                    name=name,
+                    dpi_scale=self.dpi_scale,
+                    text_renderer=self.text_renderer,
+                    on_back=lambda: self._navigate_back_from_config(stack_widget, config_page)
+                )
+                
+                # 添加到堆叠窗口并导航
+                stack_widget.addWidget(config_page)
+                stack_widget.setCurrentWidget(config_page)
+            else:
+                logger.warning("Could not find QStackedWidget for navigation")
+
+    def _navigate_back_from_config(self, stack_widget, config_page):
+        """从配置编辑器页面返回"""
+        stack_widget.removeWidget(config_page)
+        config_page.deleteLater()
+
 
     def _cache_resourcepack_data(self, resourcepack_items, non_resourcepack_dirs, favorited_resourcepacks):
         """缓存资源包和文件夹数据
@@ -1241,9 +1285,10 @@ class FileExplorer(QWidget):
                 modified_time = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
             except Exception:
                 pass
-            
-            # 检查是否收藏
-            is_favorited = full_path in favorited_resourcepacks
+
+            # 检查是否收藏（统一路径格式进行比较）
+            normalized_path = full_path.replace('\\', '/')
+            is_favorited = normalized_path in favorited_resourcepacks
             
             # 缓存资源包数据
             self._cached_resourcepacks.append((name, is_dir, full_path, icon_pixmap, description, file_size, modified_time, is_favorited, is_editable))
@@ -1270,14 +1315,17 @@ class FileExplorer(QWidget):
         if self.config_manager:
             config = self.config_manager.config if hasattr(self.config_manager, 'config') else self.config_manager
             favorited_resourcepacks = config.get("favorited_resourcepacks", [])
+            # 统一路径为正斜杠
+            favorited_resourcepacks = [path.replace('\\', '/') for path in favorited_resourcepacks]
         
         # 分离收藏和非收藏的资源包
         favorites = []
         non_favorites = []
         for item in filtered_resourcepacks:
             name, is_dir, full_path, icon_pixmap, description, file_size, modified_time, is_favorited, is_editable = item
-            # 更新收藏状态
-            is_favorited = full_path in favorited_resourcepacks
+            # 更新收藏状态（统一路径格式进行比较）
+            normalized_path = full_path.replace('\\', '/')
+            is_favorited = normalized_path in favorited_resourcepacks
             if is_favorited:
                 favorites.append((name, is_dir, full_path, icon_pixmap, description, file_size, modified_time, is_favorited, is_editable))
             else:

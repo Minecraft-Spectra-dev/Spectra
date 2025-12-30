@@ -101,10 +101,10 @@ class StyleMixin:
             background:transparent;
         }}
         QComboBox QAbstractItemView{{
-            background:rgba(0,0,0,{opacity_rgba:.2f});
+            background:rgba(0,0,0,0.15);
             border:1px solid rgba(255,255,255,0.1);
             border-radius:{border_radius}px;
-            selection-background-color:rgba(255,255,255,0.15);
+            selection-background-color:rgba(255,255,255,0.3);
             selection-color:white;
             outline:none;
             padding:{self._scale_size(2)}px;

@@ -25,6 +25,8 @@ class InstancesPageBuilder:
 
     def __init__(self, builder):
         self.builder = builder
+        # 配置编辑器页面缓存，用于返回
+        self._config_editor_page = None
 
     def create_instance_page(self):
         """创建实例页面 - 使用多层级导航结构"""
@@ -232,7 +234,8 @@ class InstancesPageBuilder:
             language_manager=self.builder.window.language_manager,
             text_renderer=self.builder.text_renderer,
             no_scroll=True,
-            show_close_button=False
+            show_close_button=False,
+            instances_page_builder=self
         )
         root_resourcepacks_layout.addWidget(self.builder.window.root_resourcepacks_explorer)
 
@@ -253,7 +256,8 @@ class InstancesPageBuilder:
             dpi_scale=self.builder.dpi_scale,
             config_manager=self.builder.window.config_manager,
             language_manager=self.builder.window.language_manager,
-            text_renderer=self.builder.text_renderer
+            text_renderer=self.builder.text_renderer,
+            instances_page_builder=self
         )
 
         # 连接关闭按钮信号
@@ -614,6 +618,56 @@ class InstancesPageBuilder:
             count = self.builder.window.instance_stack.count()
         # 确保返回到主页面
         self.builder.window.instance_stack.setCurrentIndex(0)
+
+    def _navigate_to_config_editor_page(self, full_path, name):
+        """导航到资源包配置编辑器页面"""
+        try:
+            from widgets.resourcepack_config_editor_page import ResourcepackConfigEditorPage
+
+            # 保存当前页面（文件浏览器页面）
+            current_page = self.builder.window.instance_stack.currentWidget()
+
+            # 创建并添加配置编辑器页面
+            config_page = ResourcepackConfigEditorPage(
+                parent=self.builder.window.instance_stack,
+                full_path=full_path,
+                dpi_scale=self.builder.dpi_scale,
+                text_renderer=self.builder.text_renderer,
+                on_back=lambda: self._navigate_back_from_config(current_page)
+            )
+
+            # 缓存配置编辑器页面
+            self._config_editor_page = config_page
+
+            # 添加到堆叠窗口并导航
+            self.builder.window.instance_stack.addWidget(config_page)
+            self.builder.window.instance_stack.setCurrentWidget(config_page)
+        except Exception as e:
+            logger.error(f"Error navigating to config editor page: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _navigate_back_from_config(self, previous_page):
+        """从配置编辑器页面返回"""
+        try:
+            if hasattr(self, '_config_editor_page') and self._config_editor_page:
+                self.builder.window.instance_stack.removeWidget(self._config_editor_page)
+                self._config_editor_page.deleteLater()
+                self._config_editor_page = None
+        except Exception as e:
+            logger.error(f"Error removing config editor page: {e}")
+
+        # 返回到之前的页面
+        if previous_page:
+            try:
+                self.builder.window.instance_stack.setCurrentWidget(previous_page)
+            except Exception as e:
+                logger.error(f"Error setting current widget: {e}")
+                # 如果出错，尝试返回到第一个页面
+                try:
+                    self.builder.window.instance_stack.setCurrentIndex(0)
+                except:
+                    pass
 
     def _detect_version_type(self, minecraft_path, version_name):
         """检测Minecraft版本类型（fabric/forge/neoforge/vanilla）"""
