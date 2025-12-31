@@ -37,9 +37,22 @@ class ResourcepackConfigEditor(QDialog):
             return self.text_renderer.translate(key, **kwargs)
         return key
 
+    def update_language(self):
+        """更新对话框语言"""
+        if self.text_renderer:
+            self.text_renderer.update_group_language("resourcepack_config")
+            # 更新窗口标题
+            if self.text_renderer:
+                self.setWindowTitle(f"{self.text_renderer.translate('resourcepack_config_title')} - {self.name}")
+            else:
+                self.setWindowTitle(f"资源包配置 - {self.name}")
+
     def _init_ui(self):
         """初始化UI"""
-        self.setWindowTitle(f"资源包配置 - {self.name}")
+        if self.text_renderer:
+            self.setWindowTitle(f"{self.text_renderer.translate('resourcepack_config_title')} - {self.name}")
+        else:
+            self.setWindowTitle(f"资源包配置 - {self.name}")
         self.setFixedWidth(int(600 * self.dpi_scale))
         self.setMinimumHeight(int(400 * self.dpi_scale))
         
@@ -137,7 +150,7 @@ class ResourcepackConfigEditor(QDialog):
         layout.setSpacing(int(16 * self.dpi_scale))
         
         # 标题
-        title_label = QLabel("资源包配置")
+        title_label = QLabel()
         title_font = QFont()
         title_font.setFamily("Microsoft YaHei UI")
         title_font.setWeight(QFont.Weight.Bold)
@@ -145,6 +158,8 @@ class ResourcepackConfigEditor(QDialog):
         title_label.setFont(title_font)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title_label)
+        if self.text_renderer:
+            self.text_renderer.register_widget(title_label, "resourcepack_config_title", group="resourcepack_config")
         
         # 分隔线
         separator = QFrame()

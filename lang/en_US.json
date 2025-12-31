@@ -108,6 +108,9 @@
     "resourcepack_sort_size": "By Size",
     "resourcepack_sort_time": "By Modified Time",
     "resourcepack_sort_asc": "Ascending",
-    "resourcepack_sort_desc": "Descending"
+    "resourcepack_sort_desc": "Descending",
+    "resourcepack_config_title": "Resource Pack Config",
+    "resourcepack_config_save": "Save and Apply",
+    "resourcepack_config_applied": "Applied"
   }
 }

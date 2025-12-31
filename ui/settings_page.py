@@ -30,7 +30,12 @@ class SettingsPageBuilder:
         )
         pl.setSpacing(self.builder._scale_size(15))
 
-        title = QLabel(self.builder.window.language_manager.translate("page_settings"))
+        title = QLabel()
+        title.setStyleSheet(
+            f"color:white;font-size:{self.builder._scale_size(20)}px;"
+            f"font-family:'{self.builder._get_font_family()}';font-weight:bold;"
+        )
+        self.builder.text_renderer.register_widget(title, "page_settings", group="settings_page")
         title.setStyleSheet(
             f"color:white;font-size:{self.builder._scale_size(20)}px;"
             f"font-family:'{self.builder._get_font_family()}';font-weight:bold;"
@@ -57,8 +62,8 @@ class SettingsPageBuilder:
 
         # 外观设置容器
         self.builder.window.appearance_container = self._create_expandable_menu(
-            self.builder.window.language_manager.translate("settings_appearance"),
-            self.builder.window.language_manager.translate("settings_appearance_desc"),
+            "settings_appearance",
+            "settings_appearance_desc",
             "svg/palette.svg", "svg/palette-fill.svg",
             content_attr="appearance"
         )
@@ -68,8 +73,8 @@ class SettingsPageBuilder:
 
         # 纯色背景卡片
         self.builder.window.solid_card = self._create_bg_card(
-            self.builder.window.language_manager.translate("background_solid"),
-            self.builder.window.language_manager.translate("background_solid_desc"),
+            "background_solid",
+            "background_solid_desc",
             self.builder.window.config.get("background_mode") == "blur" or self.builder.window.config.get("background_mode") == "solid",
             lambda: self.builder.window.set_background("solid")
         )
@@ -85,8 +90,8 @@ class SettingsPageBuilder:
 
         # 图片背景卡片
         self.builder.window.image_card = self._create_bg_card(
-            self.builder.window.language_manager.translate("background_image"),
-            self.builder.window.language_manager.translate("background_image_desc"),
+            "background_image",
+            "background_image_desc",
             self.builder.window.config.get("background_mode") == "image",
             lambda: self.builder.window.set_background("image")
         )
@@ -104,8 +109,8 @@ class SettingsPageBuilder:
 
         # 语言设置容器
         self.builder.window.language_container = self._create_expandable_menu(
-            self.builder.window.language_manager.translate("settings_language"),
-            self.builder.window.language_manager.translate("settings_language_desc"),
+            "settings_language",
+            "settings_language_desc",
             "svg/translate.svg", "svg/file-earmark-font.svg",
             toggle_handler=self.builder.window.toggle_language_menu,
             content_attr="language"
@@ -121,8 +126,8 @@ class SettingsPageBuilder:
 
         # 字体设置容器
         self.builder.window.font_container = self._create_expandable_menu(
-            self.builder.window.language_manager.translate("settings_font"),
-            self.builder.window.language_manager.translate("settings_font_desc"),
+            "settings_font",
+            "settings_font_desc",
             "svg/type.svg", "svg/file-earmark-font.svg",
             toggle_handler=self.builder.window.toggle_font_menu,
             content_attr="font"
@@ -133,8 +138,8 @@ class SettingsPageBuilder:
 
         # 选择字体卡片
         self.builder.window.font_select_card = self._create_bg_card(
-            self.builder.window.language_manager.translate("font_select"),
-            self.builder.window.language_manager.translate("font_select_desc"),
+            "font_select",
+            "font_select_desc",
             self.builder.window.config.get("font_mode") == 0,
             lambda: self.builder.window.set_font_mode(0)
         )
@@ -146,8 +151,8 @@ class SettingsPageBuilder:
 
         # 自定义字体卡片
         self.builder.window.font_custom_card = self._create_bg_card(
-            self.builder.window.language_manager.translate("font_custom"),
-            self.builder.window.language_manager.translate("font_custom_desc"),
+            "font_custom",
+            "font_custom_desc",
             self.builder.window.config.get("font_mode") == 1,
             lambda: self.builder.window.set_font_mode(1)
         )
@@ -169,7 +174,7 @@ class SettingsPageBuilder:
 
         return page
 
-    def _create_expandable_menu(self, title, desc, icon_path=None, icon_path_active=None,
+    def _create_expandable_menu(self, title_key, desc_key, icon_path=None, icon_path_active=None,
                                   toggle_handler=None, content_attr="appearance"):
         """创建可展开菜单"""
         container = QWidget()
@@ -223,21 +228,23 @@ class SettingsPageBuilder:
         text_layout.setSpacing(self.builder._scale_size(4))
         text_layout.setContentsMargins(0, 0, 0, 0)
 
-        title_lbl = QLabel(title)
+        title_lbl = QLabel()
         title_lbl.setStyleSheet(
             f"color:white;font-size:{self.builder._scale_size(14)}px;"
             f"font-family:'{self.builder._get_font_family()}';background:transparent;"
         )
         title_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         text_layout.addWidget(title_lbl)
+        self.builder.text_renderer.register_widget(title_lbl, title_key, group="settings_page")
 
-        desc_lbl = QLabel(desc)
+        desc_lbl = QLabel()
         desc_lbl.setStyleSheet(
             f"color:rgba(255,255,255,0.6);font-size:{self.builder._scale_size(12)}px;"
             f"font-family:'{self.builder._get_font_family()}';background:transparent;"
         )
         desc_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         text_layout.addWidget(desc_lbl)
+        self.builder.text_renderer.register_widget(desc_lbl, desc_key, group="settings_page")
 
         header_layout.addLayout(text_layout)
         header_layout.addStretch()
@@ -260,7 +267,7 @@ class SettingsPageBuilder:
 
         return container
 
-    def _create_bg_card(self, title, desc, selected, handler):
+    def _create_bg_card(self, title_key, desc_key, selected, handler):
         """创建背景卡片"""
         from widgets import CardButton
 
@@ -301,21 +308,23 @@ class SettingsPageBuilder:
         text_layout.setSpacing(self.builder._scale_size(4))
         text_layout.setContentsMargins(0, 0, 0, 0)
 
-        title_lbl = QLabel(title)
+        title_lbl = QLabel()
         title_lbl.setStyleSheet(
             f"color:white;font-size:{self.builder._scale_size(14)}px;"
             f"font-family:'{self.builder._get_font_family()}';background:transparent;"
         )
         title_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         text_layout.addWidget(title_lbl)
+        self.builder.text_renderer.register_widget(title_lbl, title_key, group="settings_page")
 
-        desc_lbl = QLabel(desc)
+        desc_lbl = QLabel()
         desc_lbl.setStyleSheet(
             f"color:rgba(255,255,255,0.6);font-size:{self.builder._scale_size(12)}px;"
             f"font-family:'{self.builder._get_font_family()}';background:transparent;"
         )
         desc_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         text_layout.addWidget(desc_lbl)
+        self.builder.text_renderer.register_widget(desc_lbl, desc_key, group="settings_page")
 
         layout.addLayout(text_layout)
         layout.addStretch()
@@ -339,7 +348,12 @@ class SettingsPageBuilder:
         opacity_layout.setSpacing(self.builder._scale_size(4))
 
         opacity_header_layout = QHBoxLayout()
-        opacity_label = QLabel(self.builder.window.language_manager.translate("opacity"))
+        opacity_label = QLabel()
+        opacity_label.setStyleSheet(
+            f"color:rgba(255,255,255,0.8);font-size:{self.builder._scale_size(13)}px;"
+            f"font-family:'{self.builder._get_font_family()}';"
+        )
+        self.builder.text_renderer.register_widget(opacity_label, "opacity", group="settings_page")
         opacity_label.setStyleSheet(
             f"color:rgba(255,255,255,0.8);font-size:{self.builder._scale_size(13)}px;"
             f"font-family:'{self.builder._get_font_family()}';"
@@ -393,9 +407,7 @@ class SettingsPageBuilder:
         )
         path_layout.setSpacing(self.builder._scale_size(10))
 
-        path_label = self.builder._create_label_with_style(
-            self.builder.window.language_manager.translate("bg_image_path")
-        )
+        path_label = self.builder._create_label_with_style("bg_image_path")
         path_layout.addWidget(path_label)
 
         self.builder.text_renderer.register_widget(path_label, "bg_image_path", group="settings_page")
@@ -442,9 +454,7 @@ class SettingsPageBuilder:
         )
         color_layout.setSpacing(self.builder._scale_size(10))
 
-        color_label = self.builder._create_label_with_style(
-            self.builder.window.language_manager.translate("bg_color")
-        )
+        color_label = self.builder._create_label_with_style("bg_color")
         color_layout.addWidget(color_label)
 
         self.builder.text_renderer.register_widget(color_label, "bg_color", group="settings_page")
@@ -500,7 +510,7 @@ class SettingsPageBuilder:
         )
         font_select_layout.setSpacing(self.builder._scale_size(10))
 
-        font_select_label = QLabel(self.builder.window.language_manager.translate("font_select_label"))
+        font_select_label = QLabel()
         font_select_label.setStyleSheet(
             f"color:rgba(255,255,255,0.8);font-size:{self.builder._scale_size(13)}px;"
             f"font-family:'{self.builder._get_font_family()}';"
@@ -626,13 +636,14 @@ class SettingsPageBuilder:
         )
         font_path_layout.setSpacing(self.builder._scale_size(10))
 
-        font_path_label = self.builder._create_label_with_style(
-            self.builder.window.language_manager.translate("font_custom_label")
-        )
+        font_path_label = self.builder._create_label_with_style("font_custom_label")
         font_path_layout.addWidget(font_path_label)
 
+        self.builder.text_renderer.register_widget(font_path_label, "font_custom_label", group="settings_page")
+
+        # 创建输入框
+        from PyQt6.QtWidgets import QLineEdit
         self.builder.window.font_path_input = QLineEdit()
-        self.builder.window.font_path_input.setText(self.builder.window.config.get("custom_font_path", ""))
         self.builder.window.font_path_input.setStyleSheet(self.builder._get_lineedit_stylesheet())
         self.builder.window.font_path_input.editingFinished.connect(self.builder.window.on_font_path_changed)
         font_path_layout.addWidget(self.builder.window.font_path_input, 1)
@@ -673,7 +684,7 @@ class SettingsPageBuilder:
         )
         language_layout.setSpacing(self.builder._scale_size(10))
 
-        language_label = QLabel(self.builder.window.language_manager.translate("settings_language_label"))
+        language_label = QLabel()
         language_label.setStyleSheet(
             f"color:rgba(255,255,255,0.8);font-size:{self.builder._scale_size(13)}px;"
             f"font-family:'{self.builder._get_font_family()}';"
@@ -728,14 +739,26 @@ class SettingsPageBuilder:
         text_layout.setSpacing(self.builder._scale_size(4))
         text_layout.setContentsMargins(0, 0, 0, 0)
 
-        title_lbl = QLabel(self.builder.window.language_manager.translate("background_blur_enabled"))
+        title_lbl = QLabel()
+        title_lbl.setStyleSheet(
+            f"color:white;font-size:{self.builder._scale_size(14)}px;"
+            f"font-family:'{self.builder._get_font_family()}';background:transparent;"
+        )
+        text_layout.addWidget(title_lbl)
+        self.builder.text_renderer.register_widget(title_lbl, "background_blur_enabled", group="settings_page")
         title_lbl.setStyleSheet(
             f"color:white;font-size:{self.builder._scale_size(14)}px;"
             f"font-family:'{self.builder._get_font_family()}';background:transparent;"
         )
         text_layout.addWidget(title_lbl)
 
-        desc_lbl = QLabel(self.builder.window.language_manager.translate("background_blur_enabled_desc"))
+        desc_lbl = QLabel()
+        desc_lbl.setStyleSheet(
+            f"color:rgba(255,255,255,0.6);font-size:{self.builder._scale_size(12)}px;"
+            f"font-family:'{self.builder._get_font_family()}';background:transparent;"
+        )
+        text_layout.addWidget(desc_lbl)
+        self.builder.text_renderer.register_widget(desc_lbl, "background_blur_enabled_desc", group="settings_page")
         desc_lbl.setStyleSheet(
             f"color:rgba(255,255,255,0.6);font-size:{self.builder._scale_size(12)}px;"
             f"font-family:'{self.builder._get_font_family()}';background:transparent;"
@@ -782,14 +805,26 @@ class SettingsPageBuilder:
         text_layout.setSpacing(self.builder._scale_size(4))
         text_layout.setContentsMargins(0, 0, 0, 0)
 
-        title_lbl = QLabel(self.builder.window.language_manager.translate("version_isolation"))
+        title_lbl = QLabel()
+        title_lbl.setStyleSheet(
+            f"color:white;font-size:{self.builder._scale_size(14)}px;"
+            f"font-family:'{self.builder._get_font_family()}';background:transparent;"
+        )
+        text_layout.addWidget(title_lbl)
+        self.builder.text_renderer.register_widget(title_lbl, "version_isolation", group="settings_page")
         title_lbl.setStyleSheet(
             f"color:white;font-size:{self.builder._scale_size(14)}px;"
             f"font-family:'{self.builder._get_font_family()}';background:transparent;"
         )
         text_layout.addWidget(title_lbl)
 
-        desc_lbl = QLabel(self.builder.window.language_manager.translate("version_isolation_desc"))
+        desc_lbl = QLabel()
+        desc_lbl.setStyleSheet(
+            f"color:rgba(255,255,255,0.6);font-size:{self.builder._scale_size(12)}px;"
+            f"font-family:'{self.builder._get_font_family()}';background:transparent;"
+        )
+        text_layout.addWidget(desc_lbl)
+        self.builder.text_renderer.register_widget(desc_lbl, "version_isolation_desc", group="settings_page")
         desc_lbl.setStyleSheet(
             f"color:rgba(255,255,255,0.6);font-size:{self.builder._scale_size(12)}px;"
             f"font-family:'{self.builder._get_font_family()}';background:transparent;"
@@ -834,14 +869,26 @@ class SettingsPageBuilder:
         text_layout.setSpacing(self.builder._scale_size(4))
         text_layout.setContentsMargins(0, 0, 0, 0)
 
-        title_lbl = QLabel(self.builder.window.language_manager.translate("dev_console"))
+        title_lbl = QLabel()
+        title_lbl.setStyleSheet(
+            f"color:white;font-size:{self.builder._scale_size(14)}px;"
+            f"font-family:'{self.builder._get_font_family()}';background:transparent;"
+        )
+        text_layout.addWidget(title_lbl)
+        self.builder.text_renderer.register_widget(title_lbl, "dev_console", group="settings_page")
         title_lbl.setStyleSheet(
             f"color:white;font-size:{self.builder._scale_size(14)}px;"
             f"font-family:'{self.builder._get_font_family()}';background:transparent;"
         )
         text_layout.addWidget(title_lbl)
 
-        desc_lbl = QLabel(self.builder.window.language_manager.translate("dev_console_desc"))
+        desc_lbl = QLabel()
+        desc_lbl.setStyleSheet(
+            f"color:rgba(255,255,255,0.6);font-size:{self.builder._scale_size(12)}px;"
+            f"font-family:'{self.builder._get_font_family()}';background:transparent;"
+        )
+        text_layout.addWidget(desc_lbl)
+        self.builder.text_renderer.register_widget(desc_lbl, "dev_console_desc", group="settings_page")
         desc_lbl.setStyleSheet(
             f"color:rgba(255,255,255,0.6);font-size:{self.builder._scale_size(12)}px;"
             f"font-family:'{self.builder._get_font_family()}';background:transparent;"

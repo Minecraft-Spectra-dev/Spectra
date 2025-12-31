@@ -810,11 +810,11 @@ class Window(QWidget):
         """更新界面语言"""
         # 更新窗口标题
         self.setWindowTitle(self.language_manager.translate("app_title"))
-        
+
         # 通过 TextRenderer 更新所有已注册的控件
         self.text_renderer.update_language()
-        
-        # 更新导航栏文本（仍保持原有逻辑，可逐步迁移到 TextRenderer）
+
+        # 更新导航栏文本
         nav_texts = [
             self.language_manager.translate("nav_collapse"),
             self.language_manager.translate("nav_home"),
@@ -823,20 +823,27 @@ class Window(QWidget):
             self.language_manager.translate("nav_console"),
             self.language_manager.translate("nav_settings")
         ]
-        
+
         for i, text_widget in enumerate(self.nav_texts):
             if i < len(nav_texts):
                 text_widget.setText(nav_texts[i])
-        
-        # 更新页面标题
-        self.ui_builder._update_page_titles()
-        
-        # 更新设置页面内容
-        self.ui_builder._update_settings_page()
+
+        # 更新平台按钮文本
+        self.ui_builder._update_platform_button_texts()
 
         # 更新文件浏览器文本
         if hasattr(self, 'file_explorer') and self.file_explorer:
             self.file_explorer.update_language()
+
+        # 更新下载页面文本
+        if hasattr(self.ui_builder, 'downloads_page_builder'):
+            self.ui_builder.downloads_page_builder.update_language()
+
+        # 更新资源包配置编辑器页面文本
+        if (hasattr(self.ui_builder, 'instances_page_builder') and
+            hasattr(self.ui_builder.instances_page_builder, '_config_editor_page') and
+            self.ui_builder.instances_page_builder._config_editor_page):
+            self.ui_builder.instances_page_builder._config_editor_page.update_language()
 
     def set_background(self, mode):
         self.config["background_mode"] = mode

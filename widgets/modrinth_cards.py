@@ -332,7 +332,9 @@ class ModrinthResultCard(QWidget):
 
         # 下载按钮（也作为进度条显示）
         download_btn_text = "Download"
-        if self.language_manager:
+        if self.text_renderer:
+            download_btn_text = self.text_renderer.translate("download_btn")
+        elif self.language_manager:
             download_btn_text = self.language_manager.translate("download_btn")
         download_btn = QPushButton(download_btn_text)
         download_btn.setFixedSize(int(80 * dpi_scale), int(32 * dpi_scale))
@@ -474,7 +476,9 @@ class ModrinthResultCard(QWidget):
         if self.download_btn:
             if is_downloaded:
                 downloaded_text = "已下载"
-                if self.language_manager:
+                if self.text_renderer:
+                    downloaded_text = self.text_renderer.translate("download_btn_downloaded")
+                elif self.language_manager:
                     downloaded_text = self.language_manager.translate("download_btn_downloaded")
                 self.download_btn.setText(downloaded_text)
                 self.download_btn.setEnabled(False)
@@ -491,7 +495,9 @@ class ModrinthResultCard(QWidget):
                 self.is_downloading = False  # 下载完成，清除下载中状态
             else:
                 download_text = "Download"
-                if self.language_manager:
+                if self.text_renderer:
+                    download_text = self.text_renderer.translate("download_btn")
+                elif self.language_manager:
                     download_text = self.language_manager.translate("download_btn")
                 self.download_btn.setText(download_text)
                 self.download_btn.setEnabled(True)
@@ -609,3 +615,33 @@ class ModrinthResultCard(QWidget):
             self.hash_check_thread.stop()
             self.hash_check_thread.deleteLater()
             self.hash_check_thread = None
+
+    def update_language(self):
+        """更新卡片的语言"""
+        # 更新标题
+        title_text = self.project_data.get('title', '')
+        if self.language_manager:
+            title_text = title_text or self.language_manager.translate("download_unknown_title")
+        else:
+            title_text = title_text or "Unknown"
+        self.title_label.setText(title_text)
+
+        # 更新下载按钮文本（根据当前状态）
+        if self.download_btn:
+            if self.is_downloaded:
+                downloaded_text = "已下载"
+                if self.text_renderer:
+                    downloaded_text = self.text_renderer.translate("download_btn_downloaded")
+                elif self.language_manager:
+                    downloaded_text = self.language_manager.translate("download_btn_downloaded")
+                self.download_btn.setText(downloaded_text)
+            elif self.is_downloading:
+                # 下载中状态，不改变文本
+                pass
+            else:
+                download_text = "Download"
+                if self.text_renderer:
+                    download_text = self.text_renderer.translate("download_btn")
+                elif self.language_manager:
+                    download_text = self.language_manager.translate("download_btn")
+                self.download_btn.setText(download_text)

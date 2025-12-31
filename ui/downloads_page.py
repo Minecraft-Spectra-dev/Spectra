@@ -32,7 +32,8 @@ class DownloadsPageBuilder:
         pl.setSpacing(self.builder._scale_size(15))
 
         # 使用统一的标题创建方法
-        title = self.builder._create_page_title(self.builder.window.language_manager.translate("page_downloads"))
+        title = self.builder._create_page_title("page_downloads")
+        self.builder.text_renderer.register_widget(title, "page_downloads", group="download_page")
         pl.addWidget(title)
 
         # 搜索框、搜索按钮和版本选择
@@ -161,27 +162,24 @@ class DownloadsPageBuilder:
         platform_layout.setSpacing(0)
 
         # 全部按钮
-        self.builder.window.download_platform_all = QPushButton(
-            self.builder.window.language_manager.translate("download_platform_all")
-        )
+        self.builder.window.download_platform_all = QPushButton()
+        self.builder.text_renderer.register_widget(self.builder.window.download_platform_all, "download_platform_all", group="download_page")
         self.builder.window.download_platform_all.setFixedSize(120, 32)
         self._setup_platform_button(self.builder.window.download_platform_all, True, 0)
         self.builder.window.download_platform_all.clicked.connect(lambda: self._on_platform_selected(0))
         platform_layout.addWidget(self.builder.window.download_platform_all)
 
         # Modrinth 按钮
-        self.builder.window.download_platform_modrinth = QPushButton(
-            self.builder.window.language_manager.translate("download_platform_modrinth")
-        )
+        self.builder.window.download_platform_modrinth = QPushButton()
+        self.builder.text_renderer.register_widget(self.builder.window.download_platform_modrinth, "download_platform_modrinth", group="download_page")
         self.builder.window.download_platform_modrinth.setFixedSize(160, 32)
         self._setup_platform_button(self.builder.window.download_platform_modrinth, False, 1)
         self.builder.window.download_platform_modrinth.clicked.connect(lambda: self._on_platform_selected(1))
         platform_layout.addWidget(self.builder.window.download_platform_modrinth)
 
         # CurseForge 按钮
-        self.builder.window.download_platform_curseforge = QPushButton(
-            self.builder.window.language_manager.translate("download_platform_curseforge")
-        )
+        self.builder.window.download_platform_curseforge = QPushButton()
+        self.builder.text_renderer.register_widget(self.builder.window.download_platform_curseforge, "download_platform_curseforge", group="download_page")
         self.builder.window.download_platform_curseforge.setFixedSize(160, 32)
         self._setup_platform_button(self.builder.window.download_platform_curseforge, False, 2)
         self.builder.window.download_platform_curseforge.clicked.connect(lambda: self._on_platform_selected(2))
@@ -598,6 +596,9 @@ class DownloadsPageBuilder:
         page_info_label.setStyleSheet("color: rgba(255, 255, 255, 0.8); font-size: 12px; background: transparent;")
         page_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         pagination_layout.addWidget(page_info_label)
+        # 存储当前的页码和总页数，用于语言切换时更新
+        page_info_label.current_page = 1
+        page_info_label.total_pages = 1
 
         # 下一页按钮
         next_btn = QPushButton()
@@ -803,3 +804,15 @@ class DownloadsPageBuilder:
                     logger.info(f"Loaded {len(versions)} versions to download combo")
         except Exception as e:
             logger.error(f"Error loading versions to download combo: {e}")
+
+    def update_language(self):
+        """更新下载页面的语言"""
+        # 刷新所有卡片的语言
+        if hasattr(self.builder.window, 'download_cards'):
+            for card in self.builder.window.download_cards:
+                if hasattr(card, 'update_language'):
+                    card.update_language()
+        # 更新翻页控件的文本（手动更新页面信息标签）
+        self._update_pagination_controls()
+        if hasattr(self.builder.window, 'download_bottom_pagination') and self.builder.window.download_bottom_pagination:
+            self._update_bottom_pagination_control()

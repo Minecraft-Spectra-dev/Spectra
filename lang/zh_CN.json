@@ -108,6 +108,9 @@
     "resourcepack_sort_size": "按大小",
     "resourcepack_sort_time": "按修改时间",
     "resourcepack_sort_asc": "升序",
-    "resourcepack_sort_desc": "降序"
+    "resourcepack_sort_desc": "降序",
+    "resourcepack_config_title": "资源包配置",
+    "resourcepack_config_save": "保存并应用",
+    "resourcepack_config_applied": "已应用"
   }
 }

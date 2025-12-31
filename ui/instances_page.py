@@ -61,7 +61,13 @@ class InstancesPageBuilder:
         )
         pl.setSpacing(self.builder._scale_size(15))
 
-        title = QLabel(self.builder.window.language_manager.translate("page_instances"))
+        title = QLabel()
+        title.setStyleSheet(
+            f"color:white;font-size:{self.builder._scale_size(20)}px;"
+            f"font-family:'{self.builder._get_font_family()}';font-weight:bold;"
+        )
+        pl.addWidget(title)
+        self.builder.text_renderer.register_widget(title, "page_instances", group="instance_page")
         title.setStyleSheet(
             f"color:white;font-size:{self.builder._scale_size(20)}px;"
             f"font-family:'{self.builder._get_font_family()}';font-weight:bold;"
@@ -122,7 +128,13 @@ class InstancesPageBuilder:
         path_layout.setSpacing(self.builder._scale_size(10))
 
         # 路径标题
-        path_title = QLabel(self.builder.window.language_manager.translate("instance_path_title"))
+        path_title = QLabel()
+        path_title.setStyleSheet(
+            f"color:white;font-size:{self.builder._scale_size(14)}px;font-weight:bold;"
+            f"font-family:'{self.builder._get_font_family()}';background:transparent;"
+        )
+        path_layout.addWidget(path_title)
+        self.builder.text_renderer.register_widget(path_title, "instance_path_title", group="instance_page")
         path_title.setStyleSheet(
             f"color:white;font-size:{self.builder._scale_size(14)}px;font-weight:bold;"
             f"font-family:'{self.builder._get_font_family()}';background:transparent;"
@@ -132,7 +144,14 @@ class InstancesPageBuilder:
         self.builder.text_renderer.register_widget(path_title, "instance_path_title", group="instance_page")
 
         # 路径描述
-        path_desc = QLabel(self.builder.window.language_manager.translate("instance_path_desc"))
+        path_desc = QLabel()
+        path_desc.setStyleSheet(
+            f"color:rgba(255,255,255,0.6);font-size:{self.builder._scale_size(12)}px;"
+            f"font-family:'{self.builder._get_font_family()}';background:transparent;"
+        )
+        path_desc.setWordWrap(True)
+        path_layout.addWidget(path_desc)
+        self.builder.text_renderer.register_widget(path_desc, "instance_path_desc", group="instance_page")
         path_desc.setStyleSheet(
             f"color:rgba(255,255,255,0.6);font-size:{self.builder._scale_size(12)}px;"
             f"font-family:'{self.builder._get_font_family()}';background:transparent;"
@@ -147,8 +166,12 @@ class InstancesPageBuilder:
         path_input_layout.setSpacing(self.builder._scale_size(10))
 
         self.builder.window.instance_path_input = QLineEdit()
-        self.builder.window.instance_path_input.setPlaceholderText(
-            self.builder.window.language_manager.translate("instance_path_placeholder")
+        self.builder.window.instance_path_input.setStyleSheet(self.builder._get_lineedit_stylesheet())
+        self.builder.text_renderer.register_widget(
+            self.builder.window.instance_path_input,
+            "instance_path_placeholder",
+            update_method="setPlaceholderText",
+            group="instance_page"
         )
         self.builder.window.instance_path_input.setStyleSheet(self.builder._get_lineedit_stylesheet())
         self.builder.window.instance_path_input.editingFinished.connect(self._on_instance_path_changed)
@@ -195,7 +218,13 @@ class InstancesPageBuilder:
         version_container_layout.setSpacing(self.builder._scale_size(8))
 
         # 版本列表标题
-        version_title = QLabel(self.builder.window.language_manager.translate("instance_version_label"))
+        version_title = QLabel()
+        version_title.setStyleSheet(
+            f"color:white;font-size:{self.builder._scale_size(14)}px;font-weight:bold;"
+            f"font-family:'{self.builder._get_font_family()}';background:transparent;"
+        )
+        version_container_layout.addWidget(version_title)
+        self.builder.text_renderer.register_widget(version_title, "instance_version_label", group="instance_page")
         version_title.setStyleSheet(
             f"color:white;font-size:{self.builder._scale_size(14)}px;font-weight:bold;"
             f"font-family:'{self.builder._get_font_family()}';background:transparent;"
@@ -307,7 +336,7 @@ class InstancesPageBuilder:
         from PyQt6.QtWidgets import QFileDialog
         path = QFileDialog.getExistingDirectory(
             self.builder.window,
-            self.builder.window.language_manager.translate("instance_path_dialog_title"),
+            self.builder.text_renderer.translate("instance_path_dialog_title"),
             ""
         )
         if path:
@@ -806,7 +835,8 @@ class InstancesPageBuilder:
         dialog_layout.setSpacing(self.builder._scale_size(16))
 
         # 标题标签
-        title_label = QLabel(self.builder.window.language_manager.translate("edit_version_name_title"))
+        title_label = QLabel()
+        self.builder.text_renderer.register_widget(title_label, "edit_version_name_title", group="instance_page")
         title_label.setStyleSheet(f"""
             QLabel {{
                 color: rgba(255, 255, 255, 0.9);
@@ -845,7 +875,8 @@ class InstancesPageBuilder:
         button_layout.setSpacing(self.builder._scale_size(10))
 
         # 取消按钮
-        cancel_btn = QPushButton(self.builder.window.language_manager.translate("cancel"))
+        cancel_btn = QPushButton()
+        self.builder.text_renderer.register_widget(cancel_btn, "cancel", group="instance_page")
         cancel_btn.setFixedHeight(self.builder._scale_size(36))
         cancel_btn.setFixedWidth(self.builder._scale_size(100))
         cancel_btn.setStyleSheet(f"""
@@ -870,7 +901,8 @@ class InstancesPageBuilder:
         button_layout.addWidget(cancel_btn)
 
         # 确认按钮
-        confirm_btn = QPushButton(self.builder.window.language_manager.translate("confirm"))
+        confirm_btn = QPushButton()
+        self.builder.text_renderer.register_widget(confirm_btn, "confirm", group="instance_page")
         confirm_btn.setFixedHeight(self.builder._scale_size(36))
         confirm_btn.setFixedWidth(self.builder._scale_size(100))
         confirm_btn.setStyleSheet(f"""

@@ -179,31 +179,51 @@ class TextRenderer:
             except:
                 return
 
-            # 为 QLabel 设置字体
+            escaped_font = self._font_family.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"')
+            font_family_quoted = f'"{escaped_font}"'
+
+            # 为 QLabel 设置字体（通过样式表）
             if isinstance(widget, QLabel):
-                font = widget.font()
-                font.setFamily(self._font_family)
-                widget.setFont(font)
+                current_style = widget.styleSheet()
+                # 使用正则替换 font-family
+                import re
+                new_style = re.sub(r'font-family:\s*[^;]+;', f'font-family: {font_family_quoted};', current_style)
+                if new_style == current_style:  # 如果没有 font-family，添加它
+                    widget.setStyleSheet(f"{current_style} font-family: {font_family_quoted};")
+                else:
+                    widget.setStyleSheet(new_style)
 
-            # 为 QPushButton 设置字体
+            # 为 QPushButton 设置字体（通过样式表）
             elif isinstance(widget, QPushButton):
-                font = widget.font()
-                font.setFamily(self._font_family)
-                widget.setFont(font)
+                current_style = widget.styleSheet()
+                import re
+                new_style = re.sub(r'font-family:\s*[^;]+;', f'font-family: {font_family_quoted};', current_style)
+                if new_style == current_style:
+                    widget.setStyleSheet(f"{current_style} font-family: {font_family_quoted};")
+                else:
+                    widget.setStyleSheet(new_style)
 
-            # 为 QLineEdit 设置字体
+            # 为 QLineEdit 设置字体（通过样式表）
             elif isinstance(widget, QLineEdit):
-                font = widget.font()
-                font.setFamily(self._font_family)
-                widget.setFont(font)
+                current_style = widget.styleSheet()
+                import re
+                new_style = re.sub(r'font-family:\s*[^;]+;', f'font-family: {font_family_quoted};', current_style)
+                if new_style == current_style:
+                    widget.setStyleSheet(f"{current_style} font-family: {font_family_quoted};")
+                else:
+                    widget.setStyleSheet(new_style)
 
-            # 为 QComboBox 设置字体
+            # 为 QComboBox 设置字体（通过样式表）
             elif isinstance(widget, QComboBox):
-                font = widget.font()
-                font.setFamily(self._font_family)
-                widget.setFont(font)
+                current_style = widget.styleSheet()
+                import re
+                new_style = re.sub(r'font-family:\s*[^;]+;', f'font-family: {font_family_quoted};', current_style)
+                if new_style == current_style:
+                    widget.setStyleSheet(f"{current_style} font-family: {font_family_quoted};")
+                else:
+                    widget.setStyleSheet(new_style)
 
-            # 为 QTreeWidgetItem 设置字体
+            # 为 QTreeWidgetItem 设置字体（通过setFont方法）
             elif isinstance(widget, QTreeWidgetItem):
                 font = widget.font(0)
                 font.setFamily(self._font_family)

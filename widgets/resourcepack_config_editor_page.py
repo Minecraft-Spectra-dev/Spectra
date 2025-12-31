@@ -220,17 +220,23 @@ class ResourcepackConfigEditorPage(QWidget):
         title_layout.addWidget(back_btn)
         
         # 标题
-        title_label = QLabel("资源包配置")
+        title_label = QLabel()
         title_label.setStyleSheet(
             f"color:white;font-size:{int(20 * self.dpi_scale)}px;"
             f"font-family:'Microsoft YaHei UI';font-weight:bold;"
         )
         title_layout.addWidget(title_label)
+        if self.text_renderer:
+            self.text_renderer.register_widget(title_label, "resourcepack_config_title", group="resourcepack_config")
         title_layout.addStretch()
-        
+
         # 保存按钮
         self.save_button = QPushButton()
-        self.save_button.setText("保存并应用")
+        self.save_button_applied = False  # 是否显示"已应用"状态
+        if self.text_renderer:
+            self.save_button.setText(self.text_renderer.translate("resourcepack_config_save"))
+        else:
+            self.save_button.setText("保存并应用")
         self.save_button.setFixedHeight(int(36 * self.dpi_scale))
         self.save_button.setMinimumWidth(int(80 * self.dpi_scale))
         self.save_button.setStyleSheet(f"""
@@ -781,12 +787,12 @@ class ResourcepackConfigEditorPage(QWidget):
         try:
             self._save_config()
             # 3秒内显示"已应用"
-            original_text = "保存并应用"
-            self.save_button.setText("已应用")
+            self.save_button_applied = True
+            self.save_button.setText(self.text_renderer.translate("resourcepack_config_applied") if self.text_renderer else "已应用")
             self.save_button.setEnabled(False)
 
             from PyQt6.QtCore import QTimer
-            QTimer.singleShot(3000, lambda: self._restore_save_button(original_text))
+            QTimer.singleShot(3000, self._restore_save_button)
         except Exception as e:
             logger.error(f"保存配置失败: {e}")
             import traceback
@@ -795,8 +801,24 @@ class ResourcepackConfigEditorPage(QWidget):
     def _restore_save_button(self, original_text):
         """恢复保存按钮状态"""
         if hasattr(self, 'save_button') and self.save_button:
-            self.save_button.setText(original_text)
+            self.save_button_applied = False
+            self._update_save_button_text()
             self.save_button.setEnabled(True)
+
+    def _update_save_button_text(self):
+        """更新保存按钮的文本（根据当前状态和语言）"""
+        if self.save_button_applied:
+            text = self.text_renderer.translate("resourcepack_config_applied") if self.text_renderer else "已应用"
+        else:
+            text = self.text_renderer.translate("resourcepack_config_save") if self.text_renderer else "保存并应用"
+        self.save_button.setText(text)
+
+    def update_language(self):
+        """更新页面语言"""
+        if self.text_renderer:
+            self.text_renderer.update_group_language("resourcepack_config")
+            # 手动更新保存按钮文本
+            self._update_save_button_text()
 
     def _save_config(self):
         """保存配置到 packset_config.json"""

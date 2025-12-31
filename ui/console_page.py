@@ -25,9 +25,8 @@ class ConsolePageBuilder:
         )
         console_layout.setSpacing(self.builder._scale_size(15))
 
-        title = self.builder._create_page_title(
-            self.builder.window.language_manager.translate("page_console")
-        )
+        title = self.builder._create_page_title("page_console")
+        self.builder.text_renderer.register_widget(title, "page_console", group="console_page")
         console_layout.addWidget(title)
 
         # 计算背景透明度（主页透明度 + 20）
@@ -111,10 +110,7 @@ class ConsolePageBuilder:
 
         # 输入框
         self.builder.window.console_input = QLineEdit()
-        self.builder.window.console_input.setPlaceholderText("Enter command (restart to restart program)")
         self.builder.window.console_input.setStyleSheet(self.builder._get_lineedit_stylesheet())
-
-        # 注册到 TextRenderer
         self.builder.text_renderer.register_widget(
             self.builder.window.console_input,
             "console_input_placeholder",
