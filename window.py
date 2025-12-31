@@ -874,6 +874,9 @@ class Window(QWidget):
             opacity_value = self.config.get("blur_opacity", 150)
             # 纯色背景直接使用 opacity_value（不反转）
             self.bg_manager.set_solid_color(color, opacity_value)
+            # 清除当前背景路径，避免在调整窗口大小时错误地加载图像背景
+            if hasattr(self, 'current_bg_path'):
+                self.current_bg_path = None
             # 刷新侧边栏和右侧面板的透明度
             self.apply_opacity(opacity_value=opacity_value)
             # 根据模糊开关决定是否应用模糊效果
@@ -1125,8 +1128,14 @@ class Window(QWidget):
 
     def resizeEvent(self, ev):
         super().resizeEvent(ev)
-        if hasattr(self, 'current_bg_path') and self.current_bg_path:
+        # 根据背景模式更新背景
+        background_mode = self.config.get("background_mode", "image")
+        if background_mode == "image" and hasattr(self, 'current_bg_path') and self.current_bg_path:
+            # 图像背景模式：重新加载图像背景
             self.set_background_image(self.current_bg_path)
+        elif background_mode == "solid":
+            # 纯色背景模式：更新纯色背景的大小
+            self.bg_manager.update_solid_background_size()
 
         if not hasattr(self, '_resize_timer'):
             self._resize_timer = QTimer()

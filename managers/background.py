@@ -173,6 +173,12 @@ class BackgroundManager:
         """更新背景填充层的几何位置（保留以兼容）"""
         pass
 
+    def update_solid_background_size(self):
+        """更新纯色背景的大小，在窗口调整大小时调用"""
+        if self.solid_bg_widget and self.solid_bg_widget.isVisible():
+            w, h = self.parent.width(), self.parent.height()
+            self.solid_bg_widget.setGeometry(0, 0, w, h)
+
     def _ensure_widgets_at_bottom(self):
         """确保所有背景控件在所有控件的最底层"""
         from PyQt6.QtWidgets import QWidget
